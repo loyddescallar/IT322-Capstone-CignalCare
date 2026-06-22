@@ -74,6 +74,35 @@ Development Environment
 - VS Code
 
 Design 
-- Figma 
-Compose
-Write to Loyd Descallar
+- Figma
+
+## 🔄 System Workflow Summary
+
+1. Customer logs in using account credentials or CCA details  
+2. Customer submits service concern or request  
+3. System creates a ticket and stores it in the database  
+4. Admin reviews and assigns technician if needed  
+5. Technician performs service and updates status  
+6. System logs all updates and generates transaction or report records  
+7. Customer can track status and receive updates in real time  
+
+## 📊 Key Functional Highlights
+
+- Centralized cable service management system  
+- Real-time ticket tracking and updates  
+- Structured troubleshooting guide system  
+- Technician assignment and scheduling workflow  
+- Prepaid subscription and load transaction processing  
+- Admin analytics and reporting dashboard  
+- Secure role-based access control  
+
+## 🎯 System Objectives
+
+- To improve efficiency in cable service complaint handling  
+- To automate technician assignment and tracking  
+- To provide self-service troubleshooting for customers  
+- To digitize prepaid subscription and transaction management  
+- To enhance communication between customers and administrators  
+
+
+
