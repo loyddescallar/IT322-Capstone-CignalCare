@@ -1,7 +1,9 @@
+import Layout from "../components/Layout";
+
 export default function CustomerDashboard() {
   return (
-    <div>
+    <Layout>
       <h1>Customer Dashboard</h1>
-    </div>
+    </Layout>
   );
 }

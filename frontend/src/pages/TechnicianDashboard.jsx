@@ -1,7 +1,9 @@
+import Layout from "../components/Layout";
+
 export default function TechnicianDashboard() {
   return (
-    <div>
+    <Layout>
       <h1>Technician Dashboard</h1>
-    </div>
+    </Layout>
   );
 }
