@@ -1,179 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  TicketIcon,
-  WrenchScrewdriverIcon,
-  UsersIcon,
-  MagnifyingGlassCircleIcon,
-} from "@heroicons/react/24/outline";
-import ticketApi from "../api/ticketApi";
-import customerApi from "../api/customerApi";
-import loadAdminApi from "../api/loadAdminApi";
-import {
-  buildDashboardInsights,
-  buildMonthlySeries,
-  summarizeTicketsByCategory,
-  summarizeTicketsByStatus,
-} from "../utils/adminInsights";
+import Layout from "../components/Layout";
 
-const STATUS_COLORS = {
-  Open: "bg-red-500",
-  "In Progress": "bg-amber-400",
-  Resolved: "bg-green-500",
-  Closed: "bg-slate-400",
-};
+export default function AdminDashboard() {
+  return (
+    <Layout>
+      <h1>Admin Dashboard</h1>
 
-export default function AdminDashboard({ embedded = false }) {
-  const navigate = useNavigate();
-  const [tickets, setTickets] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loads, setLoads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadDashboard() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const [ticketRes, customerRes, loadRes] = await Promise.all([
-          ticketApi.getAdminTickets(),
-          customerApi.getCustomers(),
-          loadAdminApi.getAll(),
-        ]);
-
-        if (!active) return;
-
-        setTickets(ticketRes.data?.tickets || []);
-        setCustomers(customerRes.data?.customers || []);
-        setLoads(loadRes.data?.history || []);
-      } catch (err) {
-        console.error("ADMIN DASHBOARD ERROR", err);
-        if (active) setError("Failed to load admin dashboard data.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    loadDashboard();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const statusCounts = useMemo(() => summarizeTicketsByStatus(tickets), [tickets]);
-  const categoryCounts = useMemo(() => summarizeTicketsByCategory(tickets), [tickets]);
-  const customerGrowth = useMemo(() => buildMonthlySeries(customers), [customers]);
-  const insights = useMemo(
-    () => buildDashboardInsights({ tickets, customers, loads }),
-    [tickets, customers, loads]
-  );
-
-  const ticketCount = tickets.length;
-  const technicianRequests = tickets.filter((ticket) => ticket.category === "Technician Request").length;
-  const customerCount = customers.length;
-  const recentCustomers = customers.slice(0, 4);
-  const recentTickets = tickets.slice(0, 4);
-
-  const content = (
-    <div className="space-y-6">
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+      <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+        <div style={{ padding: "15px", border: "1px solid #ccc" }}>
+          Total Users
         </div>
-      )}
 
-      <section className="grid gap-4 xl:grid-cols-4">
-        <MetricCard
-          icon={TicketIcon}
-          title="TOTAL TICKETS"
-          value={loading ? "..." : ticketCount}
-          caption="All user-submitted support tickets."
-          accent="text-cignalRed"
-        />
-        <MetricCard
-          icon={WrenchScrewdriverIcon}
-          title="TECHNICIAN REQUESTS"
-          value={loading ? "..." : technicianRequests}
-          caption="Tickets flagged as technician request."
-          accent="text-blue-600"
-        />
-        <MetricCard
-          icon={UsersIcon}
-          title="CUSTOMERS"
-          value={loading ? "..." : customerCount}
-          caption="Registered Descallar Satellite Services accounts."
-          accent="text-cignalRed"
-        />
-        <ActionMetricCard onClick={() => navigate("/admin/customers")} />
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1.45fr_1.15fr_0.95fr]">
-        <CardShell title="Ticket Overview">
-          <StatusOverview counts={statusCounts} />
-        </CardShell>
-
-        <CardShell title="Customer Growth">
-          <GrowthChart data={customerGrowth} />
-        </CardShell>
-
-        <div className="rounded-[28px] border border-slate-200 bg-[#f8fafc] p-5 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-950">AI Insights</h2>
-          <div className="mt-5 space-y-5 border-b border-slate-200 pb-6 text-[15px] text-slate-800">
-            <InsightBlock label="Top Issue" value={insights.topIssue} />
-            <InsightBlock label="Recurring Concern" value={insights.repeatedConcern} />
-            <InsightBlock label="Resolution Rate" value={`${insights.resolutionRate}%`} />
-          </div>
-          <div className="mt-5 rounded-[22px] bg-cignalRed p-4 text-white shadow-lg">
-            <p className="text-sm font-semibold uppercase tracking-wide">Recommendation</p>
-            <p className="mt-2 text-base leading-7">{insights.recommendation}</p>
-          </div>
+        <div style={{ padding: "15px", border: "1px solid #ccc" }}>
+          Active Tickets
         </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_1.1fr_0.8fr]">
-        <DataTableCard
-          title="Recent Customers"
-          columns={["Name", "Account No.", "CCA"]}
-          rows={recentCustomers.map((customer) => [
-            customer.accountName,
-            customer.accountNumber,
-            customer.ccaNumber,
-          ])}
-          emptyText="No customer records yet."
-          actionLabel="View All"
-          onAction={() => navigate("/admin/customers")}
-        />
-
-        <DataTableCard
-          title="Recent Tickets"
-          columns={["Ticket ID", "Subject", "Status"]}
-          rows={recentTickets.map((ticket) => [
-            `TCK-${ticket.id}`,
-            ticket.subject,
-            <StatusBadge key={ticket.id} status={ticket.status} />,
-          ])}
-          emptyText="No ticket records yet."
-          actionLabel="View All"
-          onAction={() => navigate("/admin/tickets")}
-        />
-
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-950">Business Snapshot</h2>
-          <div className="mt-5 space-y-4">
-            <MiniStat label="Logged Load Value" value={`PHP ${loads.reduce((sum, item) => sum + Number(item?.loadAmount || 0), 0).toFixed(2)}`} />
-            <MiniStat label="Most Reported Category" value={categoryCounts[0]?.label || "No data yet"} />
-            <MiniStat label="Customer Records" value={`${customerCount} active profiles`} />
-          </div>
-          <div className="mt-5 rounded-[22px] bg-slate-100 p-4 text-sm leading-7 text-slate-700">
-            {insights.operationsSummary}
-          </div>
-        </div>
-      </section>
-    </div>
+      </div>
+    </Layout>
   );
 
   return embedded ? content : content;
