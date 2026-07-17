@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Chatbot from './components/Chatbot';
+import CignalBot from './components/CignalBot'; // In-update natin ang import
 
 // Admin
 import AdminWorkspace from './pages/admin/AdminWorkspace';
@@ -79,7 +79,8 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
 
-      <Chatbot />
+      {/* In-update natin ang component dito */}
+      <CignalBot />
     </>
   );
 }
