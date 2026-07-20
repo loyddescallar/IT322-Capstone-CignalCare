@@ -135,3 +135,25 @@ export function getRuleBasedResponse(message, { broad = false } = {}) {
 
   return isShortDirectCommand || isExactKnownPhrase || isErrorCode ? best : null;
 }
+
+const LIVE_SYSTEM_DATA_PATTERNS = [
+  // Dynamic prepaid/load information should come from the current database.
+  'load', 'reload', 'prepaid', 'plan', 'package', 'payment', 'paymongo',
+  'available load', 'available plan', 'channel lineup', 'channels included',
+
+  // Troubleshooting questions should use the configured troubleshooting records.
+  'no signal', 'walang signal', 'blank screen', 'black screen', 'no picture',
+  'remote', 'remote not working', 'receiver', 'cignal box', 'decoder',
+  'hd channel', 'missing channel', 'recording', 'dvr', 'troubleshoot',
+  'technical problem', 'screen problem', 'signal problem',
+];
+
+export function shouldUseLiveSystemData(message) {
+  const normalized = String(message || '').toLowerCase().trim();
+  if (!normalized) return false;
+
+  return LIVE_SYSTEM_DATA_PATTERNS.some((pattern) =>
+    normalized.includes(pattern)
+  );
+}
+

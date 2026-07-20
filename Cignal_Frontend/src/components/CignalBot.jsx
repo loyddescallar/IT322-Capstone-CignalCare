@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, X, Send, Bot, RotateCcw, ChevronDown } from 'lucide-react';
 import { sendChatbotMessage } from '../api/chatbotApi';
-import { CHATBOT_FALLBACK, getRuleBasedResponse } from '../data/chatbotRules';
+import { CHATBOT_FALLBACK, getRuleBasedResponse, shouldUseLiveSystemData } from '../data/chatbotRules';
 
 function renderText(text) {
   return text.split('\n').map((line, i) => {
@@ -54,7 +54,8 @@ export default function CignalBot() {
     setInput('');
     setTyping(true);
 
-    const ruleResponse = getRuleBasedResponse(cleanText);
+    const shouldUseLiveData = shouldUseLiveSystemData(cleanText);
+    const ruleResponse = shouldUseLiveData ? null : getRuleBasedResponse(cleanText);
 
     if (ruleResponse) {
       await new Promise((resolve) => setTimeout(resolve, 450));

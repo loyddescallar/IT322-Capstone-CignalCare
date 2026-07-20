@@ -2,6 +2,10 @@ const {
   generateGeminiReply,
   getGeminiModel,
 } = require('../services/geminiService');
+const {
+  getChatbotKnowledge,
+  buildChatbotUiHints,
+} = require('../services/chatbotKnowledgeService');
 
 const RATE_WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 12;
@@ -54,14 +58,29 @@ async function sendChatbotMessage(req, res) {
   }
 
   try {
+    let knowledgeText = '';
+
+    try {
+      const knowledge = await getChatbotKnowledge();
+      knowledgeText = knowledge.text;
+    } catch (knowledgeError) {
+      console.error('CHATBOT KNOWLEDGE ERROR:', knowledgeError?.message);
+      // Gemini remains available even if the system-data lookup temporarily fails.
+    }
+
     const result = await generateGeminiReply({
       message,
       context: sanitizeContext(req.body?.context),
+      knowledgeText,
     });
+
+    const hints = buildChatbotUiHints(message);
 
     return res.json({
       reply: result.reply,
-      source: 'gemini',
+      source: knowledgeText ? 'gemini+system-data' : 'gemini',
+      quickReplies: hints.quickReplies,
+      actions: hints.actions,
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode || 0);

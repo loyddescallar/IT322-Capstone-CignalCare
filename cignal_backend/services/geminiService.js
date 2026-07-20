@@ -40,35 +40,38 @@ function sanitizeContext(context = []) {
     .filter((item) => item.text);
 }
 
-function buildInput(message, context) {
+function buildInput(message, context, knowledgeText = '') {
   const recentConversation = sanitizeContext(context);
   const transcript = recentConversation
     .map((item) => `${item.role}: ${item.text}`)
     .join('\n');
 
   return [
-    transcript ? 'Recent conversation context:' : '',
+    knowledgeText ? 'VERIFIED CIGNALCARE SYSTEM DATA:' : '',
+    knowledgeText,
+    knowledgeText ? '' : '',
+    transcript ? 'RECENT CONVERSATION CONTEXT:' : '',
     transcript,
     transcript ? '' : '',
-    `Current user message: ${message}`,
+    `CURRENT USER MESSAGE: ${message}`,
     '',
-    'Answer the current user message only. Do not claim access to live customer records unless verified data is explicitly included above.',
+    'Answer the current user message only. Use verified system data when relevant. Do not claim access to personal customer records unless such records are explicitly included in the verified data.',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-async function generateGeminiReply({ message, context = [] }) {
+async function generateGeminiReply({ message, context = [], knowledgeText = '' }) {
   const ai = await getGeminiClient();
 
   const interaction = await ai.interactions.create({
     model: getGeminiModel(),
     store: false,
     system_instruction: CIGNALCARE_ASSISTANT_PROMPT,
-    input: buildInput(message, context),
+    input: buildInput(message, context, knowledgeText),
     generation_config: {
       thinking_level: 'low',
-      temperature: 0.35,
+      temperature: 0.25,
     },
   });
 
