@@ -127,9 +127,22 @@ export default function TroubleshootModel() {
 
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
               <div className="flex h-28 w-36 flex-shrink-0 items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-4 text-[#cc0000]">
-                <Tv size={54} strokeWidth={1.6} />
+                {model.image ? (
+                  <img
+                    src={model.image}
+                    alt={model.name}
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <Tv size={54} strokeWidth={1.6} />
+                )}
               </div>
               <div>
+                {model.type && (
+                  <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#cc0000]">
+                    {model.type} Receiver
+                  </p>
+                )}
                 <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
                   {model.name}
                 </h1>

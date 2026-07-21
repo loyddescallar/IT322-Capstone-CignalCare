@@ -235,7 +235,7 @@ const createCommonIssues = () => [
   },
 ];
 
-export const issueCategories = [
+const issueCategories = [
   'All',
   'Signal',
   'Smart Card',
@@ -244,7 +244,7 @@ export const issueCategories = [
   'Power',
 ];
 
-export const boxModels = [
+const boxModels = [
   {
     id: 'arion-hd-zapper',
     name: 'Arion Cordless HD Zapper',
@@ -303,10 +303,18 @@ export const boxModels = [
   },
 ];
 
-export function findBoxModel(modelId) {
+function findBoxModel(modelId) {
   return boxModels.find((model) => model.id === modelId);
 }
 
-export function findTroubleshootIssue(modelId, issueId) {
+function findTroubleshootIssue(modelId, issueId) {
   return findBoxModel(modelId)?.issues.find((issue) => issue.id === issueId);
 }
+
+
+module.exports = {
+  issueCategories,
+  boxModels,
+  findBoxModel,
+  findTroubleshootIssue,
+};

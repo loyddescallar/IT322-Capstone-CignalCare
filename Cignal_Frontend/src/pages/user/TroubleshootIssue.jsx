@@ -39,7 +39,7 @@ export default function TroubleshootIssue() {
     () =>
       apiSteps.map((step) => ({
         id: String(step.id),
-        sectionTitle: `Step ${step.step_number}`,
+        sectionTitle: step.section_title || `Step ${step.step_number}`,
         instruction: step.instruction,
       })),
     [apiSteps]
@@ -57,7 +57,7 @@ export default function TroubleshootIssue() {
         const [modelsResponse, issuesResponse, stepsResponse] = await Promise.all([
           troubleshootApi.getModels(),
           troubleshootApi.getIssuesByModel(modelId),
-          troubleshootApi.getStepsByIssue(issueId),
+          troubleshootApi.getStepsByIssue(issueId, modelId),
         ]);
 
         if (!active) return;
@@ -250,7 +250,15 @@ export default function TroubleshootIssue() {
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
                 <div className="hidden h-20 w-28 flex-shrink-0 items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-3 text-[#cc0000] sm:flex">
-                  <Tv size={42} strokeWidth={1.6} />
+                  {model.image ? (
+                    <img
+                      src={model.image}
+                      alt={model.name}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <Tv size={42} strokeWidth={1.6} />
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-[#cc0000]">
@@ -361,7 +369,7 @@ export default function TroubleshootIssue() {
                         Step {safeCurrentStep + 1} of {steps.length}
                       </p>
                       <h2 className="mt-1 text-xl font-black text-slate-900">
-                        Follow this instruction
+                        {activeStep.sectionTitle}
                       </h2>
                     </div>
                     <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#cc0000] text-sm font-black text-white">
@@ -577,6 +585,17 @@ export default function TroubleshootIssue() {
                 >
                   Go back
                 </button>
+              </div>
+            )}
+
+            {issue.note && (
+              <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-blue-900">
+                  Important note
+                </p>
+                <p className="mt-1 text-xs leading-5 text-blue-800">
+                  {issue.note}
+                </p>
               </div>
             )}
 

@@ -118,15 +118,30 @@ export default function Troubleshoot() {
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-50/90 via-white to-white opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
                     <div className="relative z-10 flex h-32 w-full items-center justify-center">
-                      <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-red-50 text-[#cc0000] transition-transform duration-500 group-hover:scale-110">
-                        <Tv size={48} strokeWidth={1.7} />
-                      </div>
+                      {model.image ? (
+                        <img
+                          src={model.image}
+                          alt={model.name}
+                          className="h-28 w-full object-contain transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-red-50 text-[#cc0000] transition-transform duration-500 group-hover:scale-110">
+                          <Tv size={48} strokeWidth={1.7} />
+                        </div>
+                      )}
                     </div>
 
                     <div className="relative z-10 mt-auto pt-5">
-                      <h2 className="text-lg font-bold text-gray-800 transition-colors duration-300 group-hover:text-[#cc0000]">
-                        {model.name}
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-gray-800 transition-colors duration-300 group-hover:text-[#cc0000]">
+                          {model.name}
+                        </h2>
+                        {model.type && (
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-black uppercase text-[#cc0000]">
+                            {model.type}
+                          </span>
+                        )}
+                      </div>
                       {model.description && (
                         <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
                           {model.description}

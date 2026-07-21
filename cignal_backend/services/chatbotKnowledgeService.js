@@ -1,4 +1,8 @@
 const pool = require('../config/db');
+const { boxModels } = require('../data/troubleshootData');
+const { getTicketsByUser } = require('../models/ticketModel');
+const { getRequestsByUser } = require('../models/technicianModel');
+const { getLoadRequestsByUser } = require('../models/loadRequestModel');
 
 function safeJsonArray(value) {
   if (!value) return [];
@@ -21,6 +25,22 @@ function normalizeChannel(channel) {
     name: String(channel?.name || '').trim(),
     category: String(channel?.category || 'Others').trim() || 'Others',
   };
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Not available';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  return date.toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 async function getActiveLoadPlans() {
@@ -63,55 +83,69 @@ async function getActiveLoadPlans() {
 }
 
 async function getTroubleshootingKnowledge() {
-  const [rows] = await pool.query(`
-    SELECT
-      m.id AS model_id,
-      m.name AS model_name,
-      m.description AS model_description,
-      i.id AS issue_id,
-      i.title AS issue_title,
-      i.description AS issue_description,
-      i.category,
-      i.error_code,
-      s.step_number,
-      s.instruction
-    FROM troubleshoot_models m
-    INNER JOIN troubleshoot_issues i
-      ON i.model_id = m.id
-    LEFT JOIN troubleshoot_steps s
-      ON s.issue_id = i.id
-    WHERE m.status = 'active'
-    ORDER BY m.id ASC, i.id ASC, s.step_number ASC
-  `);
-
   const issueMap = new Map();
 
-  for (const row of rows) {
-    const key = String(row.issue_id);
+  for (const model of boxModels) {
+    for (const issue of model.issues || []) {
+      const key = String(issue.id);
 
-    if (!issueMap.has(key)) {
-      issueMap.set(key, {
-        issueId: row.issue_id,
-        modelId: row.model_id,
-        modelName: row.model_name,
-        modelDescription: row.model_description,
-        title: row.issue_title,
-        description: row.issue_description,
-        category: row.category,
-        errorCode: row.error_code,
-        steps: [],
-      });
-    }
+      if (!issueMap.has(key)) {
+        let stepNumber = 0;
+        const steps = [];
 
-    if (row.instruction) {
-      issueMap.get(key).steps.push({
-        stepNumber: Number(row.step_number || 0),
-        instruction: String(row.instruction).trim(),
-      });
+        for (const section of issue.sections || []) {
+          for (const instruction of section.steps || []) {
+            stepNumber += 1;
+            steps.push({
+              stepNumber,
+              sectionTitle: section.title,
+              instruction: String(instruction).trim(),
+            });
+          }
+        }
+
+        issueMap.set(key, {
+          issueId: issue.id,
+          title: issue.shortTitle,
+          description: issue.description,
+          category: issue.category,
+          errorCode: /^E\d/i.test(String(issue.shortTitle || ''))
+            ? issue.shortTitle
+            : null,
+          keywords: Array.isArray(issue.keywords) ? issue.keywords : [],
+          note: issue.note || '',
+          applicableModels: [],
+          steps,
+        });
+      }
+
+      issueMap.get(key).applicableModels.push(model.name);
     }
   }
 
   return Array.from(issueMap.values());
+}
+
+async function getLatestPersonalSupportRecords(userId) {
+  if (!userId) {
+    return {
+      latestTicket: null,
+      latestTechnicianRequest: null,
+      latestLoadRequest: null,
+    };
+  }
+
+  const [tickets, technicianRequests, loadRequests] = await Promise.all([
+    getTicketsByUser(userId),
+    getRequestsByUser(userId),
+    getLoadRequestsByUser(userId),
+  ]);
+
+  return {
+    latestTicket: tickets[0] || null,
+    latestTechnicianRequest: technicianRequests[0] || null,
+    latestLoadRequest: loadRequests[0] || null,
+  };
 }
 
 function buildKnowledgeText({ plans = [], troubleshooting = [] }) {
@@ -158,15 +192,21 @@ function buildKnowledgeText({ plans = [], troubleshooting = [] }) {
     const troubleshootingLines = troubleshooting.map((issue) => {
       const steps = issue.steps.length
         ? issue.steps
-            .map((step) => `${step.stepNumber}. ${step.instruction}`)
+            .map((step) => {
+              const section = step.sectionTitle ? `[${step.sectionTitle}] ` : '';
+              return `${step.stepNumber}. ${section}${step.instruction}`;
+            })
             .join(' ')
         : 'No troubleshooting steps are currently configured.';
 
       return [
-        `- Model: ${issue.modelName}`,
-        `Issue: ${issue.title}`,
+        `- Issue: ${issue.title}`,
         issue.errorCode ? `Error code: ${issue.errorCode}` : '',
         issue.description ? `Description: ${issue.description}` : '',
+        issue.applicableModels?.length
+          ? `Applicable box models: ${issue.applicableModels.join(', ')}`
+          : '',
+        issue.note ? `Important note: ${issue.note}` : '',
         `Verified steps: ${steps}`,
       ]
         .filter(Boolean)
@@ -175,7 +215,7 @@ function buildKnowledgeText({ plans = [], troubleshooting = [] }) {
 
     sections.push(
       [
-        'CURRENT TROUBLESHOOTING KNOWLEDGE (database source of truth):',
+        'CURRENT VERIFIED TROUBLESHOOTING KNOWLEDGE (backend source of truth):',
         ...troubleshootingLines,
       ].join('\n')
     );
@@ -184,16 +224,108 @@ function buildKnowledgeText({ plans = [], troubleshooting = [] }) {
   return sections.join('\n\n');
 }
 
-async function getChatbotKnowledge() {
-  const [plans, troubleshooting] = await Promise.all([
+function buildPersonalSupportText({
+  latestTicket,
+  latestTechnicianRequest,
+  latestLoadRequest,
+} = {}) {
+  const lines = [
+    'AUTHENTICATED CUSTOMER PERSONAL SUPPORT DATA (read-only; current logged-in user only):',
+  ];
+
+  if (latestTicket) {
+    lines.push(
+      [
+        `Latest ticket: #${latestTicket.id}`,
+        `status: ${latestTicket.status || 'Not available'}`,
+        latestTicket.category ? `category: ${latestTicket.category}` : '',
+        latestTicket.subject ? `subject: ${latestTicket.subject}` : '',
+        `submitted: ${formatDateTime(latestTicket.created_at)}`,
+        latestTicket.updated_at
+          ? `last updated: ${formatDateTime(latestTicket.updated_at)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' | ')
+    );
+  } else {
+    lines.push('Latest ticket: No ticket record found for this customer.');
+  }
+
+  if (latestTechnicianRequest) {
+    lines.push(
+      [
+        `Latest technician request: #${latestTechnicianRequest.id}`,
+        `status: ${latestTechnicianRequest.status || 'Not available'}`,
+        latestTechnicianRequest.technician_name
+          ? `assigned technician: ${latestTechnicianRequest.technician_name}`
+          : 'assigned technician: Not assigned yet',
+        latestTechnicianRequest.preferred_date
+          ? `preferred date: ${String(latestTechnicianRequest.preferred_date).slice(0, 10)}`
+          : '',
+        latestTechnicianRequest.preferred_time
+          ? `preferred time: ${latestTechnicianRequest.preferred_time}`
+          : '',
+        `submitted: ${formatDateTime(latestTechnicianRequest.created_at)}`,
+        latestTechnicianRequest.updated_at
+          ? `last updated: ${formatDateTime(latestTechnicianRequest.updated_at)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' | ')
+    );
+  } else {
+    lines.push('Latest technician request: No technician request record found for this customer.');
+  }
+
+  if (latestLoadRequest) {
+    lines.push(
+      [
+        `Latest load request: #${latestLoadRequest.id}`,
+        `request status: ${latestLoadRequest.status || 'Not available'}`,
+        `payment status: ${latestLoadRequest.payment_status || 'Not available'}`,
+        latestLoadRequest.plan_name ? `plan: ${latestLoadRequest.plan_name}` : '',
+        latestLoadRequest.amount != null
+          ? `amount: PHP ${Number(latestLoadRequest.amount || 0).toLocaleString('en-PH')}`
+          : '',
+        latestLoadRequest.payment_method
+          ? `payment method: ${latestLoadRequest.payment_method}`
+          : '',
+        `submitted: ${formatDateTime(latestLoadRequest.created_at)}`,
+        latestLoadRequest.updated_at
+          ? `last updated: ${formatDateTime(latestLoadRequest.updated_at)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' | ')
+    );
+  } else {
+    lines.push('Latest load request: No load request record found for this customer.');
+  }
+
+  return lines.join('\n');
+}
+
+async function getChatbotKnowledge({ userId = null, includePersonalData = false } = {}) {
+  const [plans, troubleshooting, personalSupport] = await Promise.all([
     getActiveLoadPlans(),
     getTroubleshootingKnowledge(),
+    includePersonalData
+      ? getLatestPersonalSupportRecords(userId)
+      : Promise.resolve(null),
   ]);
+
+  const sections = [buildKnowledgeText({ plans, troubleshooting })];
+
+  if (personalSupport) {
+    sections.push(buildPersonalSupportText(personalSupport));
+  }
 
   return {
     plans,
     troubleshooting,
-    text: buildKnowledgeText({ plans, troubleshooting }),
+    personalSupport,
+    text: sections.filter(Boolean).join('\n\n'),
   };
 }
 
@@ -204,6 +336,9 @@ function buildChatbotUiHints(message = '') {
 
   const loadIntent = /(load|reload|prepaid|plan|package|payment|paymongo|channel lineup|available load)/i.test(normalized);
   const troubleshootIntent = /(signal|screen|remote|receiver|box|channel|record|dvr|hd|picture|display|technical|troubleshoot|problema|sira|gumagana|working|error)/i.test(normalized);
+  const ticketStatusIntent = /(ticket).*(status|latest|update|progress|ko|my)|(status|latest|update|progress).*(ticket)/i.test(normalized);
+  const technicianStatusIntent = /(technician|tech request).*(status|latest|update|progress|ko|my)|(status|latest|update|progress).*(technician|tech request)/i.test(normalized);
+  const loadStatusIntent = /(load request|payment).*(status|latest|update|progress|ko|my)|(status|latest|update|progress).*(load request|payment)/i.test(normalized);
 
   if (loadIntent) {
     actions.push(
@@ -221,8 +356,25 @@ function buildChatbotUiHints(message = '') {
     quickReplies.push('No Signal', 'Remote not working');
   }
 
+  if (ticketStatusIntent) {
+    actions.unshift({ label: '🎫 My Tickets', path: '/user/tickets', color: 'slate' });
+  }
+
+  if (technicianStatusIntent) {
+    actions.unshift({ label: '🔧 Technician Requests', path: '/user/technician-request', color: 'slate' });
+  }
+
+  if (loadStatusIntent) {
+    actions.unshift({ label: '📜 View Load History', path: '/user/load-history', color: 'slate' });
+  }
+
+  const uniqueActions = actions.filter(
+    (action, index, list) =>
+      list.findIndex((item) => item.path === action.path) === index
+  );
+
   return {
-    actions: actions.slice(0, 3),
+    actions: uniqueActions.slice(0, 3),
     quickReplies: [...new Set(quickReplies)].slice(0, 4),
   };
 }
@@ -230,6 +382,7 @@ function buildChatbotUiHints(message = '') {
 module.exports = {
   getActiveLoadPlans,
   getTroubleshootingKnowledge,
+  getLatestPersonalSupportRecords,
   getChatbotKnowledge,
   buildChatbotUiHints,
 };
