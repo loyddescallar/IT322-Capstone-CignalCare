@@ -14,7 +14,7 @@ async function ensureTicketWorkflowSchema() {
   if (ticketWorkflowReady) return;
 
   const [columns] = await pool.query(`
-    SELECT column_name
+    SELECT column_name AS column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'tickets'

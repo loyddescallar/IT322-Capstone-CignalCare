@@ -10,6 +10,14 @@ function getGeminiModel() {
   return String(process.env.GEMINI_MODEL || 'gemini-3.5-flash').trim();
 }
 
+function getGeminiTimeoutMs() {
+  const configured = Number(process.env.GEMINI_TIMEOUT_MS || 15000);
+
+  if (!Number.isFinite(configured)) return 15000;
+
+  return Math.min(Math.max(Math.round(configured), 3000), 30000);
+}
+
 async function getGeminiClient() {
   const apiKey = getGeminiApiKey();
 
@@ -40,37 +48,60 @@ function sanitizeContext(context = []) {
     .filter((item) => item.text);
 }
 
-function buildInput(message, context) {
+function buildInput(message, context, knowledgeText = '') {
   const recentConversation = sanitizeContext(context);
   const transcript = recentConversation
     .map((item) => `${item.role}: ${item.text}`)
     .join('\n');
 
   return [
-    transcript ? 'Recent conversation context:' : '',
+    knowledgeText ? 'VERIFIED CIGNALCARE SYSTEM DATA:' : '',
+    knowledgeText,
+    knowledgeText ? '' : '',
+    transcript ? 'RECENT CONVERSATION CONTEXT:' : '',
     transcript,
     transcript ? '' : '',
-    `Current user message: ${message}`,
+    `CURRENT USER MESSAGE: ${message}`,
     '',
-    'Answer the current user message only. Do not claim access to live customer records unless verified data is explicitly included above.',
+    'Answer the current user message only. Use verified system data when relevant. Only discuss personal customer records when they are explicitly included in the authenticated personal-support section.',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-async function generateGeminiReply({ message, context = [] }) {
-  const ai = await getGeminiClient();
+function withTimeout(promise, timeoutMs) {
+  let timeoutId;
 
-  const interaction = await ai.interactions.create({
-    model: getGeminiModel(),
-    store: false,
-    system_instruction: CIGNALCARE_ASSISTANT_PROMPT,
-    input: buildInput(message, context),
-    generation_config: {
-      thinking_level: 'low',
-      temperature: 0.35,
-    },
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error(`Gemini request timed out after ${timeoutMs}ms`);
+      error.code = 'GEMINI_TIMEOUT';
+      reject(error);
+    }, timeoutMs);
   });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
+async function generateGeminiReply({ message, context = [], knowledgeText = '' }) {
+  const ai = await getGeminiClient();
+  const timeoutMs = getGeminiTimeoutMs();
+
+  const interaction = await withTimeout(
+    ai.interactions.create({
+      model: getGeminiModel(),
+      store: false,
+      system_instruction: CIGNALCARE_ASSISTANT_PROMPT,
+      input: buildInput(message, context, knowledgeText),
+      generation_config: {
+        thinking_level: 'low',
+        temperature: 0.25,
+      },
+    }),
+    timeoutMs
+  );
 
   const reply = String(interaction.output_text || '').trim();
 
@@ -89,4 +120,5 @@ async function generateGeminiReply({ message, context = [] }) {
 module.exports = {
   generateGeminiReply,
   getGeminiModel,
+  getGeminiTimeoutMs,
 };

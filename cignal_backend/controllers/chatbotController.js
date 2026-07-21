@@ -2,6 +2,10 @@ const {
   generateGeminiReply,
   getGeminiModel,
 } = require('../services/geminiService');
+const {
+  getChatbotKnowledge,
+  buildChatbotUiHints,
+} = require('../services/chatbotKnowledgeService');
 
 const RATE_WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 12;
@@ -34,6 +38,23 @@ function sanitizeContext(context) {
   }));
 }
 
+function shouldIncludePersonalData(message, context = []) {
+  const recentUserText = Array.isArray(context)
+    ? context
+        .slice(-4)
+        .filter((item) => item?.role !== 'assistant')
+        .map((item) => String(item?.text || ''))
+        .join(' ')
+    : '';
+
+  const text = `${message} ${recentUserText}`.toLowerCase();
+
+  const recordTerms = /(ticket|technician|tech request|load request|payment)/i;
+  const ownershipOrStatusTerms = /(my|mine|ko|akin|aking|status|latest|update|progress|ano na|kamusta|where is|what happened)/i;
+
+  return recordTerms.test(text) && ownershipOrStatusTerms.test(text);
+}
+
 async function sendChatbotMessage(req, res) {
   const message = String(req.body?.message || '').trim();
 
@@ -53,15 +74,42 @@ async function sendChatbotMessage(req, res) {
     });
   }
 
+  const context = sanitizeContext(req.body?.context);
+  const includePersonalData = shouldIncludePersonalData(message, context);
+
   try {
+    let knowledgeText = '';
+    let hasPersonalData = false;
+
+    try {
+      const knowledge = await getChatbotKnowledge({
+        userId: req.user?.id,
+        includePersonalData,
+      });
+      knowledgeText = knowledge.text;
+      hasPersonalData = Boolean(knowledge.personalSupport);
+    } catch (knowledgeError) {
+      console.error('CHATBOT KNOWLEDGE ERROR:', knowledgeError?.message);
+      // Gemini remains available even if the system-data lookup temporarily fails.
+    }
+
     const result = await generateGeminiReply({
       message,
-      context: sanitizeContext(req.body?.context),
+      context,
+      knowledgeText,
     });
+
+    const hints = buildChatbotUiHints(message);
 
     return res.json({
       reply: result.reply,
-      source: 'gemini',
+      source: hasPersonalData
+        ? 'gemini+system-data+personal-data'
+        : knowledgeText
+          ? 'gemini+system-data'
+          : 'gemini',
+      quickReplies: hints.quickReplies,
+      actions: hints.actions,
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode || 0);
@@ -69,6 +117,12 @@ async function sendChatbotMessage(req, res) {
     if (error.code === 'GEMINI_NOT_CONFIGURED') {
       return res.status(503).json({
         error: 'AI assistance is not configured',
+      });
+    }
+
+    if (error.code === 'GEMINI_TIMEOUT') {
+      return res.status(504).json({
+        error: 'AI assistance took too long to respond',
       });
     }
 
@@ -91,4 +145,5 @@ async function sendChatbotMessage(req, res) {
 
 module.exports = {
   sendChatbotMessage,
+  shouldIncludePersonalData,
 };
