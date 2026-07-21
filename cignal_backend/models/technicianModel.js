@@ -38,7 +38,7 @@ async function ensureTechnicianColumns() {
   if (columnsReady) return;
 
   const [rows] = await pool.query(`
-    SELECT column_name
+    SELECT column_name AS column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'technician_requests'

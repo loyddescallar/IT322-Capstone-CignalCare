@@ -306,14 +306,70 @@ function buildPersonalSupportText({
   return lines.join('\n');
 }
 
+async function safeKnowledgeLookup(label, lookup, fallbackValue) {
+  try {
+    return {
+      ok: true,
+      value: await lookup(),
+      error: null,
+    };
+  } catch (error) {
+    console.error(`CHATBOT ${label} LOOKUP ERROR:`, error?.message || error);
+
+    return {
+      ok: false,
+      value: fallbackValue,
+      error,
+    };
+  }
+}
+
+function buildAvailabilityText({ plansAvailable, personalDataAvailable, personalRequested }) {
+  const lines = [];
+
+  if (!plansAvailable) {
+    lines.push(
+      '- Live prepaid plan data is temporarily unavailable. Do not invent plan names, prices, channels, or availability.'
+    );
+  }
+
+  if (personalRequested && !personalDataAvailable) {
+    lines.push(
+      '- Authenticated personal support records are temporarily unavailable. Do not guess ticket, technician-request, load-request, or payment statuses; explain that live status cannot be checked right now.'
+    );
+  }
+
+  if (!lines.length) return '';
+
+  return [
+    'SYSTEM DATA AVAILABILITY NOTICE:',
+    ...lines,
+  ].join('\n');
+}
+
 async function getChatbotKnowledge({ userId = null, includePersonalData = false } = {}) {
-  const [plans, troubleshooting, personalSupport] = await Promise.all([
-    getActiveLoadPlans(),
-    getTroubleshootingKnowledge(),
+  // Troubleshooting is backend-file based and must remain available even when
+  // the live database is temporarily offline.
+  const troubleshooting = await getTroubleshootingKnowledge();
+
+  const [plansResult, personalResult] = await Promise.all([
+    safeKnowledgeLookup('LOAD PLAN', getActiveLoadPlans, []),
     includePersonalData
-      ? getLatestPersonalSupportRecords(userId)
-      : Promise.resolve(null),
+      ? safeKnowledgeLookup(
+          'PERSONAL SUPPORT',
+          () => getLatestPersonalSupportRecords(userId),
+          null
+        )
+      : Promise.resolve({ ok: true, value: null, error: null }),
   ]);
+
+  const plans = plansResult.value;
+  const personalSupport = personalResult.value;
+  const availability = {
+    plans: plansResult.ok,
+    troubleshooting: true,
+    personalSupport: includePersonalData ? personalResult.ok : null,
+  };
 
   const sections = [buildKnowledgeText({ plans, troubleshooting })];
 
@@ -321,10 +377,21 @@ async function getChatbotKnowledge({ userId = null, includePersonalData = false 
     sections.push(buildPersonalSupportText(personalSupport));
   }
 
+  const availabilityText = buildAvailabilityText({
+    plansAvailable: plansResult.ok,
+    personalDataAvailable: personalResult.ok,
+    personalRequested: includePersonalData,
+  });
+
+  if (availabilityText) {
+    sections.push(availabilityText);
+  }
+
   return {
     plans,
     troubleshooting,
     personalSupport,
+    availability,
     text: sections.filter(Boolean).join('\n\n'),
   };
 }
