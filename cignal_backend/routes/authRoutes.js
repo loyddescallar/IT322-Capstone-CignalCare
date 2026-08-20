@@ -22,13 +22,26 @@ const {
 } = require('../controllers/authController');
 const { authRequired, requireRole } = require('../middleware/auth');
 const adminAuthRateLimit = require('../middleware/adminAuthRateLimit');
+const {
+  customerLoginRateLimit,
+  passwordChangeRateLimit,
+  accountInquiryRateLimit,
+} = require('../middleware/publicAuthRateLimit');
+
+// Authentication responses can contain tokens, setup secrets, or one-time codes.
+// Prevent browsers/proxies from caching any response under /api/auth.
+router.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
 
 // Customer authentication
-router.post('/login', login);
+router.post('/login', customerLoginRateLimit, login);
 router.post('/register', register);
-router.post('/change-password', changePassword);
+router.post('/change-password', passwordChangeRateLimit, changePassword);
 router.get('/me', authRequired, me);
-router.get('/lookup/:accountId', lookupByAccountId);
+router.get('/lookup/:accountId', accountInquiryRateLimit, lookupByAccountId);
 
 // Admin authentication and recovery
 router.get('/admin/security-status', adminSecurityStatus);
