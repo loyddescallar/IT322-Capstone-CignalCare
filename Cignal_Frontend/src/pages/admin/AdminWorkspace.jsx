@@ -207,6 +207,20 @@ function notificationTitle(type = '') {
   return titles[type] || 'Notification';
 }
 
+
+function notificationTarget(type = '') {
+  const targets = {
+    admin_ticket: '/admin/tickets',
+    admin_message: '/admin/tickets',
+    admin_technician: '/admin/technicians',
+    admin_load_request: '/admin/load-requests',
+    admin_payment: '/admin/load-requests',
+    admin_customer: '/admin/customers',
+  };
+
+  return targets[type] || null;
+}
+
 function timeAgo(dateValue) {
   if (!dateValue) return 'Just now';
 
@@ -304,6 +318,29 @@ export default function AdminWorkspace() {
       clearInterval(timer);
     };
   }, [location.pathname]);
+
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification) return;
+
+    if (!notification.read) {
+      setNotifList((prev) =>
+        prev.map((item) =>
+          item.id === notification.id ? { ...item, read: true } : item
+        )
+      );
+
+      try {
+        await notificationApi.markRead(notification.id);
+      } catch (error) {
+        console.error('MARK NOTIFICATION READ ERROR:', error);
+      }
+    }
+
+    setNotifOpen(false);
+    const target = notificationTarget(notification.type);
+    if (target) navigate(target);
+  };
 
   const handleMarkAllRead = async () => {
     setNotifList((prev) =>
@@ -568,15 +605,7 @@ export default function AdminWorkspace() {
                       return (
                         <div
                           key={notification.id}
-                          onClick={() =>
-                            setNotifList((prev) =>
-                              prev.map((item) =>
-                                item.id === notification.id
-                                  ? { ...item, read: true }
-                                  : item
-                              )
-                            )
-                          }
+                          onClick={() => handleNotificationClick(notification)}
                           className={`flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-gray-50 ${
                             !notification.read ? 'bg-blue-50/30' : ''
                           }`}

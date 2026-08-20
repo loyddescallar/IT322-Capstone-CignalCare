@@ -208,19 +208,6 @@ async function restoreUser(id) {
   return result.affectedRows;
 }
 
-async function permanentDeleteUser(id) {
-  const [result] = await pool.query(
-    `DELETE FROM users
-     WHERE id = ? AND role = 'user' AND COALESCE(status, 'active') = 'archived'`,
-    [id]
-  );
-
-  return result.affectedRows;
-}
-
-async function deleteUser(id) {
-  return archiveUser(id);
-}
 
 async function checkDuplicate(accountNumber, ccaNumber, excludeId = null) {
   let sql = `SELECT id, accountName, accountNumber, ccaNumber, status
@@ -251,6 +238,5 @@ module.exports = {
   deleteUser,
   archiveUser,
   restoreUser,
-  permanentDeleteUser,
   checkDuplicate,
 };

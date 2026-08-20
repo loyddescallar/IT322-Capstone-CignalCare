@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Users, CreditCard, Ticket, Lightbulb } from 'lucide-react';
+import { TrendingUp, Users, CreditCard, Ticket, Lightbulb, Download } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from 'recharts';
 import ticketApi from '../../api/ticketApi';
 import customerApi from '../../api/customerApi';
@@ -39,11 +39,61 @@ export default function AdminAnalytics() {
   const growthData=growth.map(m=>({month:m.label,value:m.value}));
   const loadGrowthData=loadGrowth.map(m=>({month:m.label,value:m.value}));
 
+  function exportAnalyticsReport() {
+    const periodLabel = selectedMonth
+      ? MONTHS.find((month) => month.key === selectedMonth)?.label || selectedMonth
+      : 'All Time';
+
+    const rows = [
+      ['CignalCare+ Analytics Report'],
+      ['Period', periodLabel],
+      ['Generated', new Date().toLocaleString('en-PH')],
+      [],
+      ['SUMMARY'],
+      ['Metric', 'Value'],
+      ['Total Revenue', totalRevenue.toFixed(2)],
+      ['Total Customers', filteredCustomers.length],
+      ['Total Tickets', filteredTickets.length],
+      ['Resolution Rate', `${resolvedRate}%`],
+      [],
+      ['TICKET STATUS'],
+      ['Status', 'Count'],
+      ...Object.entries(statusCounts),
+      [],
+      ['TOP TICKET CATEGORIES'],
+      ['Category', 'Count'],
+      ...categoryCounts.map((item) => [item.label, item.value]),
+      [],
+      ['REVENUE BY LOCATION'],
+      ['Location', 'Revenue'],
+      ...revenueByLocation.map(([location, revenue]) => [location, Number(revenue).toFixed(2)]),
+    ];
+
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\n');
+
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `cignalcare-analytics-${selectedMonth || 'all-time'}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div><h1 className="text-lg font-bold text-gray-800">Analytics</h1><p className="text-xs text-gray-500 mt-0.5">System performance and subscriber insights</p></div>
         <div className="flex items-center gap-1.5 flex-wrap">
+          <button onClick={exportAnalyticsReport} disabled={loading} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-semibold border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"><Download size={13}/> Export Report</button>
           <button onClick={()=>setMonth(null)} className={`text-xs px-3 py-1.5 rounded-xl font-semibold transition-colors ${selectedMonth===null?'bg-[#cc0000] text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>● All Time</button>
           {MONTHS.map(m=><button key={m.key} onClick={()=>setMonth(m.key)} className={`text-xs px-3 py-1.5 rounded-xl font-semibold transition-colors ${selectedMonth===m.key?'bg-[#cc0000] text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{m.label}</button>)}
         </div>

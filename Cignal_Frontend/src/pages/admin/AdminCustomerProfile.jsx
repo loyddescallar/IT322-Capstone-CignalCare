@@ -477,11 +477,7 @@ export default function AdminCustomerProfile() {
     setSaving(true);
 
     try {
-      if (typeof customerApi.archiveCustomer === 'function') {
-        await customerApi.archiveCustomer(customer.id);
-      } else {
-        await customerApi.deleteCustomer(customer.id);
-      }
+      await customerApi.archiveCustomer(customer.id);
 
       closeModal();
       await loadProfile();

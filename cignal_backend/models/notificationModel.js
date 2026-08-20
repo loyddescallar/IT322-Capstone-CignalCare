@@ -23,6 +23,19 @@ async function markNotificationsRead(userId, accountNumber) {
   return result.affectedRows;
 }
 
+
+async function markNotificationRead(notificationId, userId, accountNumber) {
+  const [result] = await pool.query(
+    `UPDATE notifications
+     SET is_read = 1
+     WHERE id = ?
+       AND (user_id = ? OR account_number = ?)`,
+    [notificationId, userId, accountNumber || '']
+  );
+
+  return result.affectedRows;
+}
+
 async function createNotification(data) {
   const [result] = await pool.query(
     `INSERT INTO notifications (user_id, account_number, type, message, is_read)
@@ -71,6 +84,7 @@ async function createAdminNotification(data) {
 module.exports = {
   getNotificationsForUser,
   markNotificationsRead,
+  markNotificationRead,
   createNotification,
   createAdminNotification,
 };

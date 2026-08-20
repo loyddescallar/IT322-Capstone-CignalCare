@@ -9,7 +9,6 @@ const {
   updateCustomerController,
   archiveCustomerController,
   restoreCustomerController,
-  permanentDeleteCustomerController,
 } = require('../controllers/customerController');
 const { authRequired, requireRole } = require('../middleware/auth');
 
@@ -20,8 +19,6 @@ router.get('/id/:id', authRequired, getCustomerById);
 router.put('/id/:id', authRequired, requireRole('admin'), updateCustomerController);
 router.patch('/id/:id/archive', authRequired, requireRole('admin'), archiveCustomerController);
 router.patch('/id/:id/restore', authRequired, requireRole('admin'), restoreCustomerController);
-router.delete('/id/:id/permanent', authRequired, requireRole('admin'), permanentDeleteCustomerController);
-router.delete('/id/:id', authRequired, requireRole('admin'), archiveCustomerController);
 router.get('/:accountId', authRequired, getCustomerByAccount);
 
 module.exports = router;
