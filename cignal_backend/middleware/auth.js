@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getJwtSecret } = require('../utils/authConfig');
+const { findSecurityByUserId, writeAudit } = require('../models/adminSecurityModel');
 
 async function authRequired(req, res, next) {
   const header = req.headers.authorization;
@@ -31,8 +32,16 @@ async function authRequired(req, res, next) {
       return res.status(401).json({ error: 'Account is unavailable' });
     }
 
-    // Use current database values so role, ownership, and account changes take
-    // effect immediately instead of waiting for the JWT to expire.
+    if (user.role === 'admin') {
+      const security = await findSecurityByUserId(user.id);
+      if (!security || !Boolean(security.totp_enabled)) {
+        return res.status(401).json({ error: 'Secure admin authentication is required.' });
+      }
+      if (Number(payload.sessionVersion || 0) !== Number(security.session_version || 1)) {
+        return res.status(401).json({ error: 'Admin session has been revoked. Please log in again.' });
+      }
+    }
+
     req.user = {
       ...payload,
       id: user.id,
@@ -43,6 +52,22 @@ async function authRequired(req, res, next) {
       location: user.location,
       status: user.status,
     };
+
+    if (user.role === 'admin' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      const startedAt = Date.now();
+      res.on('finish', () => {
+        if (res.statusCode >= 200 && res.statusCode < 400) {
+          writeAudit({
+            userId: user.id,
+            action: 'ADMIN_API_MUTATION',
+            ipAddress: forwarded || req.ip || req.socket?.remoteAddress || null,
+            userAgent: req.headers['user-agent'] || null,
+            details: `${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`,
+          });
+        }
+      });
+    }
 
     return next();
   } catch (error) {
