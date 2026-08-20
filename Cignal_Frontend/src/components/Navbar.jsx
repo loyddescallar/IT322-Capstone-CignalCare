@@ -92,7 +92,7 @@ export default function Navbar() {
   const navBtn =
     'relative group flex items-center gap-2 text-white font-semibold text-[13px] cursor-pointer transition-all duration-150 hover:scale-110 whitespace-nowrap';
 
-  const hidePaths = ['/login', '/register', '/admin-login'];
+  const hidePaths = ['/login', '/register', '/admin-login', '/change-password'];
 
   if (hidePaths.includes(location.pathname)) {
     return null;

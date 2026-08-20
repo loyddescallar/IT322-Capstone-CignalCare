@@ -13,6 +13,9 @@ import {
   XCircle,
   Archive,
   RotateCcw,
+  Upload,
+  KeyRound,
+  Download,
 } from 'lucide-react';
 import customerApi from '../../api/customerApi';
 
@@ -24,6 +27,7 @@ const EMPTY = {
   ccaNumber: '',
   address: '',
   phone: '',
+  email: '',
   location: 'Balayan',
 };
 
@@ -83,12 +87,14 @@ function safeDate(value) {
   return date.toLocaleDateString('en-PH');
 }
 
-function validateCustomerForm(form) {
+function validateCustomerForm(form, enforceIdentifiers = true) {
   if (!form.accountName.trim()) return 'Account name is required.';
   if (!form.accountNumber.trim()) return 'Account number is required.';
   if (!form.ccaNumber.trim()) return 'CCA number is required.';
-  if (form.accountNumber.trim().length < 3) return 'Account number is too short.';
-  if (form.ccaNumber.trim().length < 3) return 'CCA number is too short.';
+  if (enforceIdentifiers && !/^\d{1,9}$/.test(form.accountNumber.trim())) return 'Account Number must contain digits only and be at most 9 digits.';
+  if (enforceIdentifiers && !/^\d{1,11}$/.test(form.ccaNumber.trim())) return 'CCA Number must contain digits only and be at most 11 digits.';
+  if (!form.address.trim()) return 'Address is required.';
+  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return 'Email format is invalid.';
   if (!LOCATIONS.includes(form.location)) return 'Please select a valid coverage location.';
 
   if (form.phone.trim() && !/^[0-9+()\-\s]{7,20}$/.test(form.phone.trim())) {
@@ -148,6 +154,13 @@ export default function AdminCustomers() {
   const [form, setForm] = useState({ ...EMPTY });
   const [formErr, setFormErr] = useState('');
   const [saving, setSaving] = useState(false);
+  const [issuedCredentials, setIssuedCredentials] = useState(null);
+  const [importFile, setImportFile] = useState(null);
+  const [importLocation, setImportLocation] = useState('Balayan');
+  const [importPreview, setImportPreview] = useState(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importCredentials, setImportCredentials] = useState([]);
 
   const loadData = async (status = recordStatus) => {
     setLoading(true);
@@ -188,6 +201,7 @@ export default function AdminCustomers() {
         String(customer.accountNumber || '').toLowerCase().includes(query) ||
         String(customer.ccaNumber || '').toLowerCase().includes(query) ||
         String(customer.phone || '').toLowerCase().includes(query) ||
+        String(customer.email || '').toLowerCase().includes(query) ||
         String(customer.address || '').toLowerCase().includes(query) ||
         String(customer.location || '').toLowerCase().includes(query);
 
@@ -216,6 +230,7 @@ export default function AdminCustomers() {
         ccaNumber: customer.ccaNumber || '',
         address: customer.address || '',
         phone: customer.phone || '',
+        email: customer.email || '',
         location: normalizeLocation(customer.location) === '—' ? 'Balayan' : normalizeLocation(customer.location),
       });
     } else if (nextMode === 'add') {
@@ -236,7 +251,7 @@ export default function AdminCustomers() {
   };
 
   const saveCustomer = async () => {
-    const validationError = validateCustomerForm(form);
+    const validationError = validateCustomerForm(form, mode === 'add');
     if (validationError) {
       setFormErr(validationError);
       return;
@@ -253,21 +268,74 @@ export default function AdminCustomers() {
         ccaNumber: form.ccaNumber.trim(),
         address: form.address.trim(),
         phone: form.phone.trim(),
+        email: form.email.trim(),
       };
 
       if (mode === 'add') {
-        await customerApi.createCustomer(payload);
+        const response = await customerApi.createCustomer(payload);
+        setIssuedCredentials(response.data?.credentials || null);
       } else {
         await customerApi.updateCustomer(selected.id, payload);
       }
 
-      closeModal();
+      if (mode !== 'add') closeModal();
       await loadData(recordStatus);
     } catch (error) {
       setFormErr(error.response?.data?.error || 'Failed to save customer.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetCredentials = async (customer) => {
+    try {
+      const response = await customerApi.resetCredentials(customer.id);
+      setIssuedCredentials(response.data?.credentials || null);
+      setSelected(customer);
+      setMode('credentials');
+    } catch (error) {
+      setFormErr(error.response?.data?.error || 'Unable to generate credentials.');
+    }
+  };
+
+  const previewSubscriberImport = async () => {
+    if (!importFile) { setImportError('Choose an .xlsx file first.'); return; }
+    setImportBusy(true); setImportError(''); setImportPreview(null); setImportCredentials([]);
+    try {
+      const response = await customerApi.previewImport(importFile, importLocation);
+      setImportPreview(response.data);
+    } catch (error) {
+      setImportError(error.response?.data?.error || 'Unable to preview the Excel file.');
+    } finally { setImportBusy(false); }
+  };
+
+  const confirmSubscriberImport = async () => {
+    if (!importFile || !importPreview?.summary?.valid) return;
+    setImportBusy(true); setImportError('');
+    try {
+      const response = await customerApi.importSubscribers(importFile, importLocation);
+      setImportCredentials(response.data?.credentials || []);
+      setImportPreview(null);
+      await loadData(recordStatus);
+    } catch (error) {
+      setImportError(error.response?.data?.error || 'Unable to import subscribers.');
+    } finally { setImportBusy(false); }
+  };
+
+  const downloadCredentialsCsv = () => {
+    if (!importCredentials.length) return;
+    const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = [
+      ['Name', 'Account Number', 'Temporary Password', 'Location'].join(','),
+      ...importCredentials.map((item) => [item.accountName, item.accountNumber, item.temporaryPassword, item.location].map(escape).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cignalcare-temporary-credentials-${importLocation.toLowerCase()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleArchive = async () => {
@@ -278,7 +346,7 @@ export default function AdminCustomers() {
 
     try {
       await customerApi.archiveCustomer(selected.id);
-      closeModal();
+      if (mode !== 'add') closeModal();
       await loadData(recordStatus);
     } catch (error) {
       setFormErr(error.response?.data?.error || 'Failed to archive customer.');
@@ -295,7 +363,7 @@ export default function AdminCustomers() {
 
     try {
       await customerApi.restoreCustomer(selected.id);
-      closeModal();
+      if (mode !== 'add') closeModal();
       await loadData(recordStatus);
     } catch (error) {
       setFormErr(error.response?.data?.error || 'Failed to restore customer.');
@@ -320,7 +388,6 @@ export default function AdminCustomers() {
   };
 
   const currentListLabel = recordStatus === 'archived' ? 'archived customers' : 'active customers';
-  const confirmMatches = deleteConfirm.trim() === String(selected?.accountNumber || '');
 
   return (
     <div className="space-y-4">
@@ -328,17 +395,26 @@ export default function AdminCustomers() {
         <div>
           <h1 className="text-lg font-bold text-gray-800">Customers</h1>
           <p className="mt-0.5 text-xs text-gray-500">
-            Registered Descallar Satellite Services accounts
+            Verified Descallar Satellite Services subscriber accounts
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => openModal('add')}
-          className="flex items-center gap-1.5 rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
-        >
-          <Plus size={14} /> Add Customer
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setMode('import'); setImportError(''); setImportPreview(null); setImportCredentials([]); }}
+            className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            <Upload size={14} /> Import Excel
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIssuedCredentials(null); openModal('add'); }}
+            className="flex items-center gap-1.5 rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+          >
+            <Plus size={14} /> Add Subscriber
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
@@ -466,7 +542,7 @@ export default function AdminCustomers() {
             <Search size={14} className="text-gray-400" />
             <input
               type="text"
-              placeholder="Search name, account, CCA, phone..."
+              placeholder="Search name, account, CCA, phone, email..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder-gray-400"
@@ -635,6 +711,14 @@ export default function AdminCustomers() {
                                 Edit
                               </SmallActionButton>
                               <SmallActionButton
+                                title="Generate temporary password"
+                                icon={<KeyRound size={12} />}
+                                className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                                onClick={() => handleResetCredentials(customer)}
+                              >
+                                Credentials
+                              </SmallActionButton>
+                              <SmallActionButton
                                 title="Archive customer"
                                 icon={<Archive size={12} />}
                                 className="text-slate-600 hover:bg-slate-100 hover:text-slate-800"
@@ -689,10 +773,11 @@ export default function AdminCustomers() {
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Account Name *', name: 'accountName' },
+                  { label: 'Subscriber Name *', name: 'accountName' },
                   { label: 'Account Number *', name: 'accountNumber' },
                   { label: 'CCA Number *', name: 'ccaNumber' },
-                  { label: 'Phone', name: 'phone' },
+                  { label: 'Phone (optional)', name: 'phone' },
+                  { label: 'Email (optional)', name: 'email' },
                 ].map((field) => (
                   <div key={field.name}>
                     <label
@@ -704,8 +789,16 @@ export default function AdminCustomers() {
                     <input
                       name={field.name}
                       value={form[field.name]}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000]"
+                      inputMode={field.name === 'accountNumber' || field.name === 'ccaNumber' ? 'numeric' : undefined}
+                      maxLength={field.name === 'accountNumber' ? 9 : field.name === 'ccaNumber' ? 11 : undefined}
+                      disabled={mode === 'edit' && (field.name === 'accountNumber' || field.name === 'ccaNumber')}
+                      onChange={(event) => {
+                        if (field.name === 'accountNumber' || field.name === 'ccaNumber') {
+                          event.target.value = event.target.value.replace(/\D/g, '');
+                        }
+                        handleChange(event);
+                      }}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000] disabled:bg-gray-100 disabled:text-gray-500"
                     />
                   </div>
                 ))}
@@ -746,14 +839,23 @@ export default function AdminCustomers() {
                 </div>
               </div>
 
+              {mode === 'add' && issuedCredentials && (
+                <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-xs text-green-800">
+                  <p className="font-bold">Temporary credentials — show or copy these now.</p>
+                  <p className="mt-1">Account Number: <span className="font-mono font-bold">{issuedCredentials.accountNumber}</span></p>
+                  <p>Temporary Password: <span className="font-mono font-bold">{issuedCredentials.temporaryPassword}</span></p>
+                  <p className="mt-1 text-green-700">The subscriber will be required to create a new password on first login.</p>
+                </div>
+              )}
+
               <div className="mt-4 flex gap-2">
                 <button
                   type="button"
-                  onClick={saveCustomer}
+                  onClick={mode === 'add' && issuedCredentials ? closeModal : saveCustomer}
                   disabled={saving}
                   className="flex-1 rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                 >
-                  {saving ? 'Saving...' : mode === 'add' ? 'Save Customer' : 'Update Customer'}
+                  {saving ? 'Saving...' : mode === 'add' && issuedCredentials ? 'Done' : mode === 'add' ? 'Create Subscriber' : 'Update Customer'}
                 </button>
                 <button
                   type="button"
@@ -763,6 +865,85 @@ export default function AdminCustomers() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode === 'credentials' && issuedCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <h2 className="text-sm font-bold text-gray-900">Temporary Login Credentials</h2>
+            <p className="mt-2 text-xs text-gray-500">Give these directly to the verified subscriber. The password will be changed on first login.</p>
+            <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs">
+              <p>Account Number: <span className="font-mono font-bold">{issuedCredentials.accountNumber}</span></p>
+              <p className="mt-1">Temporary Password: <span className="font-mono font-bold">{issuedCredentials.temporaryPassword}</span></p>
+            </div>
+            <button type="button" onClick={closeModal} className="mt-4 w-full rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white">Done</button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'import' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Import Subscribers from Excel</h2>
+                <p className="text-xs text-gray-500">Required columns: NAME, ADDRESS, CCA NUMBER, ACCT NUMBER</p>
+              </div>
+              <button type="button" onClick={closeModal}><X size={17} className="text-gray-400" /></button>
+            </div>
+            <div className="max-h-[78vh] overflow-y-auto p-5">
+              {importError && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{importError}</div>}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Location for this file</label>
+                  <select value={importLocation} onChange={(e) => { setImportLocation(e.target.value); setImportPreview(null); }} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs">
+                    {LOCATIONS.map((location) => <option key={location}>{location}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Excel file (.xlsx)</label>
+                  <input type="file" accept=".xlsx" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportPreview(null); setImportCredentials([]); }} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs" />
+                </div>
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <button type="button" disabled={importBusy || !importFile} onClick={previewSubscriberImport} className="rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                  {importBusy ? 'Checking...' : 'Preview & Validate'}
+                </button>
+                {importPreview?.summary?.valid > 0 && (
+                  <button type="button" disabled={importBusy} onClick={confirmSubscriberImport} className="rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                    Import {importPreview.summary.valid} Valid Subscriber{importPreview.summary.valid === 1 ? '' : 's'}
+                  </button>
+                )}
+              </div>
+
+              {importPreview && (
+                <div className="mt-4">
+                  <div className="mb-2 flex gap-3 text-xs">
+                    <span className="font-semibold text-gray-700">Total: {importPreview.summary.total}</span>
+                    <span className="font-semibold text-green-700">Valid: {importPreview.summary.valid}</span>
+                    <span className="font-semibold text-red-700">Invalid/Duplicate: {importPreview.summary.invalid}</span>
+                  </div>
+                  <div className="max-h-64 overflow-auto rounded-xl border">
+                    <table className="w-full text-[11px]">
+                      <thead className="sticky top-0 bg-gray-50"><tr><th className="p-2 text-left">Row</th><th className="p-2 text-left">Name</th><th className="p-2 text-left">Account</th><th className="p-2 text-left">CCA</th><th className="p-2 text-left">Result</th></tr></thead>
+                      <tbody>{importPreview.rows.map((row) => <tr key={row.rowNumber} className="border-t"><td className="p-2">{row.rowNumber}</td><td className="p-2">{row.accountName}</td><td className="p-2 font-mono">{row.accountNumber}</td><td className="p-2 font-mono">{row.ccaNumber}</td><td className={`p-2 ${row.valid ? 'text-green-700' : 'text-red-700'}`}>{row.valid ? 'Valid' : row.errors.join(' ')}</td></tr>)}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {importCredentials.length > 0 && (
+                <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div><p className="text-xs font-bold text-green-800">Import complete: {importCredentials.length} credentials generated.</p><p className="text-[11px] text-green-700">Download them now. The system stores only password hashes.</p></div>
+                    <button type="button" onClick={downloadCredentialsCsv} className="flex items-center gap-1 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white"><Download size={13} /> Download Credentials</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

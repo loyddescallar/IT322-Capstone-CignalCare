@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   X,
   Search,
-  User,
   Hash,
+  LockKeyhole,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -89,8 +89,8 @@ const STATUS_COLORS = {
 export default function Login() {
   const navigate = useNavigate();
 
-  const [accountName, setAccountName] = useState('');
-  const [accountId, setAccountId] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -124,8 +124,13 @@ export default function Login() {
   const handleLogin = async (event) => {
     event.preventDefault();
 
-    if (!accountName.trim() || !accountId.trim()) {
-      setError('All fields are required.');
+    if (!/^\d{1,9}$/.test(accountNumber.trim())) {
+      setError('Enter your Account Number using up to 9 digits.');
+      return;
+    }
+
+    if (!password) {
+      setError('Password is required.');
       return;
     }
 
@@ -134,21 +139,22 @@ export default function Login() {
 
     try {
       const response = await authApi.login({
-        accountName: accountName.trim(),
-        accountId: accountId.trim(),
+        accountNumber: accountNumber.trim(),
+        password,
       });
 
-      const { token, user } = response.data;
+      const { token, user, mustChangePassword, passwordChangeToken } = response.data;
+
+      if (mustChangePassword) {
+        sessionStorage.setItem('passwordChangeToken', passwordChangeToken);
+        sessionStorage.setItem('pendingPasswordUser', JSON.stringify(user));
+        navigate('/change-password');
+        return;
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-
-      if (user.role === 'admin') {
-        localStorage.setItem('adminUser', JSON.stringify(user));
-        navigate('/admin-dashboard');
-      } else {
-        navigate('/user-dashboard');
-      }
+      navigate('/user-dashboard');
     } catch (loginError) {
       setError(
         loginError.response?.data?.error ||
@@ -334,8 +340,7 @@ export default function Login() {
                   </div>
 
                   <p className="text-sm leading-6 text-gray-500">
-                    Enter your registered account name and account or CCA
-                    number.
+                    Existing subscribers can sign in using the Account Number and temporary or personal password issued for their CignalCare+ account.
                   </p>
                 </div>
 
@@ -347,58 +352,44 @@ export default function Login() {
 
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div>
-                    <label
-                      htmlFor="accountName"
-                      className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-600"
-                    >
-                      Account Name
+                    <label htmlFor="accountNumber" className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-600">
+                      Account Number
                     </label>
-
                     <div className="relative">
-                      <User
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
-
+                      <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
-                        id="accountName"
+                        id="accountNumber"
                         type="text"
-                        value={accountName}
+                        inputMode="numeric"
+                        maxLength={9}
+                        value={accountNumber}
                         onChange={(event) => {
-                          setAccountName(event.target.value);
+                          setAccountNumber(event.target.value.replace(/\D/g, '').slice(0, 9));
                           if (error) setError('');
                         }}
                         autoComplete="username"
-                        placeholder="Enter your account name"
+                        placeholder="Account Number (up to 9 digits)"
                         className="w-full rounded-xl border border-gray-200 bg-white py-3.5 pl-11 pr-4 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#cc0000] focus:ring-4 focus:ring-red-100"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="accountId"
-                      className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-600"
-                    >
-                      Account Number / CCA Number
+                    <label htmlFor="password" className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-600">
+                      Password
                     </label>
-
                     <div className="relative">
-                      <Hash
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
-
+                      <LockKeyhole size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
-                        id="accountId"
-                        type="text"
-                        value={accountId}
+                        id="password"
+                        type="password"
+                        value={password}
                         onChange={(event) => {
-                          setAccountId(event.target.value);
+                          setPassword(event.target.value);
                           if (error) setError('');
                         }}
                         autoComplete="current-password"
-                        placeholder="Enter account or CCA number"
+                        placeholder="Enter your password"
                         className="w-full rounded-xl border border-gray-200 bg-white py-3.5 pl-11 pr-4 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#cc0000] focus:ring-4 focus:ring-red-100"
                       />
                     </div>
@@ -413,16 +404,10 @@ export default function Login() {
                   </button>
                 </form>
 
-                <div className="mt-5 flex flex-col gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/register')}
-                    className="text-xs text-gray-500 transition hover:text-[#cc0000]"
-                  >
-                    Don&apos;t have an account?{' '}
-                    <span className="font-bold">Register</span>
-                  </button>
-
+                <div className="mt-5 flex flex-col gap-2 text-center">
+                  <p className="text-xs leading-5 text-gray-500">
+                    Need login credentials or forgot your password? Contact Descallar Satellite Services for account verification and a temporary password.
+                  </p>
                   <button
                     type="button"
                     onClick={() => navigate('/admin-login')}

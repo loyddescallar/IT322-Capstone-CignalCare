@@ -544,7 +544,7 @@ export default function AdminDashboard() {
       activities.push({
         id: `customer-${customer.id}`,
         icon: UserPlus,
-        title: 'New subscriber registered',
+        title: 'Subscriber account created',
         desc: customer.accountName || 'Customer account created',
         time: date,
         path: '/admin/customers',

@@ -6,7 +6,7 @@ import AdminChat from './pages/admin/AdminChat';
 
 // Auth
 import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
+import ChangePassword from './pages/auth/ChangePassword';
 import AdminLogin from './pages/auth/AdminLogin';
 
 // User
@@ -28,7 +28,8 @@ export default function App() {
     <Routes>
       {/* Auth */}
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/admin-login" element={<AdminLogin />} />
 
       {/* Admin */}
