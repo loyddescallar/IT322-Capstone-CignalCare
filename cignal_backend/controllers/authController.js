@@ -44,6 +44,14 @@ const pendingAdminSetups = new Map();
 const pendingAdminRecoveries = new Map();
 const PENDING_TTL_MS = 10 * 60 * 1000;
 
+function passwordFingerprint(passwordHash) {
+  return crypto
+    .createHash('sha256')
+    .update(String(passwordHash || ''))
+    .digest('hex')
+    .slice(0, 24);
+}
+
 function signToken(user, extra = {}) {
   return jwt.sign(
     {
@@ -113,7 +121,12 @@ async function login(req, res) {
 
     if (Boolean(user.must_change_password)) {
       const passwordChangeToken = jwt.sign(
-        { id: user.id, role: 'user', purpose: 'password_change' },
+        {
+          id: user.id,
+          role: 'user',
+          purpose: 'password_change',
+          credentialFingerprint: passwordFingerprint(user.password_hash),
+        },
         getJwtSecret(),
         { expiresIn: '20m' }
       );
@@ -149,6 +162,25 @@ async function changePassword(req, res) {
     const user = await findById(payload.id);
     if (!user || user.role !== 'user' || String(user.status || '').toLowerCase() !== 'active') {
       return res.status(401).json({ error: 'Account is unavailable.' });
+    }
+
+    if (!Boolean(user.must_change_password)) {
+      return res.status(409).json({
+        error: 'This temporary password-change session has already been used. Please log in normally.',
+      });
+    }
+
+    if (
+      !payload.credentialFingerprint ||
+      payload.credentialFingerprint !== passwordFingerprint(user.password_hash)
+    ) {
+      return res.status(401).json({
+        error: 'Temporary credentials have changed. Please log in again using the latest credentials.',
+      });
+    }
+
+    if (await bcrypt.compare(password, user.password_hash)) {
+      return res.status(400).json({ error: 'Your new password must be different from the temporary password.' });
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -517,7 +549,12 @@ async function me(req, res) {
 
 async function lookupByAccountId(req, res) {
   try {
-    const user = await findByAccountIdOrCca(req.params.accountId);
+    const accountId = String(req.params.accountId || '').trim();
+    if (!/^\d{1,11}$/.test(accountId)) {
+      return res.status(400).json({ error: 'Enter a valid Account Number or CCA Number.' });
+    }
+
+    const user = await findByAccountIdOrCca(accountId);
     if (!user) return res.status(404).json({ error: 'Account not found' });
     return res.json({ user: {
       accountName: user.accountName, accountNumber: user.accountNumber, ccaNumber: user.ccaNumber,
