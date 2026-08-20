@@ -23,6 +23,8 @@ import {
   X,
   Save,
   ExternalLink,
+  Mail,
+  KeyRound,
 } from 'lucide-react';
 
 import customerApi from '../../api/customerApi';
@@ -44,6 +46,7 @@ const EMPTY_FORM = {
   ccaNumber: '',
   address: '',
   phone: '',
+  email: '',
   location: 'Balayan',
 };
 
@@ -263,6 +266,7 @@ export default function AdminCustomerProfile() {
 
   const [activeTab, setActiveTab] = useState('transactions');
   const [mode, setMode] = useState(null);
+  const [issuedCredentials, setIssuedCredentials] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [formErr, setFormErr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -409,6 +413,7 @@ export default function AdminCustomerProfile() {
       ccaNumber: customer.ccaNumber || '',
       address: customer.address || '',
       phone: customer.phone || '',
+      email: customer.email || '',
       location: normalizeLocation(customer.location) || 'Balayan',
     });
     setMode('edit');
@@ -435,8 +440,9 @@ export default function AdminCustomerProfile() {
     if (!form.ccaNumber.trim()) return 'CCA number is required.';
     if (!form.location.trim()) return 'Coverage location is required.';
 
-    if (form.accountNumber.trim().length < 5) {
-      return 'Account number looks too short.';
+    if (!form.address.trim()) return 'Address is required.';
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return 'Email format is invalid.';
     }
 
     if (form.phone.trim() && form.phone.trim().length < 7) {
@@ -466,6 +472,21 @@ export default function AdminCustomerProfile() {
       await loadProfile();
     } catch (error) {
       setFormErr(error.response?.data?.error || 'Failed to update customer.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleResetCredentials() {
+    if (!customer || isArchived) return;
+    setSaving(true);
+    setFormErr('');
+    try {
+      const response = await customerApi.resetCredentials(customer.id);
+      setIssuedCredentials(response.data?.credentials || null);
+      setMode('credentials');
+    } catch (error) {
+      setFormErr(error.response?.data?.error || 'Unable to generate credentials.');
     } finally {
       setSaving(false);
     }
@@ -602,6 +623,13 @@ export default function AdminCustomerProfile() {
                   </div>
 
                   <div className="flex items-center gap-1">
+                    <Mail size={11} className="text-slate-400" />
+                    <span className="text-xs text-slate-600">
+                      {customer.email || 'No email'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
                     <MapPin size={11} className="text-slate-400" />
                     <span className="text-xs text-slate-600">
                       {customer.address || normalizeLocation(customer.location)}
@@ -642,6 +670,16 @@ export default function AdminCustomerProfile() {
                   >
                     <Pencil size={13} />
                     Edit Customer
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetCredentials}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                  >
+                    <KeyRound size={13} />
+                    Reset Credentials
                   </button>
 
                   <button
@@ -1080,6 +1118,11 @@ export default function AdminCustomerProfile() {
                 Icon: Phone,
               },
               {
+                label: 'Email',
+                value: customer.email || '—',
+                Icon: Mail,
+              },
+              {
                 label: 'Location',
                 value: normalizeLocation(customer.location),
                 Icon: MapPin,
@@ -1120,6 +1163,20 @@ export default function AdminCustomerProfile() {
         </div>
       </div>
 
+      {mode === 'credentials' && issuedCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <h2 className="text-sm font-bold text-gray-900">Temporary Login Credentials</h2>
+            <p className="mt-2 text-xs leading-5 text-gray-500">Give these directly to the verified subscriber. This password must be changed on the next login.</p>
+            <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs">
+              <p>Account Number: <span className="font-mono font-bold">{issuedCredentials.accountNumber}</span></p>
+              <p className="mt-1">Temporary Password: <span className="font-mono font-bold">{issuedCredentials.temporaryPassword}</span></p>
+            </div>
+            <button type="button" onClick={closeModal} className="mt-4 w-full rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white">Done</button>
+          </div>
+        </div>
+      )}
+
       {/* Edit Modal */}
       {mode === 'edit' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -1148,7 +1205,7 @@ export default function AdminCustomerProfile() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   {
-                    label: 'Account Name *',
+                    label: 'Subscriber Name *',
                     name: 'accountName',
                   },
                   {
@@ -1160,8 +1217,12 @@ export default function AdminCustomerProfile() {
                     name: 'ccaNumber',
                   },
                   {
-                    label: 'Phone',
+                    label: 'Phone (optional)',
                     name: 'phone',
+                  },
+                  {
+                    label: 'Email (optional)',
+                    name: 'email',
                   },
                 ].map((field) => (
                   <div key={field.name}>
@@ -1175,11 +1236,23 @@ export default function AdminCustomerProfile() {
                     <input
                       name={field.name}
                       value={form[field.name]}
-                      onChange={handleFormChange}
+                      inputMode={field.name === 'accountNumber' || field.name === 'ccaNumber' ? 'numeric' : undefined}
+                      maxLength={field.name === 'accountNumber' ? 9 : field.name === 'ccaNumber' ? 11 : undefined}
+                      disabled={field.name === 'accountNumber' || field.name === 'ccaNumber'}
+                      onChange={(event) => {
+                        if (field.name === 'accountNumber' || field.name === 'ccaNumber') {
+                          event.target.value = event.target.value.replace(/\D/g, '');
+                        }
+                        handleFormChange(event);
+                      }}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000]"
                     />
                   </div>
                 ))}
+
+                <div className="col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500">
+                  Account Number and CCA Number are permanent subscriber identifiers. Correct them only through a controlled data migration.
+                </div>
 
                 <div className="col-span-2">
                   <label

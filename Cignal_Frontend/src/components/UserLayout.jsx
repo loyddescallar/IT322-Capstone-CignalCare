@@ -10,12 +10,12 @@ export default function UserLayout({ children }) {
   useEffect(()=>{
     const token=localStorage.getItem('token');
     const user=JSON.parse(localStorage.getItem('user')||'{}');
-    const noAuthPaths=['/login','/register','/admin-login'];
+    const noAuthPaths=['/login','/register','/admin-login','/change-password'];
     if(!token&&!noAuthPaths.includes(location.pathname)){navigate('/login',{replace:true});}
     if(token&&user.role==='admin'&&!location.pathname.startsWith('/admin')){/* allow admin to see user pages */}
   },[navigate,location.pathname]);
 
-  const hidePaths=['/login','/register','/admin-login'];
+  const hidePaths=['/login','/register','/admin-login','/change-password'];
   const showNavbar=!hidePaths.includes(location.pathname);
 
   return (
