@@ -62,15 +62,17 @@ axiosClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const currentPath = window.location.pathname || '';
-      const isAdminPath =
-        currentPath.startsWith('/admin') ||
-        currentPath === '/admin-dashboard';
+      const isAuthPage = ['/login', '/admin-login', '/change-password'].includes(currentPath);
+      const isAdminPath = currentPath.startsWith('/admin') || currentPath === '/admin-dashboard';
 
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('adminUser');
-
-      window.location.href = isAdminPath ? '/admin-login' : '/login';
+      // Authentication screens need to display invalid-login / recovery errors
+      // themselves instead of being reloaded by the global interceptor.
+      if (!isAuthPage) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('adminUser');
+        window.location.href = isAdminPath ? '/admin-login' : '/login';
+      }
     }
 
     return Promise.reject(error);

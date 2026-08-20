@@ -43,6 +43,7 @@ export default function App() {
       <Route path="/admin/transactions" element={<AdminWorkspace />} />
       <Route path="/admin/load-requests" element={<AdminWorkspace />} />
       <Route path="/admin/analytics" element={<AdminWorkspace />} />
+      <Route path="/admin/security" element={<AdminWorkspace />} />
       <Route path="/admin/chat/:ticketId" element={<AdminChat />} />
 
       {/* User */}

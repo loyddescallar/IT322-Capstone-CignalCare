@@ -35,6 +35,7 @@ import AdminPlans from './AdminPlans';
 import AdminTransactions from './AdminTransactions';
 import AdminLoadRequests from './AdminLoadRequests';
 import AdminAnalytics from './AdminAnalytics';
+import AdminSecurity from './AdminSecurity';
 
 const navGroups = [
   {
@@ -108,6 +109,17 @@ const navGroups = [
         label: 'Analytics',
         path: '/admin/analytics',
         key: 'analytics',
+      },
+    ],
+  },
+  {
+    group: 'Security',
+    items: [
+      {
+        icon: ShieldCheck,
+        label: 'Admin Security',
+        path: '/admin/security',
+        key: 'security',
       },
     ],
   },
@@ -409,6 +421,8 @@ export default function AdminWorkspace() {
         return <AdminLoadRequests />;
       case 'analytics':
         return <AdminAnalytics />;
+      case 'security':
+        return <AdminSecurity />;
       default:
         return <AdminDashboard />;
     }
