@@ -7,7 +7,6 @@ const {
   updateUser,
   archiveUser,
   restoreUser,
-  permanentDeleteUser,
   checkDuplicate,
   normalizeLocation,
 } = require('../models/userModel');
@@ -194,39 +193,6 @@ async function restoreCustomerController(req, res) {
   }
 }
 
-async function permanentDeleteCustomerController(req, res) {
-  try {
-    const customer = await findById(req.params.id);
-    if (!customer) return res.status(404).json({ error: 'Customer not found' });
-
-    if (String(customer.status || '').toLowerCase() !== 'archived') {
-      return res.status(400).json({ error: 'Archive the customer before permanent deletion' });
-    }
-
-    const confirmAccountNumber = String(req.body?.confirmAccountNumber || '').trim();
-    if (confirmAccountNumber !== String(customer.accountNumber)) {
-      return res.status(400).json({ error: 'Account number confirmation does not match' });
-    }
-
-    const customerName = customer.accountName;
-    const accountNumber = customer.accountNumber;
-    const deleted = await permanentDeleteUser(req.params.id);
-
-    if (!deleted) return res.status(400).json({ error: 'Unable to permanently delete customer' });
-
-    await notifySafely('DELETE CUSTOMER', () =>
-      createAdminNotification({
-        type: 'admin_customer',
-        message: `Customer permanently deleted: ${customerName} (${accountNumber}).`,
-      })
-    );
-
-    return res.json({ message: 'Customer permanently deleted' });
-  } catch (err) {
-    console.error('PERMANENT DELETE CUSTOMER ERROR', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-}
 
 module.exports = {
   getCustomerByAccount,
@@ -237,5 +203,4 @@ module.exports = {
   updateCustomerController,
   archiveCustomerController,
   restoreCustomerController,
-  permanentDeleteCustomerController,
 };

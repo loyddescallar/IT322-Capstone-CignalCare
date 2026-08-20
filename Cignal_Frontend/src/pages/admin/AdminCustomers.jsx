@@ -13,8 +13,6 @@ import {
   XCircle,
   Archive,
   RotateCcw,
-  Trash2,
-  ShieldAlert,
 } from 'lucide-react';
 import customerApi from '../../api/customerApi';
 
@@ -150,7 +148,6 @@ export default function AdminCustomers() {
   const [form, setForm] = useState({ ...EMPTY });
   const [formErr, setFormErr] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState('');
 
   const loadData = async (status = recordStatus) => {
     setLoading(true);
@@ -211,7 +208,6 @@ export default function AdminCustomers() {
     setMode(nextMode);
     setSelected(customer);
     setFormErr('');
-    setDeleteConfirm('');
 
     if (nextMode === 'edit' && customer) {
       setForm({
@@ -232,7 +228,6 @@ export default function AdminCustomers() {
     setSelected(null);
     setFormErr('');
     setSaving(false);
-    setDeleteConfirm('');
   };
 
   const handleChange = (event) => {
@@ -309,22 +304,6 @@ export default function AdminCustomers() {
     }
   };
 
-  const handlePermanentDelete = async () => {
-    if (!selected) return;
-
-    setSaving(true);
-    setFormErr('');
-
-    try {
-      await customerApi.permanentDeleteCustomer(selected.id, deleteConfirm.trim());
-      closeModal();
-      await loadData(recordStatus);
-    } catch (error) {
-      setFormErr(error.response?.data?.error || 'Failed to permanently delete customer.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleCcaSearch = (event) => {
     event.preventDefault();
@@ -665,24 +644,14 @@ export default function AdminCustomers() {
                               </SmallActionButton>
                             </>
                           ) : (
-                            <>
-                              <SmallActionButton
-                                title="Restore customer"
-                                icon={<RotateCcw size={12} />}
-                                className="text-green-600 hover:bg-green-50 hover:text-green-700"
-                                onClick={() => openModal('restore', customer)}
-                              >
-                                Restore
-                              </SmallActionButton>
-                              <SmallActionButton
-                                title="Delete customer permanently"
-                                icon={<Trash2 size={12} />}
-                                className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                                onClick={() => openModal('permanent-delete', customer)}
-                              >
-                                Delete
-                              </SmallActionButton>
-                            </>
+                            <SmallActionButton
+                              title="Restore customer"
+                              icon={<RotateCcw size={12} />}
+                              className="text-green-600 hover:bg-green-50 hover:text-green-700"
+                              onClick={() => openModal('restore', customer)}
+                            >
+                              Restore
+                            </SmallActionButton>
                           )}
                         </div>
                       </td>
@@ -873,60 +842,7 @@ export default function AdminCustomers() {
         </div>
       )}
 
-      {mode === 'permanent-delete' && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-red-700">
-                <ShieldAlert size={16} /> Delete Permanently
-              </h2>
-              <button type="button" onClick={closeModal} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5">
-              {formErr && (
-                <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
-                  {formErr}
-                </div>
-              )}
 
-              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs leading-relaxed text-red-700">
-                This action cannot be undone. The customer account will be permanently removed.
-                Some connected records may be detached or removed depending on database relationships.
-              </div>
-
-              <p className="mt-3 text-xs leading-relaxed text-gray-600">
-                To confirm deletion of <span className="font-semibold">{selected.accountName}</span>, type the account number:
-              </p>
-              <p className="mt-1 rounded-lg bg-gray-100 px-3 py-2 font-mono text-xs font-bold text-gray-700">
-                {selected.accountNumber}
-              </p>
-
-              <input
-                value={deleteConfirm}
-                onChange={(event) => setDeleteConfirm(event.target.value)}
-                placeholder="Type account number here"
-                className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-red-500"
-              />
-
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handlePermanentDelete}
-                  disabled={saving || !confirmMatches}
-                  className="flex-1 rounded-xl bg-red-600 py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving ? 'Deleting...' : 'Delete Permanently'}
-                </button>
-                <button type="button" onClick={closeModal} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-xs text-gray-600 hover:bg-gray-50">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

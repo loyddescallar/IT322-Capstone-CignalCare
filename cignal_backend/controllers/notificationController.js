@@ -1,6 +1,7 @@
 const {
   getNotificationsForUser,
   markNotificationsRead,
+  markNotificationRead,
   createNotification,
   createAdminNotification: createAdminNotificationForAdmins,
 } = require('../models/notificationModel');
@@ -21,6 +22,27 @@ async function markMyNotificationsRead(req, res) {
   );
 
   return res.json({ message: 'Notifications marked as read', updated });
+}
+
+
+async function markMyNotificationRead(req, res) {
+  const notificationId = Number(req.params.id);
+
+  if (!Number.isInteger(notificationId) || notificationId <= 0) {
+    return res.status(400).json({ error: 'Invalid notification id' });
+  }
+
+  const updated = await markNotificationRead(
+    notificationId,
+    req.user.id,
+    req.user.accountNumber
+  );
+
+  if (!updated) {
+    return res.status(404).json({ error: 'Notification not found' });
+  }
+
+  return res.json({ message: 'Notification marked as read' });
 }
 
 async function createAdminNotification(req, res) {
@@ -55,5 +77,6 @@ async function createAdminNotification(req, res) {
 module.exports = {
   getMyNotifications,
   markMyNotificationsRead,
+  markMyNotificationRead,
   createAdminNotification,
 };

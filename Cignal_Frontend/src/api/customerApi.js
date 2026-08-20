@@ -9,14 +9,6 @@ const customerApi = {
   createCustomer: (data) => axiosClient.post('/customers', data),
   updateCustomer: (id, data) => axiosClient.put('/customers/id/' + id, data),
   archiveCustomer: (id) => axiosClient.patch('/customers/id/' + id + '/archive'),
-  restoreCustomer: (id) => axiosClient.patch('/customers/id/' + id + '/restore'),
-  permanentDeleteCustomer: (id, confirmAccountNumber) =>
-    axiosClient.delete('/customers/id/' + id + '/permanent', {
-      data: { confirmAccountNumber },
-    }),
-
-  // Backward compatibility for older pages/components.
-  deleteCustomer: (id) => axiosClient.patch('/customers/id/' + id + '/archive'),
-};
+  restoreCustomer: (id) => axiosClient.patch('/customers/id/' + id + '/restore'),};
 
 export default customerApi;
