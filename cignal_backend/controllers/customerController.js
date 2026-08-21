@@ -31,7 +31,14 @@ const {
 
 function safeCustomer(customer) {
   if (!customer) return customer;
-  const { password_hash, recovery_code_hash, auth_session_version, ...safe } = customer;
+  const {
+    password_hash,
+    recovery_code_hash,
+    auth_session_version,
+    email_verification_code_hash,
+    password_reset_code_hash,
+    ...safe
+  } = customer;
   return safe;
 }
 

@@ -23,6 +23,7 @@ import UserLoadHistory from './pages/user/UserLoadHistory';
 import Troubleshoot from './pages/user/Troubleshoot';
 import TroubleshootModel from './pages/user/TroubleshootModel';
 import TroubleshootIssue from './pages/user/TroubleshootIssue';
+import AccountSecurity from './pages/user/AccountSecurity';
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/user/retrieve-info" element={<UserRetrieveInfo />} />
       <Route path="/user/load-request" element={<UserLoadRequest />} />
       <Route path="/user/load-history" element={<UserLoadHistory />} />
+      <Route path="/user/account-security" element={<AccountSecurity />} />
 
       {/* Troubleshooting */}
       <Route path="/troubleshoot" element={<Troubleshoot />} />

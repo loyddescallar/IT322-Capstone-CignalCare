@@ -9,6 +9,12 @@ const authApi = {
       headers: { Authorization: `Bearer ${passwordChangeToken}` },
     }),
   recoverPassword: (data) => axiosClient.post('/auth/recover-password', data),
+  recoveryOptions: (data) => axiosClient.post('/auth/recovery-options', data),
+  startEmailRecovery: (data) => axiosClient.post('/auth/email-recovery/start', data),
+  completeEmailRecovery: (data) => axiosClient.post('/auth/email-recovery/complete', data),
+  customerSecurityInfo: () => axiosClient.get('/auth/customer/security'),
+  requestEmailVerification: (data) => axiosClient.post('/auth/customer/email/verification/request', data),
+  confirmEmailVerification: (data) => axiosClient.post('/auth/customer/email/verification/confirm', data),
   me: () => axiosClient.get('/auth/me'),
   lookup: (id) => axiosClient.get('/auth/lookup/' + id),
 

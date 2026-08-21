@@ -62,7 +62,7 @@ axiosClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       const currentPath = window.location.pathname || '';
-      const isAuthPage = ['/login', '/admin-login', '/change-password'].includes(currentPath);
+      const isAuthPage = ['/login', '/admin-login', '/change-password', '/forgot-password'].includes(currentPath);
       const isAdminPath = currentPath.startsWith('/admin') || currentPath === '/admin-dashboard';
 
       // Authentication screens need to display invalid-login / recovery errors
