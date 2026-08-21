@@ -8,6 +8,7 @@ const authApi = {
     axiosClient.post('/auth/change-password', { password }, {
       headers: { Authorization: `Bearer ${passwordChangeToken}` },
     }),
+  recoverPassword: (data) => axiosClient.post('/auth/recover-password', data),
   me: () => axiosClient.get('/auth/me'),
   lookup: (id) => axiosClient.get('/auth/lookup/' + id),
 

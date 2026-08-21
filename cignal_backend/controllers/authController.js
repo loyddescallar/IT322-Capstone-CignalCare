@@ -7,7 +7,8 @@ const {
   findByAccountNumber,
   findById,
   findByAccountIdOrCca,
-  setPassword,
+  completeCustomerPasswordChange,
+  recoverCustomerAccount,
 } = require('../models/userModel');
 const {
   hasConfiguredAdminSecurity,
@@ -25,7 +26,12 @@ const {
   changePasswordAndRevokeSessions,
   updateAdminEmail,
 } = require('../models/adminSecurityModel');
-const { ACCOUNT_NUMBER_RE, validateNewPassword } = require('../utils/subscriberAccount');
+const {
+  ACCOUNT_NUMBER_RE,
+  validateNewPassword,
+  generateRecoveryCode: generateCustomerRecoveryCode,
+  hashRecoveryCode: hashCustomerRecoveryCode,
+} = require('../utils/subscriberAccount');
 const {
   normalizeAdminUsername,
   validateAdminUsername,
@@ -120,6 +126,17 @@ async function login(req, res) {
     if (!matches) return res.status(401).json({ error: 'Invalid Account Number or password.' });
 
     if (Boolean(user.must_change_password)) {
+      const expiresAt = user.temporary_password_expires_at
+        ? new Date(user.temporary_password_expires_at).getTime()
+        : 0;
+
+      if (!expiresAt || expiresAt <= Date.now()) {
+        return res.status(403).json({
+          error: 'This temporary password has expired. Use your recovery code to reset your password, or contact Descallar Satellite Services if you no longer have the recovery code.',
+          temporaryPasswordExpired: true,
+        });
+      }
+
       const passwordChangeToken = jwt.sign(
         {
           id: user.id,
@@ -133,7 +150,10 @@ async function login(req, res) {
       return res.json({ mustChangePassword: true, passwordChangeToken, user: publicUser(user) });
     }
 
-    return res.json({ token: signToken(user), user: publicUser(user) });
+    return res.json({
+      token: signToken(user, { sessionVersion: Number(user.auth_session_version || 1) }),
+      user: publicUser(user),
+    });
   } catch (err) {
     console.error('LOGIN ERROR', err);
     return res.status(500).json({ error: 'Server error during login' });
@@ -184,15 +204,92 @@ async function changePassword(req, res) {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    await setPassword(user.id, hash, false);
-    const updated = { ...user, must_change_password: false };
-    return res.json({ message: 'Password updated successfully.', token: signToken(updated), user: publicUser(updated) });
+    const sessionVersion = await completeCustomerPasswordChange(user.id, hash);
+    const updated = {
+      ...user,
+      password_hash: hash,
+      must_change_password: false,
+      temporary_password_expires_at: null,
+      auth_session_version: sessionVersion,
+    };
+    return res.json({
+      message: 'Password updated successfully.',
+      token: signToken(updated, { sessionVersion }),
+      user: publicUser(updated),
+    });
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Password-change session expired. Please log in again.' });
     }
     console.error('CHANGE PASSWORD ERROR', err);
     return res.status(500).json({ error: 'Unable to change password.' });
+  }
+}
+
+
+async function recoverCustomerPassword(req, res) {
+  try {
+    const accountNumber = String(req.body.accountNumber || '').trim();
+    const recoveryCode = String(req.body.recoveryCode || '').trim();
+    const password = String(req.body.password || '');
+
+    if (!ACCOUNT_NUMBER_RE.test(accountNumber)) {
+      return res.status(400).json({ error: 'Enter a valid Account Number of up to 9 digits.' });
+    }
+
+    const passwordError = validateNewPassword(password);
+    if (passwordError) return res.status(400).json({ error: passwordError });
+    if (!recoveryCode) return res.status(400).json({ error: 'Recovery code is required.' });
+
+    const user = await findByAccountNumber(accountNumber);
+    const submittedHash = hashCustomerRecoveryCode(recoveryCode);
+    const storedHash = String(user?.recovery_code_hash || '');
+
+    let recoveryMatches = false;
+    if (storedHash.length === submittedHash.length && storedHash.length > 0) {
+      recoveryMatches = crypto.timingSafeEqual(
+        Buffer.from(storedHash, 'utf8'),
+        Buffer.from(submittedHash, 'utf8')
+      );
+    }
+
+    if (!user || !recoveryMatches) {
+      return res.status(401).json({
+        error: 'Invalid Account Number or recovery code. If you no longer have your recovery code, contact Descallar Satellite Services.',
+      });
+    }
+
+    if (user.password_hash && await bcrypt.compare(password, user.password_hash)) {
+      return res.status(400).json({
+        error: 'Your new password must be different from your current or temporary password.',
+      });
+    }
+
+    const newRecoveryCode = generateCustomerRecoveryCode();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const sessionVersion = await recoverCustomerAccount(
+      user.id,
+      passwordHash,
+      hashCustomerRecoveryCode(newRecoveryCode)
+    );
+
+    const updated = {
+      ...user,
+      password_hash: passwordHash,
+      must_change_password: false,
+      temporary_password_expires_at: null,
+      auth_session_version: sessionVersion,
+    };
+
+    return res.json({
+      message: 'Password reset successfully. All older customer sessions have been revoked.',
+      token: signToken(updated, { sessionVersion }),
+      user: publicUser(updated),
+      recoveryCode: newRecoveryCode,
+    });
+  } catch (error) {
+    console.error('CUSTOMER RECOVERY ERROR:', error);
+    return res.status(500).json({ error: 'Unable to recover the customer account.' });
   }
 }
 
@@ -542,8 +639,7 @@ async function me(req, res) {
   try {
     const user = await findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const { password_hash, ...safeUser } = user;
-    return res.json({ user: safeUser });
+    return res.json({ user: publicUser(user) });
   } catch (err) { return res.status(500).json({ error: 'Server error' }); }
 }
 
@@ -567,6 +663,7 @@ module.exports = {
   login,
   register,
   changePassword,
+  recoverCustomerPassword,
   adminSecurityStatus,
   adminBootstrapStart,
   adminBootstrapComplete,
