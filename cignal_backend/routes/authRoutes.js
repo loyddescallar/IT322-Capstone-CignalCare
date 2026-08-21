@@ -5,6 +5,12 @@ const {
   register,
   changePassword,
   recoverCustomerPassword,
+  customerSecurityInfo,
+  requestCustomerEmailVerification,
+  confirmCustomerEmailVerification,
+  customerRecoveryOptions,
+  startCustomerEmailRecovery,
+  completeCustomerEmailRecovery,
   adminSecurityStatus,
   adminBootstrapStart,
   adminBootstrapComplete,
@@ -28,6 +34,7 @@ const {
   passwordChangeRateLimit,
   accountInquiryRateLimit,
   customerRecoveryRateLimit,
+  customerEmailRateLimit,
 } = require('../middleware/publicAuthRateLimit');
 
 // Authentication responses can contain tokens, setup secrets, or one-time codes.
@@ -43,6 +50,12 @@ router.post('/login', customerLoginRateLimit, login);
 router.post('/register', register);
 router.post('/change-password', passwordChangeRateLimit, changePassword);
 router.post('/recover-password', customerRecoveryRateLimit, recoverCustomerPassword);
+router.post('/recovery-options', customerRecoveryRateLimit, customerRecoveryOptions);
+router.post('/email-recovery/start', customerEmailRateLimit, startCustomerEmailRecovery);
+router.post('/email-recovery/complete', customerEmailRateLimit, completeCustomerEmailRecovery);
+router.get('/customer/security', authRequired, requireRole('user'), customerSecurityInfo);
+router.post('/customer/email/verification/request', authRequired, requireRole('user'), customerEmailRateLimit, requestCustomerEmailVerification);
+router.post('/customer/email/verification/confirm', authRequired, requireRole('user'), customerEmailRateLimit, confirmCustomerEmailVerification);
 router.get('/me', authRequired, me);
 router.get('/lookup/:accountId', accountInquiryRateLimit, lookupByAccountId);
 

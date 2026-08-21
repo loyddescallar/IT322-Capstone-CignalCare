@@ -65,9 +65,18 @@ const customerRecoveryRateLimit = createRateLimiter({
   message: 'Too many account-recovery attempts. Please wait a few minutes and try again.',
 });
 
+
+const customerEmailRateLimit = createRateLimiter({
+  scope: 'customer-email-security',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 12,
+  message: 'Too many email verification or recovery attempts. Please wait a few minutes and try again.',
+});
+
 module.exports = {
   customerLoginRateLimit,
   passwordChangeRateLimit,
   accountInquiryRateLimit,
   customerRecoveryRateLimit,
+  customerEmailRateLimit,
 };

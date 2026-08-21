@@ -9,6 +9,11 @@ const {
   findByAccountIdOrCca,
   completeCustomerPasswordChange,
   recoverCustomerAccount,
+  setCustomerEmailVerificationChallenge,
+  incrementEmailVerificationAttempts,
+  markCustomerEmailVerified,
+  setCustomerPasswordResetChallenge,
+  incrementPasswordResetAttempts,
 } = require('../models/userModel');
 const {
   hasConfiguredAdminSecurity,
@@ -32,6 +37,22 @@ const {
   generateRecoveryCode: generateCustomerRecoveryCode,
   hashRecoveryCode: hashCustomerRecoveryCode,
 } = require('../utils/subscriberAccount');
+const {
+  OTP_MAX_ATTEMPTS,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  normalizeEmail,
+  isValidEmail,
+  generateEmailOtp,
+  hashEmailOtp,
+  safeHashEquals,
+  otpExpiry,
+  secondsSince,
+  maskEmail,
+} = require('../utils/customerEmailSecurity');
+const {
+  isEmailDeliveryConfigured,
+  sendOtpEmail,
+} = require('../services/emailService');
 const {
   normalizeAdminUsername,
   validateAdminUsername,
@@ -84,6 +105,7 @@ function publicUser(user) {
     address: user.address,
     phone: user.phone,
     email: user.email || null,
+    emailVerified: Boolean(user.email_verified_at),
     role: user.role,
     location: user.location,
     status: user.status,
@@ -290,6 +312,246 @@ async function recoverCustomerPassword(req, res) {
   } catch (error) {
     console.error('CUSTOMER RECOVERY ERROR:', error);
     return res.status(500).json({ error: 'Unable to recover the customer account.' });
+  }
+}
+
+
+async function customerSecurityInfo(req, res) {
+  try {
+    const user = await findById(req.user.id);
+    if (!user || user.role !== 'user') return res.status(404).json({ error: 'Customer account not found.' });
+
+    return res.json({
+      accountNumber: user.accountNumber,
+      email: user.email || '',
+      emailVerified: Boolean(user.email_verified_at),
+      emailVerifiedAt: user.email_verified_at || null,
+      emailDeliveryConfigured: isEmailDeliveryConfigured(),
+    });
+  } catch (error) {
+    console.error('CUSTOMER SECURITY INFO ERROR:', error);
+    return res.status(500).json({ error: 'Unable to load account security information.' });
+  }
+}
+
+async function requestCustomerEmailVerification(req, res) {
+  try {
+    if (!isEmailDeliveryConfigured()) {
+      return res.status(503).json({
+        error: 'Email delivery is not configured yet. You can still use your recovery code for account recovery.',
+      });
+    }
+
+    const user = await findById(req.user.id);
+    if (!user || user.role !== 'user') return res.status(404).json({ error: 'Customer account not found.' });
+
+    const email = normalizeEmail(req.body.email);
+    if (!isValidEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+
+    const sameEmail = normalizeEmail(user.email) === email;
+    if (sameEmail && user.email_verified_at) {
+      return res.status(409).json({ error: 'This email address is already verified.' });
+    }
+
+    if (sameEmail && secondsSince(user.email_verification_last_sent_at) < OTP_RESEND_COOLDOWN_SECONDS) {
+      const wait = OTP_RESEND_COOLDOWN_SECONDS - secondsSince(user.email_verification_last_sent_at);
+      return res.status(429).json({ error: `Please wait ${Math.max(1, wait)} seconds before requesting another code.` });
+    }
+
+    const code = generateEmailOtp();
+    const expiresAt = otpExpiry();
+    const codeHash = hashEmailOtp({
+      userId: user.id,
+      email,
+      purpose: 'verify_email',
+      code,
+    });
+
+    await sendOtpEmail({ to: email, code, purpose: 'verify_email' });
+    await setCustomerEmailVerificationChallenge(user.id, email, codeHash, expiresAt);
+
+    return res.json({
+      message: `Verification code sent to ${maskEmail(email)}. It expires in 10 minutes.`,
+      maskedEmail: maskEmail(email),
+    });
+  } catch (error) {
+    console.error('REQUEST CUSTOMER EMAIL VERIFICATION ERROR:', error);
+    return res.status(500).json({ error: 'Unable to send the verification code right now.' });
+  }
+}
+
+async function confirmCustomerEmailVerification(req, res) {
+  try {
+    const code = String(req.body.code || '').trim();
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit verification code.' });
+
+    const user = await findById(req.user.id);
+    if (!user || user.role !== 'user') return res.status(404).json({ error: 'Customer account not found.' });
+    if (!user.email || !user.email_verification_code_hash || !user.email_verification_expires_at) {
+      return res.status(400).json({ error: 'Request a new verification code first.' });
+    }
+    if (Number(user.email_verification_attempts || 0) >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ error: 'Too many incorrect attempts. Request a new verification code.' });
+    }
+    if (new Date(user.email_verification_expires_at).getTime() <= Date.now()) {
+      return res.status(400).json({ error: 'Verification code expired. Request a new code.' });
+    }
+
+    const submittedHash = hashEmailOtp({
+      userId: user.id,
+      email: user.email,
+      purpose: 'verify_email',
+      code,
+    });
+
+    if (!safeHashEquals(submittedHash, user.email_verification_code_hash)) {
+      await incrementEmailVerificationAttempts(user.id);
+      return res.status(400).json({ error: 'Incorrect verification code.' });
+    }
+
+    const updated = await markCustomerEmailVerified(user.id);
+    return res.json({
+      message: 'Email verified successfully. It can now be used for password recovery.',
+      user: publicUser(updated),
+    });
+  } catch (error) {
+    console.error('CONFIRM CUSTOMER EMAIL VERIFICATION ERROR:', error);
+    return res.status(500).json({ error: 'Unable to verify the email address.' });
+  }
+}
+
+
+async function customerRecoveryOptions(req, res) {
+  try {
+    const accountNumber = String(req.body.accountNumber || '').trim();
+    if (!ACCOUNT_NUMBER_RE.test(accountNumber)) {
+      return res.status(400).json({ error: 'Enter a valid Account Number of up to 9 digits.' });
+    }
+
+    const user = await findByAccountNumber(accountNumber);
+    const emailVerified = Boolean(user?.email && user?.email_verified_at);
+    const emailDeliveryConfigured = isEmailDeliveryConfigured();
+    const recoveryCodeAvailable = Boolean(user?.recovery_code_hash);
+
+    return res.json({
+      emailVerified,
+      emailAvailable: emailVerified && emailDeliveryConfigured,
+      maskedEmail: emailVerified ? maskEmail(user.email) : null,
+      recoveryCodeAvailable,
+      emailDeliveryConfigured,
+    });
+  } catch (error) {
+    console.error('CUSTOMER RECOVERY OPTIONS ERROR:', error);
+    return res.status(500).json({ error: 'Unable to check recovery options right now.' });
+  }
+}
+
+async function startCustomerEmailRecovery(req, res) {
+  try {
+    if (!isEmailDeliveryConfigured()) {
+      return res.status(503).json({
+        error: 'Email recovery is temporarily unavailable. Use your recovery code instead.',
+      });
+    }
+
+    const accountNumber = String(req.body.accountNumber || '').trim();
+    if (!ACCOUNT_NUMBER_RE.test(accountNumber)) {
+      return res.status(400).json({ error: 'Enter a valid Account Number of up to 9 digits.' });
+    }
+
+    const genericMessage = 'If this account has a verified recovery email, a 6-digit reset code has been sent.';
+    const user = await findByAccountNumber(accountNumber);
+
+    if (!user || !user.email || !user.email_verified_at) {
+      return res.status(400).json({
+        error: 'Verified email recovery is not available for this account. Use your recovery code or contact Descallar Satellite Services.',
+      });
+    }
+
+    if (secondsSince(user.password_reset_last_sent_at) < OTP_RESEND_COOLDOWN_SECONDS) {
+      return res.json({ message: genericMessage });
+    }
+
+    const code = generateEmailOtp();
+    const expiresAt = otpExpiry();
+    const codeHash = hashEmailOtp({
+      userId: user.id,
+      email: user.email,
+      purpose: 'password_reset',
+      code,
+    });
+
+    await sendOtpEmail({ to: user.email, code, purpose: 'password_reset' });
+    await setCustomerPasswordResetChallenge(user.id, codeHash, expiresAt);
+
+    return res.json({ message: genericMessage });
+  } catch (error) {
+    console.error('START CUSTOMER EMAIL RECOVERY ERROR:', error);
+    return res.status(500).json({ error: 'Unable to start email recovery right now.' });
+  }
+}
+
+async function completeCustomerEmailRecovery(req, res) {
+  try {
+    const accountNumber = String(req.body.accountNumber || '').trim();
+    const code = String(req.body.code || '').trim();
+    const password = String(req.body.password || '');
+
+    if (!ACCOUNT_NUMBER_RE.test(accountNumber)) {
+      return res.status(400).json({ error: 'Enter a valid Account Number of up to 9 digits.' });
+    }
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Enter the 6-digit reset code.' });
+
+    const passwordError = validateNewPassword(password);
+    if (passwordError) return res.status(400).json({ error: passwordError });
+
+    const user = await findByAccountNumber(accountNumber);
+    const invalidMessage = 'Invalid or expired reset code. Request a new code or use your recovery code instead.';
+
+    if (!user || !user.email || !user.email_verified_at || !user.password_reset_code_hash || !user.password_reset_expires_at) {
+      return res.status(400).json({ error: invalidMessage });
+    }
+    if (Number(user.password_reset_attempts || 0) >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ error: 'Too many incorrect attempts. Request a new reset code.' });
+    }
+    if (new Date(user.password_reset_expires_at).getTime() <= Date.now()) {
+      return res.status(400).json({ error: invalidMessage });
+    }
+
+    const submittedHash = hashEmailOtp({
+      userId: user.id,
+      email: user.email,
+      purpose: 'password_reset',
+      code,
+    });
+
+    if (!safeHashEquals(submittedHash, user.password_reset_code_hash)) {
+      await incrementPasswordResetAttempts(user.id);
+      return res.status(400).json({ error: invalidMessage });
+    }
+
+    if (user.password_hash && await bcrypt.compare(password, user.password_hash)) {
+      return res.status(400).json({ error: 'Your new password must be different from your current or temporary password.' });
+    }
+
+    const newRecoveryCode = generateCustomerRecoveryCode();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const sessionVersion = await recoverCustomerAccount(
+      user.id,
+      passwordHash,
+      hashCustomerRecoveryCode(newRecoveryCode)
+    );
+
+    const updated = await findById(user.id);
+    return res.json({
+      message: 'Password reset successfully. All older customer sessions have been revoked.',
+      token: signToken(updated, { sessionVersion }),
+      user: publicUser(updated),
+      recoveryCode: newRecoveryCode,
+    });
+  } catch (error) {
+    console.error('COMPLETE CUSTOMER EMAIL RECOVERY ERROR:', error);
+    return res.status(500).json({ error: 'Unable to complete email recovery.' });
   }
 }
 
@@ -664,6 +926,12 @@ module.exports = {
   register,
   changePassword,
   recoverCustomerPassword,
+  customerSecurityInfo,
+  requestCustomerEmailVerification,
+  confirmCustomerEmailVerification,
+  customerRecoveryOptions,
+  startCustomerEmailRecovery,
+  completeCustomerEmailRecovery,
   adminSecurityStatus,
   adminBootstrapStart,
   adminBootstrapComplete,

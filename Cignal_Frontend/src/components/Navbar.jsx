@@ -10,6 +10,7 @@ import {
   Smartphone,
   FileSearch,
   Stethoscope,
+  ShieldCheck,
 } from 'lucide-react';
 
 const LOGO_SRC = '/images/CignalLogo4.png'; 
@@ -48,6 +49,11 @@ const NAV_LINKS = [
     label: 'CCA Inquiry',
     path: '/user/retrieve-info',
     icon: FileSearch,
+  },
+  {
+    label: 'Account Security',
+    path: '/user/account-security',
+    icon: ShieldCheck,
   },
 ];
 

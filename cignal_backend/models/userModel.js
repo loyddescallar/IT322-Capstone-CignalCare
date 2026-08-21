@@ -11,7 +11,16 @@ async function ensureAccountSchema() {
     ADD COLUMN IF NOT EXISTS temporary_password_expires_at TIMESTAMP NULL DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS recovery_code_hash VARCHAR(64) DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS recovery_code_issued_at TIMESTAMP NULL DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS auth_session_version INTEGER NOT NULL DEFAULT 1`);
+    ADD COLUMN IF NOT EXISTS auth_session_version INTEGER NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS email_verification_code_hash VARCHAR(64) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS email_verification_attempts INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS email_verification_last_sent_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS password_reset_code_hash VARCHAR(64) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS password_reset_attempts INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS password_reset_last_sent_at TIMESTAMP NULL DEFAULT NULL`);
 
   // Existing temporary credentials created before this migration receive a
   // fresh seven-day window instead of being invalidated without warning.
@@ -197,12 +206,40 @@ async function bulkCreateUsers(rows) {
 
 async function updateUser(id, data) {
   await ensureAccountSchema();
+  const existing = await findById(id);
+  const nextEmail = data.email || null;
+  const emailChanged = String(existing?.email || '').trim().toLowerCase() !== String(nextEmail || '').trim().toLowerCase();
+
   await pool.query(
     `UPDATE users
-     SET accountName=?, address=?, phone=?, email=?, location=?, role=?, updated_at = NOW()
+     SET accountName=?,
+         address=?,
+         phone=?,
+         email=?,
+         location=?,
+         role=?,
+         email_verified_at=CASE WHEN ? THEN NULL ELSE email_verified_at END,
+         email_verification_code_hash=CASE WHEN ? THEN NULL ELSE email_verification_code_hash END,
+         email_verification_expires_at=CASE WHEN ? THEN NULL ELSE email_verification_expires_at END,
+         email_verification_attempts=CASE WHEN ? THEN 0 ELSE email_verification_attempts END,
+         email_verification_last_sent_at=CASE WHEN ? THEN NULL ELSE email_verification_last_sent_at END,
+         password_reset_code_hash=CASE WHEN ? THEN NULL ELSE password_reset_code_hash END,
+         password_reset_expires_at=CASE WHEN ? THEN NULL ELSE password_reset_expires_at END,
+         password_reset_attempts=CASE WHEN ? THEN 0 ELSE password_reset_attempts END,
+         password_reset_last_sent_at=CASE WHEN ? THEN NULL ELSE password_reset_last_sent_at END,
+         updated_at = NOW()
      WHERE id=?`,
-    [data.accountName, data.address || '', data.phone || '', data.email || null,
-      normalizeLocation(data.location), data.role || 'user', id]
+    [
+      data.accountName,
+      data.address || '',
+      data.phone || '',
+      nextEmail,
+      normalizeLocation(data.location),
+      data.role || 'user',
+      emailChanged, emailChanged, emailChanged, emailChanged, emailChanged,
+      emailChanged, emailChanged, emailChanged, emailChanged,
+      id,
+    ]
   );
 }
 
@@ -248,6 +285,10 @@ async function recoverCustomerAccount(id, passwordHash, newRecoveryCodeHash) {
          temporary_password_expires_at=NULL,
          recovery_code_hash=?,
          recovery_code_issued_at=NOW(),
+         password_reset_code_hash=NULL,
+         password_reset_expires_at=NULL,
+         password_reset_attempts=0,
+         password_reset_last_sent_at=NULL,
          auth_session_version=COALESCE(auth_session_version, 1) + 1,
          updated_at=NOW()
      WHERE id=? AND role='user'`,
@@ -255,6 +296,79 @@ async function recoverCustomerAccount(id, passwordHash, newRecoveryCodeHash) {
   );
   const user = await findById(id);
   return Number(user?.auth_session_version || 1);
+}
+
+
+async function setCustomerEmailVerificationChallenge(id, email, codeHash, expiresAt) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET email=?,
+         email_verified_at=NULL,
+         email_verification_code_hash=?,
+         email_verification_expires_at=?,
+         email_verification_attempts=0,
+         email_verification_last_sent_at=NOW(),
+         password_reset_code_hash=NULL,
+         password_reset_expires_at=NULL,
+         password_reset_attempts=0,
+         password_reset_last_sent_at=NULL,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [email, codeHash, expiresAt, id]
+  );
+}
+
+async function incrementEmailVerificationAttempts(id) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET email_verification_attempts=COALESCE(email_verification_attempts, 0) + 1,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [id]
+  );
+}
+
+async function markCustomerEmailVerified(id) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET email_verified_at=NOW(),
+         email_verification_code_hash=NULL,
+         email_verification_expires_at=NULL,
+         email_verification_attempts=0,
+         email_verification_last_sent_at=NULL,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [id]
+  );
+  return findById(id);
+}
+
+async function setCustomerPasswordResetChallenge(id, codeHash, expiresAt) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET password_reset_code_hash=?,
+         password_reset_expires_at=?,
+         password_reset_attempts=0,
+         password_reset_last_sent_at=NOW(),
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [codeHash, expiresAt, id]
+  );
+}
+
+async function incrementPasswordResetAttempts(id) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET password_reset_attempts=COALESCE(password_reset_attempts, 0) + 1,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [id]
+  );
 }
 
 async function archiveUser(id) {
@@ -308,6 +422,11 @@ module.exports = {
   issueTemporaryCredentials,
   completeCustomerPasswordChange,
   recoverCustomerAccount,
+  setCustomerEmailVerificationChallenge,
+  incrementEmailVerificationAttempts,
+  markCustomerEmailVerified,
+  setCustomerPasswordResetChallenge,
+  incrementPasswordResetAttempts,
   archiveUser,
   restoreUser,
   checkDuplicate,
