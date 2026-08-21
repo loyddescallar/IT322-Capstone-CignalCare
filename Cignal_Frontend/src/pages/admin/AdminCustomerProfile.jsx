@@ -622,11 +622,22 @@ export default function AdminCustomerProfile() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Mail size={11} className="text-slate-400" />
                     <span className="text-xs text-slate-600">
                       {customer.email || 'No email'}
                     </span>
+                    {customer.email && (
+                      customer.email_verified_at ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                          <CheckCircle2 size={9} /> Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                          <AlertTriangle size={9} /> Unverified
+                        </span>
+                      )
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -1121,6 +1132,20 @@ export default function AdminCustomerProfile() {
                 label: 'Email',
                 value: customer.email || '—',
                 Icon: Mail,
+              },
+              {
+                label: 'Email Status',
+                value: customer.email
+                  ? (customer.email_verified_at ? 'Verified' : 'Unverified')
+                  : 'Not provided',
+                Icon: customer.email_verified_at ? CheckCircle2 : AlertTriangle,
+              },
+              {
+                label: 'Email Verified On',
+                value: customer.email_verified_at
+                  ? formatDate(customer.email_verified_at)
+                  : '—',
+                Icon: Calendar,
               },
               {
                 label: 'Location',

@@ -87,6 +87,15 @@ function safeDate(value) {
   return date.toLocaleDateString('en-PH');
 }
 
+function maskEmail(value) {
+  const email = String(value || '').trim();
+  if (!email || !email.includes('@')) return '—';
+
+  const [local, domain] = email.split('@');
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${'*'.repeat(Math.max(3, local.length - visible.length))}@${domain}`;
+}
+
 function validateCustomerForm(form, enforceIdentifiers = true) {
   if (!form.accountName.trim()) return 'Account name is required.';
   if (!form.accountNumber.trim()) return 'Account number is required.';
@@ -627,6 +636,7 @@ export default function AdminCustomers() {
                   'Account No.',
                   'CCA No.',
                   'Phone',
+                  'Email',
                   'Location',
                   'Status',
                   'Registered',
@@ -645,13 +655,13 @@ export default function AdminCustomers() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-gray-400">
+                  <td colSpan={9} className="py-10 text-center text-gray-400">
                     Loading customers...
                   </td>
                 </tr>
               ) : displayedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-gray-400">
+                  <td colSpan={9} className="py-10 text-center text-gray-400">
                     No {recordStatus === 'archived' ? 'archived' : 'active'} customers found.
                   </td>
                 </tr>
@@ -674,6 +684,20 @@ export default function AdminCustomers() {
                         {customer.ccaNumber || '—'}
                       </td>
                       <td className="px-3 py-2 text-gray-600">{customer.phone || '—'}</td>
+                      <td className="px-3 py-2">
+                        <div className="min-w-[150px]">
+                          <p className="text-gray-600">{maskEmail(customer.email)}</p>
+                          {customer.email_verified_at ? (
+                            <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                              <CheckCircle2 size={9} /> Verified
+                            </span>
+                          ) : (
+                            <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                              <AlertTriangle size={9} /> Unverified
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           <MapPin size={10} className="text-gray-400" />
