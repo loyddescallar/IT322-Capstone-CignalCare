@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getJwtSecret } = require('../utils/authConfig');
 const { findSecurityByUserId, writeAudit } = require('../models/adminSecurityModel');
+const { ensureAccountSchema } = require('../models/userModel');
 
 async function authRequired(req, res, next) {
   const header = req.headers.authorization;
@@ -18,8 +19,9 @@ async function authRequired(req, res, next) {
 
   try {
     const payload = jwt.verify(token, getJwtSecret());
+    await ensureAccountSchema();
     const [rows] = await pool.query(
-      `SELECT id, accountName, accountNumber, ccaNumber, role, location, status
+      `SELECT id, accountName, accountNumber, ccaNumber, role, location, status, auth_session_version
        FROM users
        WHERE id = ?
        LIMIT 1`,
@@ -39,6 +41,10 @@ async function authRequired(req, res, next) {
       }
       if (Number(payload.sessionVersion || 0) !== Number(security.session_version || 1)) {
         return res.status(401).json({ error: 'Admin session has been revoked. Please log in again.' });
+      }
+    } else if (user.role === 'user') {
+      if (Number(payload.sessionVersion || 0) !== Number(user.auth_session_version || 1)) {
+        return res.status(401).json({ error: 'Customer session has been revoked. Please log in again.' });
       }
     }
 

@@ -57,8 +57,17 @@ const accountInquiryRateLimit = createRateLimiter({
   message: 'Too many account inquiries. Please wait a few minutes and try again.',
 });
 
+
+const customerRecoveryRateLimit = createRateLimiter({
+  scope: 'customer-recovery',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
+  message: 'Too many account-recovery attempts. Please wait a few minutes and try again.',
+});
+
 module.exports = {
   customerLoginRateLimit,
   passwordChangeRateLimit,
   accountInquiryRateLimit,
+  customerRecoveryRateLimit,
 };

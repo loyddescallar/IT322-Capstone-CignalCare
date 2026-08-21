@@ -2,6 +2,7 @@ const crypto = require('crypto');
 
 const ACCOUNT_NUMBER_RE = /^\d{1,9}$/;
 const CCA_NUMBER_RE = /^\d{1,11}$/;
+const TEMP_PASSWORD_VALID_DAYS = 7;
 
 function normalizeText(value) {
   return String(value ?? '').trim();
@@ -40,6 +41,36 @@ function generateTemporaryPassword(length = 10) {
   return chars.join('');
 }
 
+function generateRecoveryCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const groups = [];
+
+  for (let group = 0; group < 4; group += 1) {
+    let value = '';
+    for (let i = 0; i < 4; i += 1) {
+      value += alphabet[crypto.randomInt(0, alphabet.length)];
+    }
+    groups.push(value);
+  }
+
+  return groups.join('-');
+}
+
+function normalizeRecoveryCode(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function hashRecoveryCode(value) {
+  return crypto
+    .createHash('sha256')
+    .update(normalizeRecoveryCode(value))
+    .digest('hex');
+}
+
+function temporaryPasswordExpiry(from = Date.now()) {
+  return new Date(Number(from) + TEMP_PASSWORD_VALID_DAYS * 24 * 60 * 60 * 1000);
+}
+
 function validateNewPassword(password) {
   const value = String(password || '');
   if (value.length < 8) return 'Password must be at least 8 characters.';
@@ -52,8 +83,13 @@ function validateNewPassword(password) {
 module.exports = {
   ACCOUNT_NUMBER_RE,
   CCA_NUMBER_RE,
+  TEMP_PASSWORD_VALID_DAYS,
   normalizeText,
   validateSubscriberIdentifiers,
   generateTemporaryPassword,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
+  hashRecoveryCode,
+  temporaryPasswordExpiry,
   validateNewPassword,
 };

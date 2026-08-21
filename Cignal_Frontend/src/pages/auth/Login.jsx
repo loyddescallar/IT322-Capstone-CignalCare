@@ -405,8 +405,15 @@ export default function Login() {
                 </form>
 
                 <div className="mt-5 flex flex-col gap-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-xs font-bold text-[#cc0000] hover:underline"
+                  >
+                    Forgot Password / Use Recovery Code
+                  </button>
                   <p className="text-xs leading-5 text-gray-500">
-                    Need login credentials or forgot your password? Contact Descallar Satellite Services for account verification and a temporary password.
+                    Lost both your password and recovery code? Contact Descallar Satellite Services for identity verification and new temporary credentials.
                   </p>
                   <button
                     type="button"

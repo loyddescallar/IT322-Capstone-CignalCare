@@ -7,7 +7,7 @@ const {
   createUser,
   bulkCreateUsers,
   updateUser,
-  setPassword,
+  issueTemporaryCredentials,
   archiveUser,
   restoreUser,
   checkDuplicate,
@@ -20,6 +20,9 @@ const { isAdmin, isSelf, ownsAccount } = require('../utils/ownership');
 const {
   validateSubscriberIdentifiers,
   generateTemporaryPassword,
+  generateRecoveryCode,
+  hashRecoveryCode,
+  temporaryPasswordExpiry,
 } = require('../utils/subscriberAccount');
 const {
   parseSubscriberWorkbook,
@@ -28,7 +31,7 @@ const {
 
 function safeCustomer(customer) {
   if (!customer) return customer;
-  const { password_hash, ...safe } = customer;
+  const { password_hash, recovery_code_hash, auth_session_version, ...safe } = customer;
   return safe;
 }
 
@@ -115,8 +118,16 @@ async function createCustomerController(req, res) {
     if (dup) return res.status(409).json({ error: getDuplicateMessage(dup) });
 
     const temporaryPassword = generateTemporaryPassword();
+    const recoveryCode = generateRecoveryCode();
+    const expiresAt = temporaryPasswordExpiry();
     const password_hash = await bcrypt.hash(temporaryPassword, 10);
-    const id = await createUser({ ...customerData, password_hash, must_change_password: true });
+    const id = await createUser({
+      ...customerData,
+      password_hash,
+      must_change_password: true,
+      temporary_password_expires_at: expiresAt,
+      recovery_code_hash: hashRecoveryCode(recoveryCode),
+    });
 
     await notifySafely('CREATE CUSTOMER', () =>
       createAdminNotification({
@@ -128,7 +139,12 @@ async function createCustomerController(req, res) {
     return res.status(201).json({
       message: 'Subscriber account created.',
       id,
-      credentials: { accountNumber: customerData.accountNumber, temporaryPassword },
+      credentials: {
+        accountNumber: customerData.accountNumber,
+        temporaryPassword,
+        recoveryCode,
+        temporaryPasswordExpiresAt: expiresAt,
+      },
     });
   } catch (err) {
     console.error('CREATE CUSTOMER ERROR', err);
@@ -175,11 +191,18 @@ async function resetCredentialsController(req, res) {
     }
 
     const temporaryPassword = generateTemporaryPassword();
+    const recoveryCode = generateRecoveryCode();
+    const expiresAt = temporaryPasswordExpiry();
     const hash = await bcrypt.hash(temporaryPassword, 10);
-    await setPassword(customer.id, hash, true);
+    await issueTemporaryCredentials(customer.id, hash, hashRecoveryCode(recoveryCode), expiresAt);
     return res.json({
-      message: 'Temporary credentials generated. The subscriber must change the password on first login.',
-      credentials: { accountNumber: customer.accountNumber, temporaryPassword },
+      message: 'Temporary credentials generated. The temporary password is valid for 7 days and must be changed on first login.',
+      credentials: {
+        accountNumber: customer.accountNumber,
+        temporaryPassword,
+        recoveryCode,
+        temporaryPasswordExpiresAt: expiresAt,
+      },
     });
   } catch (err) {
     console.error('RESET CREDENTIALS ERROR', err);
@@ -225,18 +248,28 @@ async function importSubscribersController(req, res) {
       const hashedBatch = await Promise.all(
         batch.map(async (row) => {
           const temporaryPassword = generateTemporaryPassword();
+          const recoveryCode = generateRecoveryCode();
+          const expiresAt = temporaryPasswordExpiry();
           const password_hash = await bcrypt.hash(temporaryPassword, 10);
-          return { row, temporaryPassword, password_hash };
+          return { row, temporaryPassword, recoveryCode, expiresAt, password_hash };
         })
       );
 
       for (const item of hashedBatch) {
-        prepared.push({ ...item.row, password_hash: item.password_hash, must_change_password: true });
+        prepared.push({
+          ...item.row,
+          password_hash: item.password_hash,
+          must_change_password: true,
+          temporary_password_expires_at: item.expiresAt,
+          recovery_code_hash: hashRecoveryCode(item.recoveryCode),
+        });
         credentials.push({
           accountName: item.row.accountName,
           accountNumber: item.row.accountNumber,
           location,
           temporaryPassword: item.temporaryPassword,
+          recoveryCode: item.recoveryCode,
+          temporaryPasswordExpiresAt: item.expiresAt,
         });
       }
     }

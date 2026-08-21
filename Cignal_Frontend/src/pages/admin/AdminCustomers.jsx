@@ -326,8 +326,8 @@ export default function AdminCustomers() {
     if (!importCredentials.length) return;
     const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const csv = [
-      ['Name', 'Account Number', 'Temporary Password', 'Location'].join(','),
-      ...importCredentials.map((item) => [item.accountName, item.accountNumber, item.temporaryPassword, item.location].map(escape).join(',')),
+      ['Name', 'Account Number', 'Temporary Password', 'Recovery Code', 'Temporary Password Expires At', 'Location'].join(','),
+      ...importCredentials.map((item) => [item.accountName, item.accountNumber, item.temporaryPassword, item.recoveryCode, item.temporaryPasswordExpiresAt, item.location].map(escape).join(',')),
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -844,7 +844,11 @@ export default function AdminCustomers() {
                   <p className="font-bold">Temporary credentials — show or copy these now.</p>
                   <p className="mt-1">Account Number: <span className="font-mono font-bold">{issuedCredentials.accountNumber}</span></p>
                   <p>Temporary Password: <span className="font-mono font-bold">{issuedCredentials.temporaryPassword}</span></p>
-                  <p className="mt-1 text-green-700">The subscriber will be required to create a new password on first login.</p>
+                  <p>Recovery Code: <span className="font-mono font-bold">{issuedCredentials.recoveryCode}</span></p>
+                  {issuedCredentials.temporaryPasswordExpiresAt && (
+                    <p>Temporary Password Expires: <span className="font-semibold">{new Date(issuedCredentials.temporaryPasswordExpiresAt).toLocaleString()}</span></p>
+                  )}
+                  <p className="mt-1 text-green-700">The temporary password is valid for 7 days. The recovery code should be kept private for self-service password recovery.</p>
                 </div>
               )}
 
@@ -878,6 +882,10 @@ export default function AdminCustomers() {
             <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs">
               <p>Account Number: <span className="font-mono font-bold">{issuedCredentials.accountNumber}</span></p>
               <p className="mt-1">Temporary Password: <span className="font-mono font-bold">{issuedCredentials.temporaryPassword}</span></p>
+              <p className="mt-1">Recovery Code: <span className="font-mono font-bold">{issuedCredentials.recoveryCode}</span></p>
+              {issuedCredentials.temporaryPasswordExpiresAt && (
+                <p className="mt-1">Expires: <span className="font-semibold">{new Date(issuedCredentials.temporaryPasswordExpiresAt).toLocaleString()}</span></p>
+              )}
             </div>
             <button type="button" onClick={closeModal} className="mt-4 w-full rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white">Done</button>
           </div>

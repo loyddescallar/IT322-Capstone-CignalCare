@@ -4,6 +4,7 @@ const {
   login,
   register,
   changePassword,
+  recoverCustomerPassword,
   adminSecurityStatus,
   adminBootstrapStart,
   adminBootstrapComplete,
@@ -26,6 +27,7 @@ const {
   customerLoginRateLimit,
   passwordChangeRateLimit,
   accountInquiryRateLimit,
+  customerRecoveryRateLimit,
 } = require('../middleware/publicAuthRateLimit');
 
 // Authentication responses can contain tokens, setup secrets, or one-time codes.
@@ -40,6 +42,7 @@ router.use((_req, res, next) => {
 router.post('/login', customerLoginRateLimit, login);
 router.post('/register', register);
 router.post('/change-password', passwordChangeRateLimit, changePassword);
+router.post('/recover-password', customerRecoveryRateLimit, recoverCustomerPassword);
 router.get('/me', authRequired, me);
 router.get('/lookup/:accountId', accountInquiryRateLimit, lookupByAccountId);
 

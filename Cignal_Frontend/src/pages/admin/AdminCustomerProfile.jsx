@@ -1171,6 +1171,10 @@ export default function AdminCustomerProfile() {
             <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs">
               <p>Account Number: <span className="font-mono font-bold">{issuedCredentials.accountNumber}</span></p>
               <p className="mt-1">Temporary Password: <span className="font-mono font-bold">{issuedCredentials.temporaryPassword}</span></p>
+              <p className="mt-1">Recovery Code: <span className="font-mono font-bold">{issuedCredentials.recoveryCode}</span></p>
+              {issuedCredentials.temporaryPasswordExpiresAt && (
+                <p className="mt-1">Expires: <span className="font-semibold">{new Date(issuedCredentials.temporaryPasswordExpiresAt).toLocaleString()}</span></p>
+              )}
             </div>
             <button type="button" onClick={closeModal} className="mt-4 w-full rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white">Done</button>
           </div>

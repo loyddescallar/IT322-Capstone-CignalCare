@@ -5,7 +5,25 @@ let accountSchemaReady = false;
 
 async function ensureAccountSchema() {
   if (accountSchemaReady) return;
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE`);
+
+  await pool.query(`ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS temporary_password_expires_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS recovery_code_hash VARCHAR(64) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS recovery_code_issued_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS auth_session_version INTEGER NOT NULL DEFAULT 1`);
+
+  // Existing temporary credentials created before this migration receive a
+  // fresh seven-day window instead of being invalidated without warning.
+  await pool.query(
+    `UPDATE users
+     SET temporary_password_expires_at = DATE_ADD(NOW(), INTERVAL ? DAY)
+     WHERE role='user'
+       AND must_change_password = TRUE
+       AND temporary_password_expires_at IS NULL`,
+    [7]
+  );
+
   accountSchemaReady = true;
 }
 
@@ -142,11 +160,15 @@ async function createUser(data) {
   await ensureAccountSchema();
   const [result] = await pool.query(
     `INSERT INTO users
-     (accountName, accountNumber, ccaNumber, address, phone, location, email, password_hash, must_change_password, role, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (accountName, accountNumber, ccaNumber, address, phone, location, email,
+      password_hash, must_change_password, temporary_password_expires_at,
+      recovery_code_hash, recovery_code_issued_at, auth_session_version, role, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [data.accountName, data.accountNumber, data.ccaNumber, data.address || '', data.phone || '',
       normalizeLocation(data.location), data.email || null, data.password_hash || null,
-      Boolean(data.must_change_password), data.role || 'user', normalizeCustomerStatus(data.status)]
+      Boolean(data.must_change_password), data.temporary_password_expires_at || null,
+      data.recovery_code_hash || null, data.recovery_code_hash ? new Date() : null,
+      Number(data.auth_session_version || 1), data.role || 'user', normalizeCustomerStatus(data.status)]
   );
   return result.insertId;
 }
@@ -154,14 +176,19 @@ async function createUser(data) {
 async function bulkCreateUsers(rows) {
   await ensureAccountSchema();
   if (!rows.length) return 0;
+  const now = new Date();
   const values = rows.map((data) => [
     data.accountName, data.accountNumber, data.ccaNumber, data.address || '', data.phone || '',
     normalizeLocation(data.location), data.email || null, data.password_hash || null,
-    Boolean(data.must_change_password), 'user', 'active',
+    Boolean(data.must_change_password), data.temporary_password_expires_at || null,
+    data.recovery_code_hash || null, data.recovery_code_hash ? now : null,
+    Number(data.auth_session_version || 1), 'user', 'active',
   ]);
   const [result] = await pool.query(
     `INSERT INTO users
-     (accountName, accountNumber, ccaNumber, address, phone, location, email, password_hash, must_change_password, role, status)
+     (accountName, accountNumber, ccaNumber, address, phone, location, email,
+      password_hash, must_change_password, temporary_password_expires_at,
+      recovery_code_hash, recovery_code_issued_at, auth_session_version, role, status)
      VALUES ?`,
     [values]
   );
@@ -179,29 +206,81 @@ async function updateUser(id, data) {
   );
 }
 
-async function setPassword(id, passwordHash, mustChangePassword) {
+async function issueTemporaryCredentials(id, passwordHash, recoveryCodeHash, expiresAt) {
   await ensureAccountSchema();
   const [result] = await pool.query(
-    `UPDATE users SET password_hash=?, must_change_password=?, updated_at=NOW() WHERE id=?`,
-    [passwordHash, Boolean(mustChangePassword), id]
+    `UPDATE users
+     SET password_hash=?,
+         must_change_password=TRUE,
+         temporary_password_expires_at=?,
+         recovery_code_hash=?,
+         recovery_code_issued_at=NOW(),
+         auth_session_version=COALESCE(auth_session_version, 1) + 1,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [passwordHash, expiresAt, recoveryCodeHash, id]
   );
   return result.affectedRows;
 }
 
+async function completeCustomerPasswordChange(id, passwordHash) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET password_hash=?,
+         must_change_password=FALSE,
+         temporary_password_expires_at=NULL,
+         auth_session_version=COALESCE(auth_session_version, 1) + 1,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [passwordHash, id]
+  );
+  const user = await findById(id);
+  return Number(user?.auth_session_version || 1);
+}
+
+async function recoverCustomerAccount(id, passwordHash, newRecoveryCodeHash) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET password_hash=?,
+         must_change_password=FALSE,
+         temporary_password_expires_at=NULL,
+         recovery_code_hash=?,
+         recovery_code_issued_at=NOW(),
+         auth_session_version=COALESCE(auth_session_version, 1) + 1,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [passwordHash, newRecoveryCodeHash, id]
+  );
+  const user = await findById(id);
+  return Number(user?.auth_session_version || 1);
+}
+
 async function archiveUser(id) {
-  const [result] = await pool.query(`UPDATE users SET status='archived', updated_at=NOW() WHERE id=? AND role='user'`, [id]);
+  const [result] = await pool.query(
+    `UPDATE users
+     SET status='archived',
+         auth_session_version=COALESCE(auth_session_version, 1) + 1,
+         updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [id]
+  );
   return result.affectedRows;
 }
 
 async function restoreUser(id) {
   const [result] = await pool.query(
-    `UPDATE users SET status='active', updated_at=NOW() WHERE id=? AND role='user' AND COALESCE(status,'active')='archived'`, [id]
+    `UPDATE users SET status='active', updated_at=NOW()
+     WHERE id=? AND role='user' AND COALESCE(status,'active')='archived'`,
+    [id]
   );
   return result.affectedRows;
 }
 
 async function checkDuplicate(accountNumber, ccaNumber, excludeId = null) {
-  let sql = `SELECT id, accountName, accountNumber, ccaNumber, status FROM users WHERE (accountNumber=? OR ccaNumber=?)`;
+  let sql = `SELECT id, accountName, accountNumber, ccaNumber, status
+             FROM users WHERE (accountNumber=? OR ccaNumber=?)`;
   const params = [accountNumber, ccaNumber];
   if (excludeId) { sql += ' AND id<>?'; params.push(excludeId); }
   const [rows] = await pool.query(sql, params);
@@ -214,7 +293,23 @@ async function getIdentifierRows() {
 }
 
 module.exports = {
-  ALLOWED_LOCATIONS, ensureAccountSchema, normalizeLocation, findForAdminLogin, findByAccountNumber,
-  findById, findByAccountIdOrCca, getAllUsers, getCustomerStats, createUser, bulkCreateUsers,
-  updateUser, setPassword, archiveUser, restoreUser, checkDuplicate, getIdentifierRows,
+  ALLOWED_LOCATIONS,
+  ensureAccountSchema,
+  normalizeLocation,
+  findForAdminLogin,
+  findByAccountNumber,
+  findById,
+  findByAccountIdOrCca,
+  getAllUsers,
+  getCustomerStats,
+  createUser,
+  bulkCreateUsers,
+  updateUser,
+  issueTemporaryCredentials,
+  completeCustomerPasswordChange,
+  recoverCustomerAccount,
+  archiveUser,
+  restoreUser,
+  checkDuplicate,
+  getIdentifierRows,
 };
