@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, CheckCircle2, ChevronRight, Clock, Flag, Ticket, Wrench, AlertTriangle } from 'lucide-react';
+import { Archive, CalendarDays, CheckCircle2, ChevronRight, Clock, Flag, Ticket, UserRound, Wrench, AlertTriangle } from 'lucide-react';
 import UserPageShell from '../../components/UserPageShell';
 import RequestTimeline from '../../components/RequestTimeline';
 import ticketApi from '../../api/ticketApi';
@@ -265,8 +265,8 @@ export default function UserTickets() {
                     <p className="truncate text-sm font-semibold text-gray-800">{request.issueDescription}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-3">
                       <p className="text-xs text-gray-400">Submitted: {new Date(request.created_at || '').toLocaleDateString('en-PH')}</p>
-                      {request.preferred_date && <p className="text-xs font-semibold text-blue-600">📅 Scheduled: {request.preferred_date}</p>}
-                      {request.technician_name && <p className="text-xs text-gray-500">👤 {request.technician_name}</p>}
+                      {request.preferred_date && <p className="flex items-center gap-1 text-xs font-semibold text-blue-600"><CalendarDays size={12} /> Scheduled: {request.preferred_date}</p>}
+                      {request.technician_name && <p className="flex items-center gap-1 text-xs text-gray-500"><UserRound size={12} /> {request.technician_name}</p>}
                     </div>
                     {request.admin_note && <p className="mt-1 rounded-lg bg-gray-50 px-2 py-1 text-xs text-gray-500">Admin note: {request.admin_note}</p>}
                   </div>

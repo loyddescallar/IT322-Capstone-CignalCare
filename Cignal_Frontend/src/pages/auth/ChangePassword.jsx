@@ -51,7 +51,7 @@ export default function ChangePassword() {
         <div className="mb-6 flex items-start gap-3">
           <div className="rounded-xl bg-red-50 p-3 text-[#cc0000]"><ShieldCheck size={23} /></div>
           <div>
-            <h1 className="text-xl font-black text-gray-900">Secure Your Account</h1>
+            <h1 className="text-xl font-bold text-gray-900">Secure Your Account</h1>
             <p className="mt-1 text-sm leading-5 text-gray-500">
               {pendingUser?.accountName ? `${pendingUser.accountName}, ` : ''}replace your temporary password before continuing.
             </p>

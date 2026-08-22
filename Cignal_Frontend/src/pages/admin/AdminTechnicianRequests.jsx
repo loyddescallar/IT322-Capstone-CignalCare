@@ -54,7 +54,7 @@ export default function AdminTechnicianRequests() {
             :filtered.map(r=>{const displayStatus=r.status==='Pending'?'Submitted':r.status; const s=sCfg[displayStatus]||sCfg.Submitted;return(
               <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 last:border-0">
                 <td className="py-2 px-3 font-mono text-gray-400">{r.id}</td>
-                <td className="py-2 px-3 font-semibold text-gray-800 max-w-[180px]"><p className="truncate">{r.issueDescription}</p>{r.incident_id&&<span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase text-red-700">Linked Incident</span>}</td>
+                <td className="py-2 px-3 font-semibold text-gray-800 max-w-[180px]"><p className="truncate">{r.issueDescription}</p>{r.incident_id&&<span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold uppercase text-red-700">Linked Incident</span>}</td>
                 <td className="py-2 px-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.source==='load_request_signal_check'?'bg-red-50 text-red-700':'bg-gray-100 text-gray-500'}`}>{sourceLabel(r.source)}</span>{r.screen_issue&&<p className="mt-1 text-[10px] text-gray-400">{r.screen_issue}</p>}</td>
                 <td className="py-2 px-3"><button onClick={()=>navigateToCustomer(r.accountNumber)} className="font-mono text-gray-600 hover:text-[#cc0000] hover:underline">{r.accountNumber}</button></td>
                 <td className="py-2 px-3 text-gray-600">{r.contactName}</td>

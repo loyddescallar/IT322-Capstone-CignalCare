@@ -398,7 +398,7 @@ export default function AdminTickets() {
                           {ticket.accountNumber && <p className="font-mono text-gray-400" style={{ fontSize: '10px' }}>{ticket.accountNumber}</p>}
                         </button>
                       </td>
-                      <td className="max-w-[160px] px-3 py-2 text-gray-600"><p className="truncate">{ticket.subject}</p>{ticket.incident_id && <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase text-red-700">Linked Incident</span>}</td>
+                      <td className="max-w-[160px] px-3 py-2 text-gray-600"><p className="truncate">{ticket.subject}</p>{ticket.incident_id && <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold uppercase text-red-700">Linked Incident</span>}</td>
                       <td className="px-3 py-2">
                         <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${categoryBadge[ticket.category] || 'bg-gray-100 text-gray-600'}`}>{ticket.category}</span>
                       </td>
@@ -435,7 +435,7 @@ export default function AdminTickets() {
                     <span className="font-mono text-xs text-gray-400">#{selectedTicket.id}</span>
                     <div className="flex items-center gap-1">{statusIcon[displayStatus(selectedTicket.status)]}<span className={`rounded px-2 py-0.5 text-xs font-semibold ${statusStyle[displayStatus(selectedTicket.status)]}`}>{displayStatus(selectedTicket.status)}</span></div>
                     {selectedTicket.location && <div className="flex items-center gap-1"><MapPin size={9} className="text-gray-400" /><span className="text-xs text-gray-500">{normalizeLocation(selectedTicket.location)}</span></div>}
-                    {selectedTicket.incident_id && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase text-red-700">Incident-linked</span>}
+                    {selectedTicket.incident_id && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold uppercase text-red-700">Incident-linked</span>}
                   </div>
                   <p className="mt-1 text-xs font-bold leading-snug text-gray-800">{selectedTicket.subject}</p>
                   <div className="mt-0.5 flex items-center gap-2">

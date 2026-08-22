@@ -274,7 +274,7 @@ export default function AdminPlans() {
                   <div>
                     <p className="text-sm font-bold text-gray-800">{plan.plan_name}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-gray-400">{plan.plan_code}</p>
-                    <p className="mt-1 text-lg font-black text-[#cc0000]">{formatPeso(plan.amount)}</p>
+                    <p className="mt-1 text-lg font-bold text-[#cc0000]">{formatPeso(plan.amount)}</p>
                   </div>
 
                   <span

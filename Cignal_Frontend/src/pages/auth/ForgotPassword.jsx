@@ -198,14 +198,14 @@ export default function ForgotPassword() {
           <div className="mb-5 flex items-start gap-3">
             <div className="rounded-xl bg-green-50 p-3 text-green-700"><ShieldCheck size={23} /></div>
             <div>
-              <h1 className="text-xl font-black text-gray-900">Account Recovered</h1>
+              <h1 className="text-xl font-bold text-gray-900">Account Recovered</h1>
               <p className="mt-1 text-sm leading-5 text-gray-500">Your password was changed and older sessions were revoked.</p>
             </div>
           </div>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-amber-800">New Recovery Code</p>
-            <p className="mt-2 break-all font-mono text-lg font-black text-gray-900">{newRecoveryCode}</p>
+            <p className="mt-2 break-all font-mono text-lg font-bold text-gray-900">{newRecoveryCode}</p>
             <p className="mt-2 text-xs leading-5 text-amber-800">Save this code somewhere private. Your previous recovery code can no longer be used.</p>
           </div>
 
@@ -227,7 +227,7 @@ export default function ForgotPassword() {
         <div className="mb-5 flex items-start gap-3">
           <div className="rounded-xl bg-red-50 p-3 text-[#cc0000]"><KeyRound size={23} /></div>
           <div>
-            <h1 className="text-xl font-black text-gray-900">Recover Customer Account</h1>
+            <h1 className="text-xl font-bold text-gray-900">Recover Customer Account</h1>
             <p className="mt-1 text-sm leading-5 text-gray-500">Enter your Account Number first so CignalCare+ can show the recovery methods available for your account.</p>
           </div>
         </div>
@@ -316,7 +316,7 @@ export default function ForgotPassword() {
                         maxLength={6}
                         value={emailCode}
                         onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-black tracking-[0.35em] outline-none focus:border-[#cc0000]"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-bold tracking-[0.35em] outline-none focus:border-[#cc0000]"
                         placeholder="000000"
                       />
                     </div>

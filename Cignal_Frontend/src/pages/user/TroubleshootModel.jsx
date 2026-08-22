@@ -82,7 +82,7 @@ export default function TroubleshootModel() {
         <div className="flex min-h-[70vh] items-center justify-center px-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
             <AlertCircle size={38} className="mx-auto text-red-500" />
-            <h1 className="mt-4 text-xl font-black text-slate-900">
+            <h1 className="mt-4 text-xl font-bold text-slate-900">
               Box model unavailable
             </h1>
             <p className="mt-2 text-sm text-slate-500">
@@ -139,11 +139,11 @@ export default function TroubleshootModel() {
               </div>
               <div>
                 {model.type && (
-                  <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#cc0000]">
+                  <p className="mb-1 text-xs font-bold uppercase tracking-wide text-[#cc0000]">
                     {model.type} Receiver
                   </p>
                 )}
-                <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                   {model.name}
                 </h1>
                 <p className="mt-2 text-sm text-slate-500">
@@ -169,11 +169,11 @@ export default function TroubleshootModel() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-black text-slate-900 transition-colors group-hover:text-[#cc0000]">
+                      <h2 className="text-lg font-bold text-slate-900 transition-colors group-hover:text-[#cc0000]">
                         {issue.title}
                       </h2>
                       {issue.error_code && (
-                        <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-[#cc0000]">
+                        <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
                           {issue.error_code}
                         </span>
                       )}

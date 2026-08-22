@@ -66,7 +66,7 @@ export default function Troubleshoot() {
       <div className="min-h-screen bg-white">
         <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-12">
           <div className="mb-8">
-            <h1 className="text-3xl font-black tracking-tight text-[#cc0000]">
+            <h1 className="text-3xl font-bold tracking-tight text-[#cc0000]">
               Troubleshoot Your Box
             </h1>
             <p className="mt-2 text-sm text-gray-500">
@@ -137,7 +137,7 @@ export default function Troubleshoot() {
                           {model.name}
                         </h2>
                         {model.type && (
-                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-black uppercase text-[#cc0000]">
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase text-[#cc0000]">
                             {model.type}
                           </span>
                         )}

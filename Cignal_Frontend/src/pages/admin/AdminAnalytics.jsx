@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart3,
+  ChartNoAxesCombined,
   CheckCircle2,
   Download,
   MapPin,
-  ShoppingBag,
-  Ticket,
+  Store,
+  Headset,
   Users,
   Wrench,
 } from 'lucide-react';
@@ -53,8 +53,8 @@ function Metric({ icon: Icon, label, value, sub, tone = 'red' }) {
       <div className="flex items-start gap-3">
         {Icon && <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone] || tones.red}`}><Icon size={18} /></div>}
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-slate-400">{label}</p>
-          <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
+          <p className="text-[11px] font-semibold text-slate-500">{label}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
           <p className="mt-1 text-[11px] leading-4 text-slate-500">{sub}</p>
         </div>
       </div>
@@ -66,7 +66,7 @@ function Section({ title, subtitle, children, className = '' }) {
   return (
     <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}>
       <div>
-        <h2 className="text-sm font-black text-slate-900">{title}</h2>
+        <h2 className="text-sm font-bold text-slate-900">{title}</h2>
         {subtitle && <p className="mt-1 text-[11px] leading-5 text-slate-400">{subtitle}</p>}
       </div>
       <div className="mt-4">{children}</div>
@@ -167,7 +167,7 @@ export default function AdminAnalytics() {
     <div className="space-y-4 pb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-950">Business Analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Business Analytics</h1>
           <p className="mt-1 text-xs text-slate-500">Turn sales and subscriber-support records into management decisions.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -181,7 +181,7 @@ export default function AdminAnalytics() {
             <option value="">All Locations</option>
             {LOCATIONS.filter(Boolean).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <button onClick={exportCsv} className="flex items-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#b90000]">
+          <button onClick={exportCsv} className="flex items-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#b90000]">
             <Download size={14} /> Export Report
           </button>
         </div>
@@ -192,7 +192,7 @@ export default function AdminAnalytics() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-black transition ${tab === key ? 'bg-[#d60000] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold transition ${tab === key ? 'bg-[#d60000] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
           >
             {label}
           </button>
@@ -204,9 +204,9 @@ export default function AdminAnalytics() {
       {!loading && tab === 'overview' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Metric icon={ShoppingBag} label="POS Revenue" value={peso(k.totalRevenue)} sub={`${k.posTransactions || 0} in-store transactions`} tone="red" />
+            <Metric icon={Store} label="POS Revenue" value={peso(k.totalRevenue)} sub={`${k.posTransactions || 0} in-store transactions`} tone="red" />
             <Metric icon={Users} label="Active Subscribers" value={k.activeSubscribers || 0} sub={location || 'Across all locations'} tone="blue" />
-            <Metric icon={Ticket} label="Support Tickets" value={k.totalTickets || 0} sub={`${k.resolutionRate || 0}% resolved`} tone="amber" />
+            <Metric icon={Headset} label="Support Tickets" value={k.totalTickets || 0} sub={`${k.resolutionRate || 0}% resolved`} tone="amber" />
             <Metric icon={CheckCircle2} label="Self-Service Success" value={`${k.selfServiceResolutionRate || 0}%`} sub={`${k.selfServiceAssessments || 0} completed assessments`} tone="green" />
             <Metric icon={Wrench} label="Technician Demand" value={data?.technician?.total || 0} sub="Service requests in period" tone="violet" />
           </div>
@@ -245,7 +245,7 @@ export default function AdminAnalytics() {
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-[10px] uppercase tracking-wide text-slate-400">Reports</span>
-                    <span className="text-3xl font-black text-slate-900">{issueTotal}</span>
+                    <span className="text-3xl font-bold text-slate-900">{issueTotal}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -269,7 +269,7 @@ export default function AdminAnalytics() {
               <div className="space-y-2.5">
                 {(data?.insights || []).map((item, index) => (
                   <div key={`${item.title}-${index}`} className="rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs font-black text-slate-800">{item.title}</p>
+                    <p className="text-xs font-bold text-slate-800">{item.title}</p>
                     <p className="mt-1 text-[11px] leading-5 text-slate-500">{item.text}</p>
                   </div>
                 ))}
@@ -278,8 +278,8 @@ export default function AdminAnalytics() {
             </Section>
             <Section title="Incident Status" subtitle="Only Admin-confirmed incidents become customer advisories.">
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-amber-50 p-4"><p className="text-[10px] font-black uppercase text-amber-600">Needs Review</p><p className="mt-1 text-3xl font-black text-amber-800">{k.incidentCandidates || 0}</p></div>
-                <div className="rounded-xl bg-red-50 p-4"><p className="text-[10px] font-black uppercase text-red-600">Active</p><p className="mt-1 text-3xl font-black text-red-800">{k.activeIncidents || 0}</p></div>
+                <div className="rounded-xl bg-amber-50 p-4"><p className="text-[10px] font-bold uppercase text-amber-600">Needs Review</p><p className="mt-1 text-3xl font-bold text-amber-800">{k.incidentCandidates || 0}</p></div>
+                <div className="rounded-xl bg-red-50 p-4"><p className="text-[10px] font-bold uppercase text-red-600">Active</p><p className="mt-1 text-3xl font-bold text-red-800">{k.activeIncidents || 0}</p></div>
               </div>
               <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] leading-5 text-slate-500">Common-issue detection requires multiple distinct subscribers reporting the same specific issue in the same location.</div>
             </Section>
@@ -290,10 +290,10 @@ export default function AdminAnalytics() {
       {!loading && tab === 'sales' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric icon={ShoppingBag} label="POS Revenue" value={peso(k.totalRevenue)} sub="In-store sales only" tone="red" />
-            <Metric icon={BarChart3} label="Transactions" value={k.posTransactions || 0} sub="Completed POS transactions" tone="blue" />
+            <Metric icon={Store} label="POS Revenue" value={peso(k.totalRevenue)} sub="In-store sales only" tone="red" />
+            <Metric icon={ChartNoAxesCombined} label="Transactions" value={k.posTransactions || 0} sub="Completed POS transactions" tone="blue" />
             <Metric icon={MapPin} label="Locations" value={(data?.salesByLocation || []).length} sub="Locations with POS sales" tone="green" />
-            <Metric icon={ShoppingBag} label="Average Sale" value={peso((k.totalRevenue || 0) / Math.max(1, k.posTransactions || 0))} sub="Revenue per POS transaction" tone="amber" />
+            <Metric icon={Store} label="Average Sale" value={peso((k.totalRevenue || 0) / Math.max(1, k.posTransactions || 0))} sub="Revenue per POS transaction" tone="amber" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
             <Section title="POS Revenue Trend" subtitle="In-store POS revenue only; online PayMongo load requests are excluded.">
@@ -318,7 +318,7 @@ export default function AdminAnalytics() {
                 <div className="overflow-x-auto rounded-xl border border-slate-100">
                   <table className="min-w-full text-xs">
                     <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2.5">Plan / Product</th><th className="px-3 py-2.5">Transactions</th><th className="px-3 py-2.5">Revenue</th></tr></thead>
-                    <tbody className="divide-y divide-slate-100">{(data?.salesByPlan || []).slice(0, 8).map((row) => <tr key={row.label}><td className="px-3 py-3 font-semibold text-slate-700">{row.label}</td><td className="px-3 py-3 text-slate-500">{row.count}</td><td className="px-3 py-3 font-black text-slate-800">{peso(row.revenue)}</td></tr>)}</tbody>
+                    <tbody className="divide-y divide-slate-100">{(data?.salesByPlan || []).slice(0, 8).map((row) => <tr key={row.label}><td className="px-3 py-3 font-semibold text-slate-700">{row.label}</td><td className="px-3 py-3 text-slate-500">{row.count}</td><td className="px-3 py-3 font-bold text-slate-800">{peso(row.revenue)}</td></tr>)}</tbody>
                   </table>
                 </div>
               </div>
@@ -332,8 +332,8 @@ export default function AdminAnalytics() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={CheckCircle2} label="Resolution Rate" value={`${k.resolutionRate || 0}%`} sub={`${k.totalTickets || 0} support tickets`} tone="green" />
             <Metric icon={Users} label="Self-Service Success" value={`${k.selfServiceResolutionRate || 0}%`} sub="Verified troubleshooting outcomes" tone="blue" />
-            <Metric icon={Ticket} label="Repeat Contact Rate" value={`${k.repeatContactRate || 0}%`} sub="Subscribers with 2+ tickets" tone="amber" />
-            <Metric icon={BarChart3} label="Average Resolution" value={`${k.avgResolutionHours || 0} hrs`} sub="Resolved ticket turnaround" tone="violet" />
+            <Metric icon={Headset} label="Repeat Contact Rate" value={`${k.repeatContactRate || 0}%`} sub="Subscribers with 2+ tickets" tone="amber" />
+            <Metric icon={ChartNoAxesCombined} label="Average Resolution" value={`${k.avgResolutionHours || 0} hrs`} sub="Resolved ticket turnaround" tone="violet" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
             <Section title="Most Common Subscriber Problems" subtitle="Use this to prioritize troubleshooting content, staff training, and service improvements.">
@@ -349,7 +349,7 @@ export default function AdminAnalytics() {
                   <tbody className="divide-y divide-slate-100">
                     {(data?.guidePerformance || []).map((row) => {
                       const healthy = Number(row.resolutionRate || 0) >= 60;
-                      return <tr key={row.guide}><td className="max-w-md px-3 py-3 font-semibold text-slate-700">{row.guide}</td><td className="px-3 py-3 text-emerald-700">{row.resolved}</td><td className="px-3 py-3 text-amber-700">{row.unresolved}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 font-black ${healthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.resolutionRate}%</span></td><td className="px-3 py-3 text-[11px] text-slate-500">{healthy ? 'Guide is resolving most assessed cases.' : 'Review guide content or escalation path.'}</td></tr>;
+                      return <tr key={row.guide}><td className="max-w-md px-3 py-3 font-semibold text-slate-700">{row.guide}</td><td className="px-3 py-3 text-emerald-700">{row.resolved}</td><td className="px-3 py-3 text-amber-700">{row.unresolved}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 font-bold ${healthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.resolutionRate}%</span></td><td className="px-3 py-3 text-[11px] text-slate-500">{healthy ? 'Guide is resolving most assessed cases.' : 'Review guide content or escalation path.'}</td></tr>;
                     })}
                   </tbody>
                 </table>
@@ -365,8 +365,8 @@ export default function AdminAnalytics() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={Wrench} label="Technician Requests" value={data?.technician?.total || 0} sub="Selected period" tone="red" />
             <Metric icon={CheckCircle2} label="Completed" value={data?.technician?.completed || 0} sub="Service completed" tone="green" />
-            <Metric icon={BarChart3} label="Scheduled" value={data?.technician?.scheduled || 0} sub="Currently scheduled" tone="blue" />
-            <Metric icon={Ticket} label="Pending Review" value={data?.technician?.pending || 0} sub="Submitted / under review" tone="amber" />
+            <Metric icon={ChartNoAxesCombined} label="Scheduled" value={data?.technician?.scheduled || 0} sub="Currently scheduled" tone="blue" />
+            <Metric icon={Headset} label="Pending Review" value={data?.technician?.pending || 0} sub="Submitted / under review" tone="amber" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
             <Section title="Service Demand by Location" subtitle="Helps management allocate technician capacity based on actual request volume.">
@@ -374,9 +374,9 @@ export default function AdminAnalytics() {
             </Section>
             <Section title="Service Decision Context" subtitle="Operational signals that connect subscriber support and technician work.">
               <div className="space-y-3">
-                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Technician escalation after troubleshooting</p><p className="mt-1 text-2xl font-black text-slate-900">{k.technicianSelfServiceEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Customers who escalated from verified troubleshooting to a technician request.</p></div>
-                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Ticket escalation after troubleshooting</p><p className="mt-1 text-2xl font-black text-slate-900">{k.ticketEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Customers who escalated from troubleshooting to a support ticket.</p></div>
-                <div className="rounded-xl border border-red-100 bg-red-50 p-3"><p className="text-[10px] font-black uppercase tracking-wide text-red-500">Active service incidents</p><p className="mt-1 text-2xl font-black text-red-800">{k.activeIncidents || 0}</p><p className="mt-1 text-[11px] text-red-600">Confirmed incidents should be reviewed before unnecessary individual dispatches.</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Technician escalation after troubleshooting</p><p className="mt-1 text-2xl font-bold text-slate-900">{k.technicianSelfServiceEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Customers who escalated from verified troubleshooting to a technician request.</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Ticket escalation after troubleshooting</p><p className="mt-1 text-2xl font-bold text-slate-900">{k.ticketEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Customers who escalated from troubleshooting to a support ticket.</p></div>
+                <div className="rounded-xl border border-red-100 bg-red-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-red-500">Active service incidents</p><p className="mt-1 text-2xl font-bold text-red-800">{k.activeIncidents || 0}</p><p className="mt-1 text-[11px] text-red-600">Confirmed incidents should be reviewed before unnecessary individual dispatches.</p></div>
               </div>
             </Section>
           </div>

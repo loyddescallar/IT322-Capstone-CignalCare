@@ -94,7 +94,7 @@ export default function UserDashboard() {
       <div ref={notifRef} className="fixed top-24 right-4 z-40">
         <button onClick={()=>setNotifOpen(!notifOpen)} className="relative bg-white shadow-lg border border-gray-200 p-3 rounded-full hover:bg-gray-50 transition-colors">
           <Bell size={20} className="text-gray-600"/>
-          {unread>0&&<span className="absolute top-1 right-1 w-4 h-4 bg-cignalRed text-white rounded-full text-[9px] font-black flex items-center justify-center animate-pulse">{unread}</span>}
+          {unread>0&&<span className="absolute top-1 right-1 w-4 h-4 bg-cignalRed text-white rounded-full text-[9px] font-bold flex items-center justify-center animate-pulse">{unread}</span>}
         </button>
         {notifOpen&&(
           <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">

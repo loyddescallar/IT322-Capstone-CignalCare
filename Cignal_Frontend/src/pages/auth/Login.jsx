@@ -11,6 +11,7 @@ import {
   MapPin,
   Phone,
   ExternalLink,
+  Tv,
 } from 'lucide-react';
 import authApi from '../../api/authApi';
 
@@ -236,7 +237,7 @@ export default function Login() {
           {/* Desktop branding and inquiry actions */}
           <section className="hidden text-white lg:block">
             <div className="max-w-xl">
-              <h2 className="mt-6 text-5xl font-black leading-[1.08] tracking-tight xl:text-6xl">
+              <h2 className="mt-6 text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">
                 CignalCare+
                 <span className="block text-red-400">
                   Descallar Satellite Services
@@ -334,7 +335,7 @@ export default function Login() {
                   <div className="mb-3 flex items-center gap-3">
                     <div className="h-7 w-1.5 rounded-full bg-[#cc0000]" />
 
-                    <h2 className="text-2xl font-black text-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-900">
                       User Login
                     </h2>
                   </div>
@@ -453,7 +454,7 @@ export default function Login() {
                     </div>
 
                     <div className="min-w-0">
-                      <p className="text-xs font-black text-gray-900">
+                      <p className="text-xs font-bold text-gray-900">
                         Visit Our Store
                       </p>
 
@@ -519,7 +520,7 @@ export default function Login() {
               }`}
             >
               <div>
-                <p className="text-sm font-black">
+                <p className="text-sm font-bold">
                   {prepaidModal
                     ? 'Prepaid Account Inquiry'
                     : 'CCA Inquiry'}
@@ -597,7 +598,7 @@ export default function Login() {
                         )}
 
                         <div>
-                          <p className="text-xs font-black">
+                          <p className="text-xs font-bold">
                             {status} Account
                           </p>
 
@@ -663,8 +664,9 @@ export default function Login() {
                   {/* Subscription details */}
                   {prepaidModal && inquiryResult.prepaid && (
                     <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-4">
-                      <p className="mb-2 text-xs font-bold text-blue-700">
-                        📺 Subscription Details
+                      <p className="mb-2 flex items-center gap-2 text-xs font-bold text-blue-700">
+                        <Tv size={14} />
+                        Subscription Details
                       </p>
 
                       {[
