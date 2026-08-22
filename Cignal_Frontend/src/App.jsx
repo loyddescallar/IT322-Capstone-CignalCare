@@ -41,6 +41,7 @@ export default function App() {
       <Route path="/admin/customers/:id" element={<AdminWorkspace />} />
       <Route path="/admin/tickets" element={<AdminWorkspace />} />
       <Route path="/admin/technicians" element={<AdminWorkspace />} />
+      <Route path="/admin/incidents" element={<AdminWorkspace />} />
       <Route path="/admin/plans" element={<AdminWorkspace />} />
       <Route path="/admin/pos" element={<AdminWorkspace />} />
       <Route path="/admin/transactions" element={<AdminWorkspace />} />

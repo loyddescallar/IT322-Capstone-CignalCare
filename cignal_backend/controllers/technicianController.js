@@ -10,6 +10,7 @@ const { createNotification, createAdminNotification } = require('../models/notif
 const { notifySafely } = require('../utils/safeNotification');
 const { isAdmin, ownsAccount } = require('../utils/ownership');
 const { uploadImageMaybe } = require('../utils/cloudinaryUpload');
+const { linkTechnicianIfActive } = require('../models/incidentModel');
 
 const ALLOWED_STATUS = ['Submitted', 'Under Review', 'Scheduled', 'Completed', 'Cancelled'];
 
@@ -50,6 +51,8 @@ async function createTechnicianRequest(req, res) {
       screen_photo_url: screenPhotoUrl || null,
     });
 
+    const linkedIncident = await linkTechnicianIfActive(id, customer.location, issueDescription.trim());
+
     await notifySafely('CREATE TECHNICIAN REQUEST', async () => {
       await createNotification({
         user_id: customer.id,
@@ -64,7 +67,7 @@ async function createTechnicianRequest(req, res) {
       });
     });
 
-    return res.status(201).json({ message: 'Request submitted', id });
+    return res.status(201).json({ message: 'Request submitted', id, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TECHNICIAN REQUEST ERROR', err);
 

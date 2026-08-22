@@ -306,6 +306,28 @@ function buildPersonalSupportText({
   return lines.join('\n');
 }
 
+async function getConfirmedIncidentsForUser(userId) {
+  if (!userId) return [];
+  const [rows] = await pool.query(`
+    SELECT si.id, si.issue_label, si.location, si.confirmed_at, si.notes
+    FROM support_incidents si
+    JOIN users u ON u.location = si.location
+    WHERE u.id = ? AND si.status = 'confirmed'
+    ORDER BY si.confirmed_at DESC, si.created_at DESC
+    LIMIT 5
+  `, [userId]);
+  return rows;
+}
+
+function buildIncidentKnowledgeText(incidents = []) {
+  if (!incidents.length) return '';
+  return [
+    'ADMIN-CONFIRMED SERVICE INCIDENTS FOR THIS CUSTOMER LOCATION:',
+    ...incidents.map((incident) => `- ${incident.issue_label} in ${incident.location}${incident.notes ? ` | Admin note: ${incident.notes}` : ''}`),
+    'These incidents were confirmed by an administrator. Explain them as advisories, but still allow the customer to report an individual issue if their situation differs.',
+  ].join('\n');
+}
+
 async function safeKnowledgeLookup(label, lookup, fallbackValue) {
   try {
     return {
@@ -352,7 +374,7 @@ async function getChatbotKnowledge({ userId = null, includePersonalData = false 
   // the live database is temporarily offline.
   const troubleshooting = await getTroubleshootingKnowledge();
 
-  const [plansResult, personalResult] = await Promise.all([
+  const [plansResult, personalResult, incidentResult] = await Promise.all([
     safeKnowledgeLookup('LOAD PLAN', getActiveLoadPlans, []),
     includePersonalData
       ? safeKnowledgeLookup(
@@ -361,10 +383,14 @@ async function getChatbotKnowledge({ userId = null, includePersonalData = false 
           null
         )
       : Promise.resolve({ ok: true, value: null, error: null }),
+    userId
+      ? safeKnowledgeLookup('CONFIRMED INCIDENT', () => getConfirmedIncidentsForUser(userId), [])
+      : Promise.resolve({ ok: true, value: [], error: null }),
   ]);
 
   const plans = plansResult.value;
   const personalSupport = personalResult.value;
+  const confirmedIncidents = incidentResult.value || [];
   const availability = {
     plans: plansResult.ok,
     troubleshooting: true,
@@ -376,6 +402,9 @@ async function getChatbotKnowledge({ userId = null, includePersonalData = false 
   if (personalSupport) {
     sections.push(buildPersonalSupportText(personalSupport));
   }
+
+  const incidentText = buildIncidentKnowledgeText(confirmedIncidents);
+  if (incidentText) sections.push(incidentText);
 
   const availabilityText = buildAvailabilityText({
     plansAvailable: plansResult.ok,
@@ -391,6 +420,7 @@ async function getChatbotKnowledge({ userId = null, includePersonalData = false 
     plans,
     troubleshooting,
     personalSupport,
+    confirmedIncidents,
     availability,
     text: sections.filter(Boolean).join('\n\n'),
   };
@@ -450,6 +480,7 @@ module.exports = {
   getActiveLoadPlans,
   getTroubleshootingKnowledge,
   getLatestPersonalSupportRecords,
+  getConfirmedIncidentsForUser,
   getChatbotKnowledge,
   buildChatbotUiHints,
 };
