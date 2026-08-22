@@ -17,6 +17,9 @@ import {
   TicketPlus,
   Wrench,
   Signal,
+  SignalLow,
+  CircleHelp,
+  MonitorOff,
   Tv,
   UserRound,
   WalletCards,
@@ -35,7 +38,7 @@ const SCREEN_OPTIONS = [
     id: 'no_signal',
     label: 'No Signal',
     desc: 'Black screen, no signal, or dish/cable issue',
-    icon: '📡',
+    icon: Signal,
     allowsLoad: false,
     action: 'troubleshoot',
   },
@@ -43,7 +46,7 @@ const SCREEN_OPTIONS = [
     id: 'weak_signal',
     label: 'Weak Signal / Pixelated',
     desc: 'Picture freezes, breaks, or disappears',
-    icon: '📶',
+    icon: SignalLow,
     allowsLoad: false,
     action: 'troubleshoot',
   },
@@ -51,7 +54,7 @@ const SCREEN_OPTIONS = [
     id: 'smartcard',
     label: 'Smartcard Error',
     desc: 'E4, E5, card error, or not detected',
-    icon: '💳',
+    icon: CreditCard,
     allowsLoad: false,
     action: 'troubleshoot',
   },
@@ -59,7 +62,7 @@ const SCREEN_OPTIONS = [
     id: 'subscribe',
     label: 'Please Subscribe',
     desc: 'Subscription expired or channel is locked',
-    icon: '📺',
+    icon: Tv,
     allowsLoad: true,
     action: 'load',
   },
@@ -67,7 +70,7 @@ const SCREEN_OPTIONS = [
     id: 'black_screen',
     label: 'Black Screen',
     desc: 'TV is on but no visible Cignal message',
-    icon: '⬛',
+    icon: MonitorOff,
     allowsLoad: false,
     action: 'troubleshoot',
   },
@@ -75,7 +78,7 @@ const SCREEN_OPTIONS = [
     id: 'unknown',
     label: 'Something Else',
     desc: 'I am not sure what the issue is',
-    icon: '❓',
+    icon: CircleHelp,
     allowsLoad: false,
     action: 'technician',
   },
@@ -465,12 +468,18 @@ export default function UserLoadRequest() {
                       <h3 className="font-bold text-slate-900">What appears on the screen?</h3>
                       <p className="mt-1 text-xs leading-5 text-slate-500">Select the closest match. The system will only allow loading when the issue is likely an expired subscription.</p>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        {SCREEN_OPTIONS.map((option) => (
-                          <button key={option.id} type="button" onClick={() => setSelectedScreen(option.id)} className={`rounded-xl border p-4 text-left transition ${selectedScreen === option.id ? 'border-[#cc0000] bg-red-50 ring-2 ring-red-100' : 'border-slate-200 hover:border-red-200 hover:bg-red-50'}`}>
-                            <p className="font-bold text-slate-900"><span className="mr-1.5">{option.icon}</span>{option.label}</p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">{option.desc}</p>
-                          </button>
-                        ))}
+                        {SCREEN_OPTIONS.map((option) => {
+                          const OptionIcon = option.icon;
+                          return (
+                            <button key={option.id} type="button" onClick={() => setSelectedScreen(option.id)} className={`rounded-xl border p-4 text-left transition ${selectedScreen === option.id ? 'border-[#cc0000] bg-red-50 ring-2 ring-red-100' : 'border-slate-200 hover:border-red-200 hover:bg-red-50'}`}>
+                              <p className="flex items-center gap-2 font-bold text-slate-900">
+                                <OptionIcon size={15} className="text-slate-500" />
+                                {option.label}
+                              </p>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">{option.desc}</p>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -513,7 +522,7 @@ export default function UserLoadRequest() {
                     return (
                       <div key={plan.id || plan.plan_code || `${plan.amount}-${index}`} className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? 'border-[#cc0000] ring-2 ring-red-100' : 'border-slate-200'}`}>
                         <button type="button" onClick={() => setSelectedPlan(plan)} className="w-full text-left">
-                          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#cc0000]">{plan.plan_code || 'Prepaid Plan'}</p><h3 className="mt-1 text-lg font-bold text-slate-900">{plan.name}</h3></div><p className="text-2xl font-black text-[#cc0000]">{formatPeso(plan.amount)}</p></div>
+                          <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#cc0000]">{plan.plan_code || 'Prepaid Plan'}</p><h3 className="mt-1 text-lg font-bold text-slate-900">{plan.name}</h3></div><p className="text-2xl font-bold text-[#cc0000]">{formatPeso(plan.amount)}</p></div>
                           <p className="mt-3 min-h-[40px] text-sm leading-5 text-slate-500">{plan.description}</p>
                           <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-xs"><div><p className="text-slate-400">Validity</p><p className="mt-0.5 font-semibold text-slate-700">{plan.duration}</p></div><div><p className="text-slate-400">Channels</p><p className="mt-0.5 font-semibold text-slate-700">{plan.channels || 0}</p></div></div>
                         </button>
@@ -572,7 +581,7 @@ export default function UserLoadRequest() {
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Send payment to</p><p className="mt-1 font-bold text-slate-900">{MANUAL_ACCOUNT.name}</p>
                       <div className="mt-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{manualMethod} Number</p><p className="mt-1 font-mono text-lg font-bold text-slate-900">{MANUAL_ACCOUNT.number}</p></div><button type="button" onClick={() => copyText(MANUAL_ACCOUNT.number, 'number')} className="inline-flex items-center gap-1 rounded-lg bg-[#cc0000] px-3 py-2 text-xs font-bold text-white">{copied === 'number' ? <Check size={12} /> : <Copy size={12} />}{copied === 'number' ? 'Copied' : 'Copy'}</button></div>
-                      <div className="mt-4 border-t border-slate-200 pt-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Exact amount</p><p className="mt-1 text-3xl font-black text-[#cc0000]">{formatPeso(selectedPlan.amount)}</p></div>
+                      <div className="mt-4 border-t border-slate-200 pt-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Exact amount</p><p className="mt-1 text-3xl font-bold text-[#cc0000]">{formatPeso(selectedPlan.amount)}</p></div>
                     </div>
                   </div>
 
@@ -610,7 +619,7 @@ export default function UserLoadRequest() {
             <div className="mt-4 space-y-4">
               <div className="flex items-start gap-3"><div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><UserRound size={16} /></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Subscriber</p><p className="truncate text-sm font-semibold text-slate-800">{user.accountName || 'Subscriber'}</p><p className="text-xs text-slate-500">{user.accountNumber || 'No account number'}</p></div></div>
               <div className="flex items-start gap-3"><div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><MapPin size={16} /></div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Location</p><p className="truncate text-sm font-semibold text-slate-800">{user.location || 'Balayan'}</p></div></div>
-              <div className="border-t border-slate-100 pt-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Selected plan</p>{selectedPlan ? <><p className="mt-1 text-sm font-bold text-slate-900">{selectedPlan.name}</p><div className="mt-2 flex items-end justify-between"><p className="text-xs text-slate-500">{selectedPlan.duration} • {selectedPlan.channels || 0} channels</p><p className="text-xl font-black text-[#cc0000]">{formatPeso(selectedPlan.amount)}</p></div></> : <p className="mt-1 text-sm text-slate-400">No plan selected yet</p>}</div>
+              <div className="border-t border-slate-100 pt-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Selected plan</p>{selectedPlan ? <><p className="mt-1 text-sm font-bold text-slate-900">{selectedPlan.name}</p><div className="mt-2 flex items-end justify-between"><p className="text-xs text-slate-500">{selectedPlan.duration} • {selectedPlan.channels || 0} channels</p><p className="text-xl font-bold text-[#cc0000]">{formatPeso(selectedPlan.amount)}</p></div></> : <p className="mt-1 text-sm text-slate-400">No plan selected yet</p>}</div>
               <div className="border-t border-slate-100 pt-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Signal check</p><p className="mt-1 text-sm font-semibold text-slate-800">{channelOneWorking === true ? 'Channel 1 has a picture' : channelOneWorking === false ? selectedOption?.label || 'Issue not selected' : 'Not completed'}</p></div>
             </div>
           </div>

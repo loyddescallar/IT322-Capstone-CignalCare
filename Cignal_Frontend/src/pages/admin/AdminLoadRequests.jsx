@@ -142,7 +142,7 @@ export default function AdminLoadRequests() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-black text-gray-800">Load Requests</h1>
+        <h1 className="text-lg font-bold text-gray-800">Load Requests</h1>
         <p className="mt-0.5 text-xs text-gray-500">PayMongo and manual prepaid load requests submitted by subscribers.</p>
       </div>
 
@@ -153,7 +153,7 @@ export default function AdminLoadRequests() {
               <div className={`h-2 w-2 rounded-full ${stat.dot}`} />
               <p className="text-xs text-gray-500">{stat.label}</p>
             </div>
-            <p className={`text-2xl font-black ${stat.color}`}>{loading ? '...' : stat.value}</p>
+            <p className={`text-2xl font-bold ${stat.color}`}>{loading ? '...' : stat.value}</p>
           </div>
         ))}
       </div>
@@ -228,7 +228,7 @@ export default function AdminLoadRequests() {
                       </td>
                       <td className="px-3 py-2 font-mono text-gray-600">{request.account_number}</td>
                       <td className="px-3 py-2 text-gray-600">{request.plan_name}</td>
-                      <td className="px-3 py-2 font-black text-[#cc0000]">₱{Number(request.amount || 0).toLocaleString()}</td>
+                      <td className="px-3 py-2 font-bold text-[#cc0000]">₱{Number(request.amount || 0).toLocaleString()}</td>
                       <td className="px-3 py-2 text-gray-500">{request.payment_method}</td>
                       <td className="px-3 py-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PAYMENT_BADGE[paymentStatus] || PAYMENT_BADGE.manual_review}`}>
@@ -262,7 +262,7 @@ export default function AdminLoadRequests() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhotoModal(null)}>
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-              <h2 className="text-sm font-black text-gray-800">{photoModal.label}</h2>
+              <h2 className="text-sm font-bold text-gray-800">{photoModal.label}</h2>
               <button onClick={() => setPhotoModal(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100"><X size={16} /></button>
             </div>
             <div className="p-4"><img src={photoModal.url} alt={photoModal.label} className="max-h-96 w-full rounded-xl border border-gray-200 object-contain" /></div>
@@ -274,7 +274,7 @@ export default function AdminLoadRequests() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <h2 className="text-sm font-black text-gray-800">Review Load Request #{selected.id}</h2>
+              <h2 className="text-sm font-bold text-gray-800">Review Load Request #{selected.id}</h2>
               <button onClick={() => setSelected(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100"><X size={16} /></button>
             </div>
             <div className="space-y-3 p-5">

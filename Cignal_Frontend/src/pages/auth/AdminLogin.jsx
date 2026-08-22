@@ -186,7 +186,7 @@ export default function AdminLogin() {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-300">CignalCare+ Security</p>
-              <h1 className="mt-1 text-2xl font-black text-white">{title}</h1>
+              <h1 className="mt-1 text-2xl font-bold text-white">{title}</h1>
               <p className="mt-1 text-xs leading-5 text-white/50">Descallar Satellite Services · Authorized personnel only</p>
             </div>
           </div>

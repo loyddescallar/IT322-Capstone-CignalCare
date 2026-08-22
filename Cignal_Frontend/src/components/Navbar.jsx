@@ -130,7 +130,6 @@ export default function Navbar() {
             <div className="flex items-center gap-2 whitespace-nowrap border-r-2 border-white/50 pr-5 text-[15px] font-semibold">
               <span>Welcome,</span>
               <span className="font-bold capitalize">{username}</span>
-              <span>😊</span>
             </div>
 
             {NAV_LINKS.map((link) => {
@@ -172,7 +171,7 @@ export default function Navbar() {
         {menuOpen && (
           <div className="space-y-3 border-t border-white/20 bg-cignalRed px-6 py-5 shadow-md lg:hidden">
             <p className="text-sm font-semibold">
-              Welcome, {username} 😊
+              Welcome, {username}
             </p>
 
             {NAV_LINKS.map((link) => {

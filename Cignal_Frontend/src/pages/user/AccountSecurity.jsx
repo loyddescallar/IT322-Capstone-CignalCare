@@ -67,7 +67,7 @@ export default function AccountSecurity() {
           <div className="flex items-start gap-3">
             <div className="rounded-2xl bg-red-50 p-3 text-[#cc0000]"><ShieldCheck size={24} /></div>
             <div>
-              <h1 className="text-2xl font-black text-gray-900">Account Security</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Account Security</h1>
               <p className="mt-1 text-sm text-gray-500">Verify an optional recovery email so you can reset your password without waiting for Admin assistance.</p>
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function AccountSecurity() {
                   maxLength={6}
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-black tracking-[0.35em] outline-none focus:border-[#cc0000]"
+                  className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-bold tracking-[0.35em] outline-none focus:border-[#cc0000]"
                   placeholder="000000"
                 />
                 <button

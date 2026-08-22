@@ -95,7 +95,7 @@ export default function UserLoadHistory() {
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="mb-1 text-xs text-gray-500">{stat.label}</p>
-              <p className={`text-2xl font-black ${stat.color}`}>{loading ? '...' : stat.value}</p>
+              <p className={`text-2xl font-bold ${stat.color}`}>{loading ? '...' : stat.value}</p>
             </div>
           ))}
         </div>
@@ -135,7 +135,7 @@ export default function UserLoadHistory() {
                   filtered.map((request) => (
                     <tr key={request.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
                       <td className="px-4 py-3 font-semibold text-gray-800">{request.plan_name}</td>
-                      <td className="px-4 py-3 font-black text-[#cc0000]">₱{Number(request.amount || 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 font-bold text-[#cc0000]">₱{Number(request.amount || 0).toLocaleString()}</td>
                       <td className="px-4 py-3 text-gray-600">{request.payment_method}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PAYMENT_BADGE[request.payment_status] || PAYMENT_BADGE.manual_review}`}>
@@ -179,7 +179,7 @@ export default function UserLoadHistory() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhoto(null)}>
             <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-                <h2 className="text-sm font-black text-gray-800">{photo.label}</h2>
+                <h2 className="text-sm font-bold text-gray-800">{photo.label}</h2>
                 <button onClick={() => setPhoto(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100">
                   <X size={16} />
                 </button>

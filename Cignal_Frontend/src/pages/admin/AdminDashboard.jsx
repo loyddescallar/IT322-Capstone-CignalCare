@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
-  BarChart3,
+  ChartNoAxesCombined,
   CheckCircle2,
   Clock3,
-  CreditCard,
-  Lightbulb,
+  Banknote,
   MapPin,
   Siren,
-  Ticket,
+  Headset,
   Users,
   Wrench,
 } from 'lucide-react';
@@ -66,8 +65,8 @@ function KpiCard({ icon: Icon, label, value, helper, tone }) {
           <Icon size={20} />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-          <p className="mt-1 truncate text-2xl font-black text-slate-950">{value}</p>
+          <p className="text-[11px] font-semibold text-slate-500">{label}</p>
+          <p className="mt-1 truncate text-2xl font-bold text-slate-950">{value}</p>
           <p className="mt-1 text-[11px] leading-4 text-slate-400">{helper}</p>
         </div>
       </div>
@@ -80,7 +79,7 @@ function CardTitle({ icon: Icon, title, action, onAction }) {
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
         {Icon && <Icon size={16} className="text-[#cc0000]" />}
-        <h2 className="text-sm font-black text-slate-900">{title}</h2>
+        <h2 className="text-sm font-bold text-slate-900">{title}</h2>
       </div>
       {action && (
         <button onClick={onAction} className="text-[11px] font-bold text-blue-600 hover:text-blue-700">
@@ -142,7 +141,7 @@ export default function AdminDashboard() {
     <div className="space-y-4 pb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-950">Dashboard Overview</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Dashboard Overview</h1>
           <p className="mt-1 text-xs text-slate-500">Sales, subscriber support, and service operations at a glance.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -169,8 +168,8 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard icon={CreditCard} label="Sales Today" value={loading ? '...' : peso(k.salesToday)} helper="In-store POS revenue" tone="red" />
-        <KpiCard icon={Ticket} label="Support Requests Today" value={loading ? '...' : k.supportToday || 0} helper="New subscriber tickets" tone="blue" />
+        <KpiCard icon={Banknote} label="Sales Today" value={loading ? '...' : peso(k.salesToday)} helper="In-store POS revenue" tone="red" />
+        <KpiCard icon={Headset} label="Support Requests Today" value={loading ? '...' : k.supportToday || 0} helper="New subscriber tickets" tone="blue" />
         <KpiCard icon={CheckCircle2} label="Resolved Today" value={loading ? '...' : k.resolvedToday || 0} helper="Tickets resolved today" tone="green" />
         <KpiCard icon={Wrench} label="Technician Escalations" value={loading ? '...' : k.technicianEscalations || 0} helper="Requests in selected period" tone="amber" />
         <KpiCard icon={Clock3} label="Pending Concerns" value={loading ? '...' : pendingTickets} helper="Open support tickets" tone="violet" />
@@ -186,17 +185,17 @@ export default function AdminDashboard() {
                   <Siren size={18} />
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-red-500">
+                  <p className="text-[11px] font-semibold text-red-600">
                     {primaryIncident.status === 'candidate' ? 'Needs Admin Review' : 'Confirmed Active Incident'}
                   </p>
-                  <p className="mt-1 text-xl font-black text-slate-950">{primaryIncident.issue_label}</p>
+                  <p className="mt-1 text-xl font-bold text-slate-950">{primaryIncident.issue_label}</p>
                   <p className="mt-1 text-sm font-semibold text-slate-600">{primaryIncident.location}</p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-red-50 p-3 text-xs">
                 <div>
                   <p className="text-slate-400">Subscribers</p>
-                  <p className="mt-1 font-black text-red-700">{primaryIncident.distinct_subscribers || 0}</p>
+                  <p className="mt-1 font-bold text-red-700">{primaryIncident.distinct_subscribers || 0}</p>
                 </div>
                 <div>
                   <p className="text-slate-400">First detected</p>
@@ -205,7 +204,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={() => navigate('/admin/incidents')}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#d60000] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#b90000]"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#d60000] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#b90000]"
               >
                 Review Incident <ArrowRight size={14} />
               </button>
@@ -213,14 +212,14 @@ export default function AdminDashboard() {
           ) : (
             <div className="mt-4 flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-6 text-center">
               <CheckCircle2 size={28} className="text-emerald-500" />
-              <p className="mt-3 text-sm font-black text-slate-800">No common issue detected</p>
+              <p className="mt-3 text-sm font-bold text-slate-800">No common issue detected</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">The system will flag a pattern when multiple distinct subscribers report the same specific issue in one location.</p>
             </div>
           )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-4">
-          <CardTitle icon={Lightbulb} title="Smart Management Insights" action="View Analytics" onAction={() => navigate('/admin/analytics')} />
+          <CardTitle icon={ChartNoAxesCombined} title="Smart Management Insights" action="View Analytics" onAction={() => navigate('/admin/analytics')} />
           <div className="mt-4 space-y-2.5">
             {(data?.insights || []).length ? (
               data.insights.slice(0, 5).map((insight, index) => {
@@ -232,9 +231,9 @@ export default function AdminDashboard() {
                 return (
                   <div key={`${insight.title}-${index}`} className={`rounded-xl border p-3 ${tone}`}>
                     <div className="flex items-start gap-2">
-                      <BarChart3 size={15} className="mt-0.5 shrink-0" />
+                      <ChartNoAxesCombined size={15} className="mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-xs font-black">{insight.title}</p>
+                        <p className="text-xs font-bold">{insight.title}</p>
                         <p className="mt-1 text-[11px] leading-5 opacity-80">{insight.text}</p>
                       </div>
                     </div>
@@ -267,7 +266,7 @@ export default function AdminDashboard() {
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total</span>
-                <span className="text-2xl font-black text-slate-900">{issueTotal}</span>
+                <span className="text-2xl font-bold text-slate-900">{issueTotal}</span>
                 <span className="text-[10px] text-slate-400">issues</span>
               </div>
             </div>
@@ -334,7 +333,7 @@ export default function AdminDashboard() {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-black text-slate-900">{resolutionRate}%</span>
+              <span className="text-3xl font-bold text-slate-900">{resolutionRate}%</span>
               <span className="text-xs font-semibold text-slate-400">Resolved</span>
             </div>
           </div>
@@ -352,13 +351,13 @@ export default function AdminDashboard() {
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-[11px]">
-              <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+              <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 <tr><th className="px-4 py-3">Ticket</th><th className="px-3 py-3">Customer</th><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(data?.recentTickets || []).slice(0, 5).map((ticket) => (
                   <tr key={ticket.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3 font-black text-blue-600">#{ticket.ticket_no || ticket.id}</td>
+                    <td className="px-4 py-3 font-bold text-blue-600">#{ticket.ticket_no || ticket.id}</td>
                     <td className="px-3 py-3 font-semibold text-slate-700">{ticket.accountName || ticket.accountNumber || 'Subscriber'}</td>
                     <td className="max-w-40 truncate px-3 py-3 text-slate-600">{ticket.issue_label || ticket.category || 'Support Concern'}</td>
                     <td className="px-3 py-3 text-slate-500">{ticket.location || '—'}</td>
@@ -377,13 +376,13 @@ export default function AdminDashboard() {
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-[11px]">
-              <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-400">
+              <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 <tr><th className="px-4 py-3">Incident</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Reported</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(data?.incidents || []).slice(0, 5).map((incident) => (
                   <tr key={incident.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3 font-black text-slate-700">INC-{String(incident.id).padStart(4, '0')}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">INC-{String(incident.id).padStart(4, '0')}</td>
                     <td className="px-3 py-3 text-slate-600">{incident.location}</td>
                     <td className="max-w-40 truncate px-3 py-3 font-semibold text-slate-700">{incident.issue_label}</td>
                     <td className="px-3 py-3"><span className={`rounded-full px-2 py-1 font-bold ${incident.status === 'confirmed' ? 'bg-red-50 text-red-700' : incident.status === 'resolved' ? 'bg-emerald-50 text-emerald-700' : incident.status === 'candidate' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{incident.status}</span></td>

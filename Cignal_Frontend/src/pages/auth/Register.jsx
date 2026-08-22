@@ -681,7 +681,7 @@ export default function Register() {
                 Smart Registration Validation
               </span>
 
-              <h1 className="mt-6 text-5xl font-black leading-[1.08] tracking-tight xl:text-6xl">
+              <h1 className="mt-6 text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">
                 Create your
                 <span className="block text-red-400">subscriber account.</span>
               </h1>
@@ -721,7 +721,7 @@ export default function Register() {
                       className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md"
                     >
                       <Icon size={18} className="text-red-300" />
-                      <p className="mt-2 text-xs font-black text-white">
+                      <p className="mt-2 text-xs font-bold text-white">
                         {feature.title}
                       </p>
                       <p className="mt-1 text-[11px] leading-4 text-white/60">
@@ -780,7 +780,7 @@ export default function Register() {
                     <div className="h-7 w-1.5 rounded-full bg-[#cc0000]" />
 
                     <div>
-                      <h2 className="text-2xl font-black text-gray-900">
+                      <h2 className="text-2xl font-bold text-gray-900">
                         Create Account
                       </h2>
                       <p className="mt-1 text-xs text-gray-500">
@@ -1082,7 +1082,7 @@ export default function Register() {
                     <p className="text-xs text-gray-600">
                       {allValid
                         ? '✅ All fields validated. Ready to register!'
-                        : '🔍 Smart validation is checking your inputs...'}
+                        : 'Smart validation is checking your inputs...'}
                     </p>
                   </div>
 

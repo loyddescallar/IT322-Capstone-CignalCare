@@ -164,7 +164,7 @@ export default function TroubleshootIssue() {
         <div className="flex min-h-[70vh] items-center justify-center px-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
             <XCircle size={40} className="mx-auto text-red-500" />
-            <h1 className="mt-4 text-xl font-black text-slate-900">
+            <h1 className="mt-4 text-xl font-bold text-slate-900">
               Troubleshooting guide unavailable
             </h1>
             <p className="mt-2 text-sm text-slate-500">
@@ -278,7 +278,7 @@ export default function TroubleshootIssue() {
                     {model.name}
                     {issue.category ? ` · ${issue.category}` : ''}
                   </p>
-                  <h1 className="mt-1 text-2xl font-black text-slate-900 sm:text-3xl">
+                  <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
                     {issueTitle}
                   </h1>
                   <p className="mt-1 text-sm text-slate-500">
@@ -286,7 +286,7 @@ export default function TroubleshootIssue() {
                       'Follow the configured steps below one at a time.'}
                   </p>
                   {issue.error_code && (
-                    <span className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-[#cc0000]">
+                    <span className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
                       {issue.error_code}
                     </span>
                   )}
@@ -308,10 +308,10 @@ export default function TroubleshootIssue() {
         <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[280px_1fr] lg:px-8">
           <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-24 lg:self-start">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                 Your progress
               </p>
-              <span className="text-sm font-black text-[#cc0000]">{progress}%</span>
+              <span className="text-sm font-bold text-[#cc0000]">{progress}%</span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
@@ -378,14 +378,14 @@ export default function TroubleshootIssue() {
                 <div className="border-b border-slate-100 bg-gradient-to-r from-red-50 to-white px-5 py-5 sm:px-7">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-wide text-[#cc0000]">
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#cc0000]">
                         Step {safeCurrentStep + 1} of {steps.length}
                       </p>
-                      <h2 className="mt-1 text-xl font-black text-slate-900">
+                      <h2 className="mt-1 text-xl font-bold text-slate-900">
                         {activeStep.sectionTitle}
                       </h2>
                     </div>
-                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#cc0000] text-sm font-black text-white">
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#cc0000] text-sm font-bold text-white">
                       {safeCurrentStep + 1}
                     </div>
                   </div>
@@ -477,7 +477,7 @@ export default function TroubleshootIssue() {
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
                   <CheckCircle2 size={32} />
                 </div>
-                <h2 className="mt-5 text-2xl font-black text-slate-900">
+                <h2 className="mt-5 text-2xl font-bold text-slate-900">
                   Did these steps solve the problem?
                 </h2>
                 <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
@@ -510,8 +510,8 @@ export default function TroubleshootIssue() {
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700">
                   <CheckCircle2 size={34} />
                 </div>
-                <h2 className="mt-5 text-2xl font-black text-slate-900">
-                  Problem resolved 🎉
+                <h2 className="mt-5 text-2xl font-bold text-slate-900">
+                  Problem resolved
                 </h2>
                 <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
                   Your progress has been saved. You may restart this guide or return to the troubleshooting page.
@@ -542,7 +542,7 @@ export default function TroubleshootIssue() {
                     <AlertTriangle size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-slate-900">
+                    <h2 className="text-xl font-bold text-slate-900">
                       The issue needs further assistance
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -605,7 +605,7 @@ export default function TroubleshootIssue() {
 
             {issue.note && (
               <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-blue-900">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-900">
                   Important note
                 </p>
                 <p className="mt-1 text-xs leading-5 text-blue-800">
@@ -621,7 +621,7 @@ export default function TroubleshootIssue() {
                   className="mt-0.5 flex-shrink-0 text-amber-700"
                 />
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wide text-amber-800">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
                     Safety reminder
                   </p>
                   <p className="mt-1 text-xs leading-5 text-amber-700">

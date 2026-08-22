@@ -4,8 +4,8 @@ import {
   LayoutDashboard,
   Users,
   CreditCard,
-  ArrowLeftRight,
-  Ticket,
+  ReceiptText,
+  Headset,
   Wrench,
   Bell,
   ChevronDown,
@@ -19,9 +19,10 @@ import {
   AlertCircle,
   Info,
   Tv,
-  BarChart2,
-  Smartphone,
+  ChartNoAxesCombined,
+  WalletCards,
   Siren,
+  Store,
 } from 'lucide-react';
 import { getAllLoadRequests } from '../../api/loadRequestApi';
 import notificationApi from '../../api/notificationApi';
@@ -61,7 +62,7 @@ const navGroups = [
         key: 'customers',
       },
       {
-        icon: Ticket,
+        icon: Headset,
         label: 'Tickets',
         path: '/admin/tickets',
         key: 'tickets',
@@ -90,19 +91,19 @@ const navGroups = [
         key: 'plans',
       },
       {
-        icon: CreditCard,
+        icon: Store,
         label: 'POS / Prepaid',
         path: '/admin/pos',
         key: 'pos',
       },
       {
-        icon: ArrowLeftRight,
+        icon: ReceiptText,
         label: 'Transactions',
         path: '/admin/transactions',
         key: 'transactions',
       },
       {
-        icon: Smartphone,
+        icon: WalletCards,
         label: 'Load Requests',
         path: '/admin/load-requests',
         key: 'load-requests',
@@ -113,7 +114,7 @@ const navGroups = [
     group: 'Analytics',
     items: [
       {
-        icon: BarChart2,
+        icon: ChartNoAxesCombined,
         label: 'Analytics',
         path: '/admin/analytics',
         key: 'analytics',
@@ -184,7 +185,7 @@ const notifIcon = {
     color: 'text-blue-500 bg-blue-50',
   },
   admin_ticket: {
-    icon: Ticket,
+    icon: Headset,
     color: 'text-red-500 bg-red-50',
   },
   admin_technician: {
@@ -192,7 +193,7 @@ const notifIcon = {
     color: 'text-orange-500 bg-orange-50',
   },
   admin_load_request: {
-    icon: Smartphone,
+    icon: WalletCards,
     color: 'text-blue-500 bg-blue-50',
   },
   admin_payment: {
@@ -445,10 +446,10 @@ export default function AdminWorkspace() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f5f7fb]">
+    <div className="admin-shell flex h-screen w-screen overflow-hidden bg-[#f6f7f9]">
       {/* SIDEBAR */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-[#0b1627] transition-transform duration-300 lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-[#101827] transition-transform duration-300 lg:relative lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -519,17 +520,17 @@ export default function AdminWorkspace() {
                         navigate(item.path);
                         setSidebarOpen(false);
                       }}
-                      className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
                         isActive
-                          ? 'bg-[#cc0000] text-white'
-                          : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                          ? 'bg-[#cc0000] text-white shadow-sm'
+                          : 'text-slate-300 hover:bg-white/[0.07] hover:text-white'
                       }`}
                     >
                       <div className="relative flex-shrink-0">
                         <item.icon size={17} />
 
                         {badge > 0 && (
-                          <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 animate-pulse items-center justify-center rounded-full bg-yellow-400 text-[8px] font-black text-gray-900">
+                          <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 animate-pulse items-center justify-center rounded-full bg-yellow-400 text-[8px] font-bold text-gray-900">
                             {badge}
                           </span>
                         )}
@@ -538,7 +539,7 @@ export default function AdminWorkspace() {
                       <span className="flex-1 text-left">{item.label}</span>
 
                       {badge > 0 && (
-                        <span className="rounded-full bg-yellow-400 px-1.5 py-0.5 text-[9px] font-black text-gray-900">
+                        <span className="rounded-full bg-yellow-400 px-1.5 py-0.5 text-[9px] font-bold text-gray-900">
                           {badge}
                         </span>
                       )}
@@ -572,7 +573,7 @@ export default function AdminWorkspace() {
 
       {/* MAIN */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-[0_1px_0_rgba(15,23,42,0.02)]">
+        <header className="flex min-h-14 flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
           <button
             className="p-1 text-gray-500 hover:text-gray-700 lg:hidden"
             onClick={() => setSidebarOpen(true)}
@@ -597,7 +598,7 @@ export default function AdminWorkspace() {
               <Bell size={18} className="text-gray-600" />
 
               {unread > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#cc0000] text-[9px] font-black text-white">
+                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#cc0000] text-[9px] font-bold text-white">
                   {unread}
                 </span>
               )}
@@ -714,7 +715,7 @@ export default function AdminWorkspace() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-5 xl:p-6">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-7">
           {renderContent()}
         </main>
       </div>
