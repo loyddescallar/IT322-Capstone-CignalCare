@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import CignalBot from './CignalBot';
+import ServiceAdvisoryBanner from './ServiceAdvisoryBanner';
 
 export default function UserLayout({ children }) {
   const navigate=useNavigate();
@@ -21,6 +22,7 @@ export default function UserLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {showNavbar&&<Navbar/>}
+      {showNavbar&&<ServiceAdvisoryBanner/>}
       <div>{children||<Outlet/>}</div>
       {showNavbar&&<CignalBot/>}
     </div>

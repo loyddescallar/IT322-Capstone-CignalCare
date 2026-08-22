@@ -10,6 +10,7 @@ const {
 const { createNotification, createAdminNotification } = require('../models/notificationModel');
 const { notifySafely } = require('../utils/safeNotification');
 const { isAdmin, isSelf } = require('../utils/ownership');
+const { linkTicketIfActive } = require('../models/incidentModel');
 
 function canAccessTicket(req, ticket) {
   return ticket && (isAdmin(req) || isSelf(req, ticket.user_id));
@@ -29,6 +30,8 @@ async function createTicketController(req, res) {
       subject: subject.trim(),
     });
 
+    const linkedIncident = await linkTicketIfActive(id, req.user.location, `${category} ${subject}`);
+
     await notifySafely('CREATE TICKET', async () => {
       await createNotification({
         user_id: req.user.id,
@@ -43,7 +46,7 @@ async function createTicketController(req, res) {
       });
     });
 
-    return res.status(201).json({ message: 'Ticket created', id });
+    return res.status(201).json({ message: 'Ticket created', id, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TICKET ERROR', err);
     return res.status(500).json({ error: 'Server error' });

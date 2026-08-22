@@ -13,6 +13,8 @@ const customerRoutes = require('./routes/customerRoutes');
 const troubleshootRoutes = require('./routes/troubleshootRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const incidentRoutes = require('./routes/incidentRoutes');
 
 const {
   payMongoWebhookController,
@@ -102,6 +104,8 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/troubleshoot', troubleshootRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/incidents', incidentRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

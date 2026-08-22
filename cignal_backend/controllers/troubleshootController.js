@@ -3,6 +3,7 @@ const {
   findBoxModel,
   findTroubleshootIssue,
 } = require('../data/troubleshootData');
+const { recordOutcome } = require('../models/troubleshootOutcomeModel');
 
 function getErrorCode(issue) {
   const title = String(issue?.shortTitle || '');
@@ -108,8 +109,28 @@ function getStepsByIssue(req, res) {
   });
 }
 
+
+async function recordTroubleshootOutcome(req, res) {
+  try {
+    const { modelId, issueId, outcome } = req.body || {};
+    const allowed = new Set(['resolved', 'unresolved', 'ticket', 'technician']);
+    if (!modelId || !issueId || !allowed.has(String(outcome || ''))) {
+      return res.status(400).json({ error: 'Valid modelId, issueId, and outcome are required.' });
+    }
+    const model = findBoxModel(modelId);
+    const issue = model ? findTroubleshootIssue(model.id, issueId) : null;
+    if (!model || !issue) return res.status(404).json({ error: 'Troubleshooting guide not found.' });
+    const id = await recordOutcome({ userId: req.user.id, accountNumber: req.user.accountNumber, location: req.user.location, modelId: model.id, modelName: model.name, issueId: issue.id, issueLabel: issue.shortTitle, outcome: String(outcome) });
+    return res.status(201).json({ ok: true, id });
+  } catch (error) {
+    console.error('RECORD TROUBLESHOOT OUTCOME ERROR:', error);
+    return res.status(500).json({ error: 'Unable to save troubleshooting outcome.' });
+  }
+}
+
 module.exports = {
   getModels,
   getIssuesByModel,
   getStepsByIssue,
+  recordTroubleshootOutcome,
 };
