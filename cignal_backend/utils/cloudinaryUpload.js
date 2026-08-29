@@ -10,9 +10,14 @@ const IMAGE_MIME_TYPES = new Set([
   'image/webp',
 ]);
 const RAW_MIME_TYPES = new Set(['application/pdf']);
+const UPLOAD_STORAGE_ERROR_CODE = 'UPLOAD_STORAGE_UNAVAILABLE';
 
 let configured = false;
 let warnedMissingCredentials = false;
+
+function isProduction() {
+  return String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+}
 
 function getCloudinaryCredentials() {
   return {
@@ -27,11 +32,25 @@ function isCloudinaryConfigured() {
   return Boolean(credentials.cloud_name && credentials.api_key && credentials.api_secret);
 }
 
+function createStorageError(message, cause = null) {
+  const error = new Error(message);
+  error.code = UPLOAD_STORAGE_ERROR_CODE;
+  error.statusCode = 503;
+  if (cause) error.cause = cause;
+  return error;
+}
+
+function isUploadStorageError(error) {
+  return error?.code === UPLOAD_STORAGE_ERROR_CODE;
+}
+
 function ensureCloudinaryConfigured() {
   if (!isCloudinaryConfigured()) {
     if (!warnedMissingCredentials) {
       console.warn(
-        'CLOUDINARY DISABLED: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET is missing. Local/base64 fallback remains active.'
+        isProduction()
+          ? 'CLOUDINARY CONFIGURATION ERROR: production uploads require CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.'
+          : 'CLOUDINARY DISABLED: credentials are incomplete. Local/base64 fallback is available for development only.'
       );
       warnedMissingCredentials = true;
     }
@@ -147,6 +166,11 @@ async function uploadImageMaybe(dataUrlOrUrl, folder = 'cignalcare/uploads') {
   });
 
   if (!ensureCloudinaryConfigured()) {
+    if (isProduction()) {
+      throw createStorageError(
+        'Image storage is temporarily unavailable. Please try again later.'
+      );
+    }
     return dataUrlOrUrl;
   }
 
@@ -156,9 +180,21 @@ async function uploadImageMaybe(dataUrlOrUrl, folder = 'cignalcare/uploads') {
       getImageUploadOptions(folder)
     );
 
-    return result.secure_url || result.url || dataUrlOrUrl;
+    if (!result.secure_url && !result.url) {
+      throw new Error('Cloudinary returned no upload URL.');
+    }
+
+    return result.secure_url || result.url;
   } catch (error) {
     console.error('CLOUDINARY DATA-URL UPLOAD FAILED:', error.message);
+
+    if (isProduction()) {
+      throw createStorageError(
+        'Image upload failed. The request was not saved. Please try again.',
+        error
+      );
+    }
+
     return dataUrlOrUrl;
   }
 }
@@ -186,6 +222,13 @@ async function uploadLocalFileMaybe(file, folder = 'cignalcare/chat') {
   const localFallback = file.filename || path.basename(file.path);
 
   if (!ensureCloudinaryConfigured()) {
+    if (isProduction()) {
+      await removeLocalFileQuietly(file.path);
+      throw createStorageError(
+        'Attachment storage is temporarily unavailable. Please try again later.'
+      );
+    }
+
     return {
       url: localFallback,
       storage: 'local',
@@ -200,6 +243,11 @@ async function uploadLocalFileMaybe(file, folder = 'cignalcare/chat') {
       : getImageUploadOptions(folder);
 
     const result = await cloudinary.uploader.upload(file.path, options);
+
+    if (!result.secure_url && !result.url) {
+      throw new Error('Cloudinary returned no upload URL.');
+    }
+
     await removeLocalFileQuietly(file.path);
 
     return {
@@ -212,6 +260,14 @@ async function uploadLocalFileMaybe(file, folder = 'cignalcare/chat') {
     };
   } catch (error) {
     console.error('CLOUDINARY LOCAL-FILE UPLOAD FAILED:', error.message);
+
+    if (isProduction()) {
+      await removeLocalFileQuietly(file.path);
+      throw createStorageError(
+        'Attachment upload failed. The message was not saved. Please try again.',
+        error
+      );
+    }
 
     return {
       url: localFallback,
@@ -242,7 +298,9 @@ module.exports = {
   MAX_UPLOAD_BYTES,
   IMAGE_MIME_TYPES,
   RAW_MIME_TYPES,
+  UPLOAD_STORAGE_ERROR_CODE,
   isCloudinaryConfigured,
+  isUploadStorageError,
   uploadImageMaybe,
   uploadLocalFileMaybe,
   deleteCloudinaryAssetMaybe,

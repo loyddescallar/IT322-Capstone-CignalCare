@@ -18,6 +18,7 @@ const {
   uploadLocalFileMaybe,
   deleteCloudinaryAssetMaybe,
   removeLocalFileQuietly,
+  isUploadStorageError,
 } = require("../utils/cloudinaryUpload");
 
 let messageSchemaReady = false;
@@ -327,6 +328,12 @@ async function sendMessageController(
           req.file.path
         );
       }
+    }
+
+    if (isUploadStorageError(error)) {
+      return res.status(error.statusCode || 503).json({
+        error: error.message,
+      });
     }
 
     if (

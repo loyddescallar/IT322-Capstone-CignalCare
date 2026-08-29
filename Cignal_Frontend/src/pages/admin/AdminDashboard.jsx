@@ -171,7 +171,7 @@ export default function AdminDashboard() {
         <KpiCard icon={Banknote} label="Sales Today" value={loading ? '...' : peso(k.salesToday)} helper="In-store POS revenue" tone="red" />
         <KpiCard icon={Headset} label="Support Requests Today" value={loading ? '...' : k.supportToday || 0} helper="New subscriber tickets" tone="blue" />
         <KpiCard icon={CheckCircle2} label="Resolved Today" value={loading ? '...' : k.resolvedToday || 0} helper="Tickets resolved today" tone="green" />
-        <KpiCard icon={Wrench} label="Technician Escalations" value={loading ? '...' : k.technicianEscalations || 0} helper="Requests in selected period" tone="amber" />
+        <KpiCard icon={Wrench} label="Technician Escalations" value={loading ? '...' : k.technicianEscalations || 0} helper="From verified troubleshooting" tone="amber" />
         <KpiCard icon={Clock3} label="Pending Concerns" value={loading ? '...' : pendingTickets} helper="Open support tickets" tone="violet" />
       </div>
 
@@ -372,7 +372,7 @@ export default function AdminDashboard() {
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="p-4">
-            <CardTitle title="Recent Incidents / Outages" action="View All" onAction={() => navigate('/admin/incidents')} />
+            <CardTitle title="Recent Common Issues / Incidents" action="View All" onAction={() => navigate('/admin/incidents')} />
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-[11px]">

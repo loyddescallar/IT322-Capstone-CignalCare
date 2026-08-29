@@ -347,10 +347,15 @@ export default function AdminAnalytics() {
                 <table className="min-w-full text-xs">
                   <thead><tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400"><th className="px-3 py-3">Guide</th><th className="px-3 py-3">Resolved</th><th className="px-3 py-3">Unresolved</th><th className="px-3 py-3">Success Rate</th><th className="px-3 py-3">Decision Signal</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(data?.guidePerformance || []).map((row) => {
-                      const healthy = Number(row.resolutionRate || 0) >= 60;
-                      return <tr key={row.guide}><td className="max-w-md px-3 py-3 font-semibold text-slate-700">{row.guide}</td><td className="px-3 py-3 text-emerald-700">{row.resolved}</td><td className="px-3 py-3 text-amber-700">{row.unresolved}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 font-bold ${healthy ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.resolutionRate}%</span></td><td className="px-3 py-3 text-[11px] text-slate-500">{healthy ? 'Guide is resolving most assessed cases.' : 'Review guide content or escalation path.'}</td></tr>;
-                    })}
+                    {(data?.guidePerformance || []).map((row) => (
+                      <tr key={row.guide}>
+                        <td className="max-w-md px-3 py-3 font-semibold text-slate-700">{row.guide}</td>
+                        <td className="px-3 py-3 text-emerald-700">{row.resolved}</td>
+                        <td className="px-3 py-3 text-amber-700">{row.unresolved}</td>
+                        <td className="px-3 py-3"><span className="rounded-full bg-blue-50 px-2 py-1 font-bold text-blue-700">{row.resolutionRate}%</span></td>
+                        <td className="px-3 py-3 text-[11px] text-slate-500">{row.resolutionRate}% of {row.total} completed assessment{Number(row.total) === 1 ? '' : 's'} reported resolved.</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
                 {!(data?.guidePerformance || []).length && <p className="py-8 text-center text-xs text-slate-400">No troubleshooting outcomes recorded yet.</p>}
