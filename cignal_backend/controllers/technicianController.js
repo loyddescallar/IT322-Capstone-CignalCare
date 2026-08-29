@@ -9,7 +9,7 @@ const { findByAccountIdOrCca } = require('../models/userModel');
 const { createNotification, createAdminNotification } = require('../models/notificationModel');
 const { notifySafely } = require('../utils/safeNotification');
 const { isAdmin, ownsAccount } = require('../utils/ownership');
-const { uploadImageMaybe } = require('../utils/cloudinaryUpload');
+const { uploadImageMaybe, isUploadStorageError } = require('../utils/cloudinaryUpload');
 const { linkTechnicianIfActive } = require('../models/incidentModel');
 
 const ALLOWED_STATUS = ['Submitted', 'Under Review', 'Scheduled', 'Completed', 'Cancelled'];
@@ -70,6 +70,10 @@ async function createTechnicianRequest(req, res) {
     return res.status(201).json({ message: 'Request submitted', id, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TECHNICIAN REQUEST ERROR', err);
+
+    if (isUploadStorageError(err)) {
+      return res.status(err.statusCode || 503).json({ error: err.message });
+    }
 
     if (
       err.message?.includes('Only JPG') ||

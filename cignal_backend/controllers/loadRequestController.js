@@ -16,7 +16,7 @@ const {
 
 const { findByAccountIdOrCca } = require('../models/userModel');
 const { createCheckoutSession } = require('../utils/paymongoClient');
-const { uploadImageMaybe } = require('../utils/cloudinaryUpload');
+const { uploadImageMaybe, isUploadStorageError } = require('../utils/cloudinaryUpload');
 const { isAdmin, ownsAccount } = require('../utils/ownership');
 const { createNotification, createAdminNotification } = require('../models/notificationModel');
 const { notifySafely } = require('../utils/safeNotification');
@@ -222,6 +222,12 @@ async function createLoadRequestController(req, res) {
   } catch (err) {
     console.error('CREATE LOAD REQUEST ERROR', err);
 
+    if (isUploadStorageError(err)) {
+      return res.status(err.statusCode || 503).json({
+        error: err.message,
+      });
+    }
+
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
         error: 'Reference number already exists',
@@ -365,6 +371,12 @@ async function createPayMongoCheckoutController(req, res) {
       gatewayStatus: err.gatewayStatus || err.status,
       details: err.details,
     });
+
+    if (isUploadStorageError(err)) {
+      return res.status(err.statusCode || 503).json({
+        error: err.message,
+      });
+    }
 
     const isDevelopment =
       String(process.env.NODE_ENV || '').toLowerCase() === 'development';

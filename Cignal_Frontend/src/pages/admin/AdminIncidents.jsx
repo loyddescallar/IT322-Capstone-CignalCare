@@ -132,6 +132,7 @@ export default function AdminIncidents() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [detectionPolicy, setDetectionPolicy] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -139,6 +140,7 @@ export default function AdminIncidents() {
     try {
       const response = await incidentApi.getAdminIncidents();
       setItems(response.data?.incidents || []);
+      setDetectionPolicy(response.data?.detectionPolicy || null);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Unable to load incidents.');
     } finally {
@@ -180,7 +182,11 @@ export default function AdminIncidents() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-950">Incidents & Common Issues</h1>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
-            CignalCare+ flags patterns only when at least 3 distinct subscribers report the same specific issue in one location within 6 hours. Admin confirmation is always required.
+            CignalCare+ flags a possible common issue using the configured operational detection rule
+            {detectionPolicy
+              ? `: at least ${detectionPolicy.minDistinctSubscribers} distinct subscribers reporting the same specific issue in one location within ${detectionPolicy.windowHours} hours.`
+              : '.'}{' '}
+            Admin confirmation is always required before a customer advisory is shown.
           </p>
         </div>
         <button
