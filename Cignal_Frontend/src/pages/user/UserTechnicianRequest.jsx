@@ -110,7 +110,9 @@ export default function UserTechnicianRequest() {
               <p className="text-sm leading-6 text-green-700">
                 {prefill.source === 'load_request_signal_check'
                   ? 'The selected TV issue and uploaded photo from Load Request were carried over for technician review.'
-                  : 'Troubleshooting details were added automatically. Review them before submitting.'}
+                  : prefill.source === 'cignalbot'
+                    ? 'CignalBot prepared this technician-request draft from your conversation. Review and edit every detail before submitting.'
+                    : 'Troubleshooting details were added automatically. Review them before submitting.'}
               </p>
             </div>
           )}

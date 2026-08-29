@@ -91,7 +91,9 @@ export default function UserReportProblem() {
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />
                 <p>
-                  Details were carried over from the Load Request signal check. Review and edit them before submitting.
+                  {prefill.source === 'cignalbot'
+                    ? 'CignalBot prepared this support draft from your conversation. Review and edit every detail before submitting.'
+                    : 'Details were carried over from the Load Request signal check. Review and edit them before submitting.'}
                 </p>
               </div>
             </div>
