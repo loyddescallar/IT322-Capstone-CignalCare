@@ -10,16 +10,57 @@ function getErrorCode(issue) {
   return /^E\d/i.test(title) ? title : null;
 }
 
-function toModelResponse(model) {
+function toGuideResponse(model) {
+  const guide = model?.guide || {};
+
   return {
+    verified: guide.verified === true,
+    cardless: guide.cardless === true,
+    display_mode: guide.displayMode || 'connection-guide',
+    note: guide.note || '',
+    components: Array.isArray(guide.components)
+      ? guide.components.map((component) => ({
+          id: component.id,
+          name: component.name,
+          area: component.area || '',
+          kind: component.kind || '',
+          description: component.description || '',
+          related_issues: Array.isArray(component.relatedIssues)
+            ? component.relatedIssues
+            : [],
+          caution: component.caution || '',
+        }))
+      : [],
+    connections: Array.isArray(guide.connections)
+      ? guide.connections.map((connection) => ({
+          id: connection.id,
+          from: connection.from,
+          through: connection.through,
+          to: connection.to,
+          description: connection.description || '',
+        }))
+      : [],
+  };
+}
+
+function toModelResponse(model, { includeGuide = false } = {}) {
+  const response = {
     id: model.id,
     name: model.name,
     type: model.type,
     image: model.image,
-    description: `${model.type || 'Cignal'} receiver`,
+    description: model.description || `${model.type || 'Cignal'} receiver`,
     status: 'active',
     issue_count: Array.isArray(model.issues) ? model.issues.length : 0,
+    source_url: model.sourceUrl || '',
+    source_label: model.sourceLabel || '',
   };
+
+  if (includeGuide) {
+    response.guide = toGuideResponse(model);
+  }
+
+  return response;
 }
 
 function toIssueResponse(modelId, issue) {
@@ -38,6 +79,22 @@ function toIssueResponse(modelId, issue) {
     category: issue.category,
     error_code: getErrorCode(issue),
     keywords: Array.isArray(issue.keywords) ? issue.keywords : [],
+    related_components: Array.isArray(issue.relatedComponents)
+      ? issue.relatedComponents
+      : [],
+    video_guides: Array.isArray(issue.videoGuides)
+      ? issue.videoGuides.map((video) => ({
+          id: video.id,
+          title: video.title,
+          youtube_id: video.youtubeId,
+          source: video.source || '',
+          source_label: video.sourceLabel || '',
+          verified: video.verified === true,
+          coverage: video.coverage || 'full',
+          purpose: video.purpose || '',
+          note: video.note || '',
+        }))
+      : [],
     note: issue.note || '',
     section_count: sections.length,
     step_count: stepCount,
@@ -45,7 +102,7 @@ function toIssueResponse(modelId, issue) {
 }
 
 function getModels(req, res) {
-  return res.json({ models: boxModels.map(toModelResponse) });
+  return res.json({ models: boxModels.map((model) => toModelResponse(model)) });
 }
 
 function getIssuesByModel(req, res) {
@@ -56,7 +113,7 @@ function getIssuesByModel(req, res) {
   }
 
   return res.json({
-    model: toModelResponse(model),
+    model: toModelResponse(model, { includeGuide: true }),
     issues: model.issues.map((issue) => toIssueResponse(model.id, issue)),
   });
 }
@@ -102,13 +159,15 @@ function getStepsByIssue(req, res) {
   });
 
   return res.json({
-    model: toModelResponse(model),
+    model: toModelResponse(model, { includeGuide: true }),
     issue: toIssueResponse(model.id, issue),
     note: issue.note || '',
+    related_components: Array.isArray(issue.relatedComponents)
+      ? issue.relatedComponents
+      : [],
     steps,
   });
 }
-
 
 async function recordTroubleshootOutcome(req, res) {
   try {
@@ -120,7 +179,16 @@ async function recordTroubleshootOutcome(req, res) {
     const model = findBoxModel(modelId);
     const issue = model ? findTroubleshootIssue(model.id, issueId) : null;
     if (!model || !issue) return res.status(404).json({ error: 'Troubleshooting guide not found.' });
-    const id = await recordOutcome({ userId: req.user.id, accountNumber: req.user.accountNumber, location: req.user.location, modelId: model.id, modelName: model.name, issueId: issue.id, issueLabel: issue.shortTitle, outcome: String(outcome) });
+    const id = await recordOutcome({
+      userId: req.user.id,
+      accountNumber: req.user.accountNumber,
+      location: req.user.location,
+      modelId: model.id,
+      modelName: model.name,
+      issueId: issue.id,
+      issueLabel: issue.shortTitle,
+      outcome: String(outcome),
+    });
     return res.status(201).json({ ok: true, id });
   } catch (error) {
     console.error('RECORD TROUBLESHOOT OUTCOME ERROR:', error);

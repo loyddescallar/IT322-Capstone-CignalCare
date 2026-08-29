@@ -4,21 +4,37 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BookOpen,
+  Cable,
   Check,
   CheckCircle2,
   Circle,
+  CircleDot,
+  ExternalLink,
+  PlayCircle,
+  Power,
   RefreshCcw,
   RotateCcw,
+  SatelliteDish,
+  ShieldCheck,
   TicketPlus,
-  Tv,
   Wrench,
   XCircle,
+  Youtube,
 } from 'lucide-react';
 import troubleshootApi from '../../api/troubleshootApi';
 import UserLayout from '../../components/UserLayout';
 
 const SAFETY_REMINDER =
   'Do not open the receiver or power adapter, touch exposed wiring, climb onto the roof, or adjust the satellite dish yourself. Stop and request professional assistance whenever a step cannot be completed safely.';
+
+function ComponentIcon({ kind, size = 17 }) {
+  if (kind === 'power') return <Power size={size} />;
+  if (kind === 'signal') return <SatelliteDish size={size} />;
+  if (kind === 'video') return <Cable size={size} />;
+  if (kind === 'card') return <CircleDot size={size} />;
+  return <Power size={size} />;
+}
 
 export default function TroubleshootIssue() {
   const { modelId, issueId } = useParams();
@@ -34,6 +50,7 @@ export default function TroubleshootIssue() {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState([]);
   const [result, setResult] = useState(null);
+  const [guideMode, setGuideMode] = useState('written');
   const outcomeSentRef = useRef(new Set());
 
   const steps = useMemo(
@@ -46,6 +63,14 @@ export default function TroubleshootIssue() {
     [apiSteps]
   );
 
+  const videos = issue?.video_guides || [];
+  const video = videos[0] || null;
+  const relatedComponents = useMemo(() => {
+    const components = model?.guide?.components || [];
+    const relatedIds = issue?.related_components || [];
+    return components.filter((component) => relatedIds.includes(component.id));
+  }, [issue, model]);
+
   useEffect(() => {
     let active = true;
 
@@ -53,6 +78,7 @@ export default function TroubleshootIssue() {
       setLoading(true);
       setError('');
       setResult(null);
+      setGuideMode('written');
 
       try {
         const [modelsResponse, issuesResponse, stepsResponse] = await Promise.all([
@@ -63,12 +89,16 @@ export default function TroubleshootIssue() {
 
         if (!active) return;
 
-        const selectedModel = (modelsResponse.data?.models || []).find(
+        const listModel = (modelsResponse.data?.models || []).find(
           (item) => String(item.id) === String(modelId)
         );
-        const selectedIssue = (issuesResponse.data?.issues || []).find(
-          (item) => String(item.id) === String(issueId)
-        );
+        const selectedModel =
+          stepsResponse.data?.model || issuesResponse.data?.model || listModel;
+        const selectedIssue =
+          stepsResponse.data?.issue ||
+          (issuesResponse.data?.issues || []).find(
+            (item) => String(item.id) === String(issueId)
+          );
         const loadedSteps = stepsResponse.data?.steps || [];
 
         if (!selectedModel || !selectedIssue) {
@@ -92,16 +122,12 @@ export default function TroubleshootIssue() {
         setApiSteps(loadedSteps);
 
         const validStepIds = new Set(loadedSteps.map((step) => String(step.id)));
-
         try {
           const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
           const savedCompleted = Array.isArray(saved.completedSteps)
-            ? saved.completedSteps
-                .map(String)
-                .filter((id) => validStepIds.has(id))
+            ? saved.completedSteps.map(String).filter((id) => validStepIds.has(id))
             : [];
           const savedCurrent = Number(saved.currentStep);
-
           setCompletedSteps(savedCompleted);
           setCurrentStep(
             Number.isInteger(savedCurrent) &&
@@ -136,7 +162,6 @@ export default function TroubleshootIssue() {
 
   useEffect(() => {
     if (loading || !issue || steps.length === 0) return;
-
     localStorage.setItem(
       storageKey,
       JSON.stringify({ currentStep, completedSteps })
@@ -176,8 +201,7 @@ export default function TroubleshootIssue() {
                 onClick={() => setReloadKey((value) => value + 1)}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
-                <RefreshCcw size={16} />
-                Try Again
+                <RefreshCcw size={16} /> Try Again
               </button>
               <button
                 type="button"
@@ -197,6 +221,16 @@ export default function TroubleshootIssue() {
   const activeStep = steps[safeCurrentStep];
   const isCurrentCompleted = completedSteps.includes(activeStep.id);
   const progress = Math.round((completedSteps.length / steps.length) * 100);
+  const issueTitle = issue.title || 'Troubleshooting issue';
+  const completedSummary = `${completedSteps.length} of ${steps.length} troubleshooting steps completed`;
+  const ticketDescription = [
+    `Box model: ${model.name}`,
+    `Issue: ${issueTitle}`,
+    completedSummary,
+    'Troubleshooting result: Issue still persists',
+    '',
+    'Additional details:',
+  ].join('\n');
 
   const toggleCurrentStep = () => {
     setCompletedSteps((previous) =>
@@ -210,7 +244,6 @@ export default function TroubleshootIssue() {
     if (!isCurrentCompleted) {
       setCompletedSteps((previous) => [...previous, activeStep.id]);
     }
-
     if (safeCurrentStep < steps.length - 1) {
       setCurrentStep(safeCurrentStep + 1);
     }
@@ -232,19 +265,24 @@ export default function TroubleshootIssue() {
     setCurrentStep(0);
     setCompletedSteps([]);
     setResult(null);
+    setGuideMode('written');
     localStorage.removeItem(storageKey);
   };
 
-  const completedSummary = `${completedSteps.length} of ${steps.length} troubleshooting steps completed`;
-  const issueTitle = issue.title || 'Troubleshooting issue';
-  const ticketDescription = [
-    `Box model: ${model.name}`,
-    `Issue: ${issueTitle}`,
-    completedSummary,
-    'Troubleshooting result: Issue still persists',
-    '',
-    'Additional details:',
-  ].join('\n');
+  const markSolved = () => {
+    setResult('solved');
+    recordSupportOutcome('resolved');
+  };
+
+  const markUnsolved = () => {
+    setResult('unsolved');
+    recordSupportOutcome('unresolved');
+  };
+
+  const switchMode = (mode) => {
+    setGuideMode(mode);
+    setResult(null);
+  };
 
   return (
     <UserLayout>
@@ -256,134 +294,265 @@ export default function TroubleshootIssue() {
               onClick={() => navigate(`/troubleshoot/${model.id}`)}
               className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-500 transition hover:text-[#cc0000]"
             >
-              <ArrowLeft size={15} />
-              Back to {model.name} Issues
+              <ArrowLeft size={15} /> Back to {model.name} Issues
             </button>
 
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="hidden h-20 w-28 flex-shrink-0 items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-3 text-[#cc0000] sm:flex">
-                  {model.image ? (
-                    <img
-                      src={model.image}
-                      alt={model.name}
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <Tv size={42} strokeWidth={1.6} />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#cc0000]">
+                    {model.name}{issue.category ? ` · ${issue.category}` : ''}
+                  </span>
+                  {model.source_url && (
+                    <a
+                      href={model.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 transition hover:text-[#cc0000]"
+                    >
+                      Official Cignal guide <ExternalLink size={11} />
+                    </a>
                   )}
                 </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#cc0000]">
-                    {model.name}
-                    {issue.category ? ` · ${issue.category}` : ''}
-                  </p>
-                  <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-                    {issueTitle}
-                  </h1>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {issue.description ||
-                      'Follow the configured steps below one at a time.'}
-                  </p>
-                  {issue.error_code && (
-                    <span className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
-                      {issue.error_code}
-                    </span>
-                  )}
-                </div>
+                <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+                  {issueTitle}
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  {issue.description}
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={restartGuide}
-                className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-[#cc0000] sm:self-auto"
+                className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-[#cc0000]"
               >
-                <RotateCcw size={15} />
-                Restart Guide
+                <RotateCcw size={15} /> Restart
               </button>
             </div>
           </div>
         </section>
 
-        <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[280px_1fr] lg:px-8">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-24 lg:self-start">
-            <div className="flex items-center justify-between">
+        <main className="mx-auto max-w-6xl px-4 py-7 sm:px-6 lg:px-8">
+          {video && !result && (
+            <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                Your progress
+                Choose how you want to follow this guide
               </p>
-              <span className="text-sm font-bold text-[#cc0000]">{progress}%</span>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-[#cc0000] transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              {completedSteps.length} of {steps.length} steps completed
-            </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => switchMode('written')}
+                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${
+                    guideMode === 'written'
+                      ? 'border-red-300 bg-red-50 ring-1 ring-red-200'
+                      : 'border-slate-200 hover:border-red-200'
+                  }`}
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-[#cc0000] shadow-sm">
+                    <BookOpen size={19} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold text-slate-900">Step-by-Step</span>
+                    <span className="mt-1 block text-xs text-slate-500">Follow the exact guide for this box model.</span>
+                  </span>
+                </button>
 
-            <div className="mt-5 max-h-[420px] space-y-2 overflow-y-auto pr-1">
-              {steps.map((step, index) => {
-                const completed = completedSteps.includes(step.id);
-                const active = safeCurrentStep === index;
+                <button
+                  type="button"
+                  onClick={() => switchMode('video')}
+                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${
+                    guideMode === 'video'
+                      ? 'border-red-300 bg-red-50 ring-1 ring-red-200'
+                      : 'border-slate-200 hover:border-red-200'
+                  }`}
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#cc0000] text-white shadow-sm">
+                    <PlayCircle size={19} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold text-slate-900">Watch Video</span>
+                    <span className="mt-1 block text-xs text-slate-500">Use the verified visual guide when you prefer watching.</span>
+                  </span>
+                </button>
+              </div>
+            </section>
+          )}
 
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => {
-                      setCurrentStep(index);
-                      setResult(null);
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
-                      active
-                        ? 'bg-red-50 ring-1 ring-red-200'
-                        : 'hover:bg-slate-50'
-                    }`}
+          {relatedComponents.length > 0 && !result && (
+            <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#cc0000]">
+                Parts involved
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {relatedComponents.map((component) => (
+                  <span
+                    key={component.id}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
                   >
-                    {completed ? (
-                      <CheckCircle2 size={18} className="flex-shrink-0 text-green-600" />
+                    <ComponentIcon kind={component.kind} />
+                    {component.name}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!result && guideMode === 'video' && video && (
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 p-5 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
+                        <Youtube size={12} /> Video Guide
+                      </span>
+                      {video.verified && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                          <ShieldCheck size={12} /> Verified source
+                        </span>
+                      )}
+                      {video.coverage === 'partial' && (
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                          Supplemental
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="mt-3 text-xl font-bold text-slate-900">{video.title}</h2>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {video.source_label || video.source}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => switchMode('written')}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:border-red-200 hover:text-[#cc0000]"
+                  >
+                    <BookOpen size={14} /> Read Steps Instead
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6">
+                <div className="aspect-video overflow-hidden rounded-2xl bg-black shadow-sm">
+                  <iframe
+                    className="h-full w-full"
+                    src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.youtube_id)}?rel=0`}
+                    title={video.title}
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+
+                {video.purpose && (
+                  <p className="mt-4 text-sm leading-6 text-slate-600">{video.purpose}</p>
+                )}
+
+                {video.note && (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={17} className="mt-0.5 flex-shrink-0 text-amber-700" />
+                      <p className="text-xs leading-5 text-amber-900">{video.note}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-bold text-slate-900">Did the video solve your problem?</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={markSolved}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-green-700"
+                    >
+                      <CheckCircle2 size={17} /> Yes, problem solved
+                    </button>
+                    {video.coverage === 'full' ? (
+                      <button
+                        type="button"
+                        onClick={markUnsolved}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-bold text-white transition hover:bg-red-700"
+                      >
+                        <XCircle size={17} /> Still having the problem
+                      </button>
                     ) : (
-                      <Circle
-                        size={18}
-                        className={
-                          active
-                            ? 'flex-shrink-0 text-[#cc0000]'
-                            : 'flex-shrink-0 text-slate-300'
-                        }
-                      />
+                      <button
+                        type="button"
+                        onClick={() => switchMode('written')}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+                      >
+                        <BookOpen size={17} /> Continue model-specific steps
+                      </button>
                     )}
-                    <div className="min-w-0">
-                      <p
-                        className={`text-xs font-bold ${
-                          active ? 'text-[#cc0000]' : 'text-slate-700'
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {!result && guideMode === 'written' && (
+            <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+              <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-24 lg:self-start">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Your progress</p>
+                  <span className="text-sm font-bold text-[#cc0000]">{progress}%</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-[#cc0000] transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {completedSteps.length} of {steps.length} steps completed
+                </p>
+
+                <div className="mt-5 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                  {steps.map((step, index) => {
+                    const completed = completedSteps.includes(step.id);
+                    const active = safeCurrentStep === index;
+                    return (
+                      <button
+                        key={step.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentStep(index);
+                          setResult(null);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
+                          active ? 'bg-red-50 ring-1 ring-red-200' : 'hover:bg-slate-50'
                         }`}
                       >
-                        Step {index + 1}
-                      </p>
-                      <p className="truncate text-[11px] text-slate-400">
-                        {step.instruction}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
+                        {completed ? (
+                          <CheckCircle2 size={18} className="flex-shrink-0 text-green-600" />
+                        ) : (
+                          <Circle
+                            size={18}
+                            className={active ? 'flex-shrink-0 text-[#cc0000]' : 'flex-shrink-0 text-slate-300'}
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <p className={`text-xs font-bold ${active ? 'text-[#cc0000]' : 'text-slate-700'}`}>
+                            Step {index + 1}
+                          </p>
+                          <p className="truncate text-[11px] text-slate-400">{step.instruction}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </aside>
 
-          <section>
-            {!result && (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 bg-gradient-to-r from-red-50 to-white px-5 py-5 sm:px-7">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wide text-[#cc0000]">
                         Step {safeCurrentStep + 1} of {steps.length}
                       </p>
-                      <h2 className="mt-1 text-xl font-bold text-slate-900">
-                        {activeStep.sectionTitle}
-                      </h2>
+                      <h2 className="mt-1 text-xl font-bold text-slate-900">{activeStep.sectionTitle}</h2>
                     </div>
                     <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#cc0000] text-sm font-bold text-white">
                       {safeCurrentStep + 1}
@@ -393,9 +562,7 @@ export default function TroubleshootIssue() {
 
                 <div className="p-5 sm:p-7">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
-                    <p className="text-base font-semibold leading-8 text-slate-800">
-                      {activeStep.instruction}
-                    </p>
+                    <p className="text-base font-semibold leading-8 text-slate-800">{activeStep.instruction}</p>
                   </div>
 
                   <button
@@ -409,9 +576,7 @@ export default function TroubleshootIssue() {
                   >
                     <div
                       className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${
-                        isCurrentCompleted
-                          ? 'bg-green-600 text-white'
-                          : 'border-2 border-slate-300 bg-white'
+                        isCurrentCompleted ? 'bg-green-600 text-white' : 'border-2 border-slate-300 bg-white'
                       }`}
                     >
                       {isCurrentCompleted && <Check size={16} />}
@@ -420,9 +585,7 @@ export default function TroubleshootIssue() {
                       <p className="text-sm font-bold">
                         {isCurrentCompleted ? 'Step completed' : 'I completed this step'}
                       </p>
-                      <p className="mt-0.5 text-xs opacity-70">
-                        Mark each step after safely completing the instruction.
-                      </p>
+                      <p className="mt-0.5 text-xs opacity-70">Mark each step after safely completing it.</p>
                     </div>
                   </button>
 
@@ -436,8 +599,7 @@ export default function TroubleshootIssue() {
                       }}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <ArrowLeft size={16} />
-                      Previous
+                      <ArrowLeft size={16} /> Previous
                     </button>
 
                     {safeCurrentStep < steps.length - 1 ? (
@@ -446,188 +608,161 @@ export default function TroubleshootIssue() {
                         onClick={goNext}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3 text-xs font-bold text-white transition hover:bg-red-700"
                       >
-                        Complete & Next
-                        <ArrowRight size={16} />
+                        Complete & Next <ArrowRight size={16} />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => {
                           if (!isCurrentCompleted) {
-                            setCompletedSteps((previous) => [
-                              ...previous,
-                              activeStep.id,
-                            ]);
+                            setCompletedSteps((previous) => [...previous, activeStep.id]);
                           }
                           setResult('question');
                         }}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3 text-xs font-bold text-white transition hover:bg-red-700"
                       >
-                        Finish Guide
-                        <CheckCircle2 size={16} />
+                        Finish Guide <CheckCircle2 size={16} />
                       </button>
                     )}
                   </div>
                 </div>
+              </section>
+            </div>
+          )}
+
+          {result === 'question' && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-9">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                <CheckCircle2 size={32} />
               </div>
-            )}
-
-            {result === 'question' && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-9">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                  <CheckCircle2 size={32} />
-                </div>
-                <h2 className="mt-5 text-2xl font-bold text-slate-900">
-                  Did these steps solve the problem?
-                </h2>
-                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-                  You completed the guided troubleshooting for{' '}
-                  <strong>{issueTitle}</strong> on the <strong>{model.name}</strong>.
-                </p>
-                <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => { setResult('solved'); recordSupportOutcome('resolved'); }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-green-700"
-                  >
-                    <CheckCircle2 size={18} />
-                    Yes, it is solved
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setResult('unsolved'); recordSupportOutcome('unresolved'); }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-red-700"
-                  >
-                    <XCircle size={18} />
-                    No, it still persists
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {result === 'solved' && (
-              <div className="rounded-2xl border border-green-200 bg-white p-6 text-center shadow-sm sm:p-9">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700">
-                  <CheckCircle2 size={34} />
-                </div>
-                <h2 className="mt-5 text-2xl font-bold text-slate-900">
-                  Problem resolved
-                </h2>
-                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-                  Your progress has been saved. You may restart this guide or return to the troubleshooting page.
-                </p>
-                <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/troubleshoot')}
-                    className="rounded-xl bg-[#cc0000] px-6 py-3 text-sm font-bold text-white"
-                  >
-                    Return to Troubleshoot
-                  </button>
-                  <button
-                    type="button"
-                    onClick={restartGuide}
-                    className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-600"
-                  >
-                    Run Guide Again
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {result === 'unsolved' && (
-              <div className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                    <AlertTriangle size={24} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">
-                      The issue needs further assistance
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Choose a support option below. Your selected box, issue, and completed-step summary will be added automatically.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600">
-                  <p><strong>Box:</strong> {model.name}</p>
-                  <p><strong>Issue:</strong> {issueTitle}</p>
-                  <p><strong>Progress:</strong> {completedSummary}</p>
-                </div>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      recordSupportOutcome('ticket');
-                      navigate('/user/report-problem', {
-                        state: {
-                          prefillCategory: 'Technical Problem',
-                          prefillSubject: `${model.name} — ${issueTitle}`,
-                          prefillDescription: ticketDescription,
-                        },
-                      });
-                    }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-red-700"
-                  >
-                    <TicketPlus size={18} />
-                    File Support Ticket
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      recordSupportOutcome('technician');
-                      navigate('/user/technician-request', {
-                        state: {
-                          prefillServiceType: 'Signal / Dish Repair',
-                          prefillIssueDescription: ticketDescription,
-                        },
-                      });
-                    }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-900"
-                  >
-                    <Wrench size={18} />
-                    Request Technician
-                  </button>
-                </div>
-
+              <h2 className="mt-5 text-2xl font-bold text-slate-900">Did these steps solve the problem?</h2>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                You completed the guided troubleshooting for <strong>{issueTitle}</strong> on the <strong>{model.name}</strong>.
+              </p>
+              <div className="mt-7 grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => setResult('question')}
-                  className="mt-4 w-full text-center text-xs font-bold text-slate-500 hover:text-[#cc0000]"
+                  onClick={markSolved}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-green-700"
                 >
-                  Go back
+                  <CheckCircle2 size={18} /> Yes, it is solved
+                </button>
+                <button
+                  type="button"
+                  onClick={markUnsolved}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-red-700"
+                >
+                  <XCircle size={18} /> No, it still persists
                 </button>
               </div>
-            )}
+            </section>
+          )}
 
-            {issue.note && (
-              <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-900">
-                  Important note
-                </p>
-                <p className="mt-1 text-xs leading-5 text-blue-800">
-                  {issue.note}
-                </p>
+          {result === 'solved' && (
+            <section className="rounded-2xl border border-green-200 bg-white p-6 text-center shadow-sm sm:p-9">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700">
+                <CheckCircle2 size={34} />
               </div>
-            )}
+              <h2 className="mt-5 text-2xl font-bold text-slate-900">Problem resolved</h2>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                The troubleshooting outcome has been saved.
+              </p>
+              <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => navigate('/troubleshoot')}
+                  className="rounded-xl bg-[#cc0000] px-6 py-3 text-sm font-bold text-white"
+                >
+                  Return to Troubleshoot
+                </button>
+                <button
+                  type="button"
+                  onClick={restartGuide}
+                  className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-600"
+                >
+                  Run Guide Again
+                </button>
+              </div>
+            </section>
+          )}
 
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle
-                  size={18}
-                  className="mt-0.5 flex-shrink-0 text-amber-700"
-                />
+          {result === 'unsolved' && (
+            <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                  <AlertTriangle size={24} />
+                </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
-                    Safety reminder
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-amber-700">
-                    {SAFETY_REMINDER}
+                  <h2 className="text-xl font-bold text-slate-900">The issue needs further assistance</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Choose a support option below. Your selected box, issue, and troubleshooting summary will be added automatically.
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600">
+                <p><strong>Box:</strong> {model.name}</p>
+                <p><strong>Issue:</strong> {issueTitle}</p>
+                <p><strong>Progress:</strong> {completedSummary}</p>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    recordSupportOutcome('ticket');
+                    navigate('/user/report-problem', {
+                      state: {
+                        prefillCategory: 'Technical Problem',
+                        prefillSubject: `${model.name} — ${issueTitle}`,
+                        prefillDescription: ticketDescription,
+                      },
+                    });
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-red-700"
+                >
+                  <TicketPlus size={18} /> File Support Ticket
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    recordSupportOutcome('technician');
+                    navigate('/user/technician-request', {
+                      state: {
+                        prefillServiceType: 'Signal / Dish Repair',
+                        prefillIssueDescription: ticketDescription,
+                      },
+                    });
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-900"
+                >
+                  <Wrench size={18} /> Request Technician
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setResult('question')}
+                className="mt-4 w-full text-center text-xs font-bold text-slate-500 hover:text-[#cc0000]"
+              >
+                Go back
+              </button>
+            </section>
+          )}
+
+          {issue.note && (
+            <section className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-blue-900">Guide note</p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">{issue.note}</p>
+            </section>
+          )}
+
+          <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="mt-0.5 flex-shrink-0 text-amber-700" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-900">Safety reminder</p>
+                <p className="mt-1 text-xs leading-5 text-amber-800">{SAFETY_REMINDER}</p>
               </div>
             </div>
           </section>

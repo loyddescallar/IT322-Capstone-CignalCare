@@ -1,5 +1,7 @@
 const {
   generateGeminiReply,
+  generateGeminiSupportDraft,
+  buildFallbackSupportDraft,
   getGeminiModel,
 } = require('../services/geminiService');
 const {
@@ -29,10 +31,10 @@ function checkRateLimit(userId) {
   return true;
 }
 
-function sanitizeContext(context) {
+function sanitizeContext(context, limit = 8) {
   if (!Array.isArray(context)) return [];
 
-  return context.slice(-8).map((item) => ({
+  return context.slice(-limit).map((item) => ({
     role: item?.role === 'assistant' ? 'assistant' : 'user',
     text: String(item?.text || '').trim().slice(0, 700),
   }));
@@ -50,7 +52,7 @@ function shouldIncludePersonalData(message, context = []) {
   const text = `${message} ${recentUserText}`.toLowerCase();
 
   const recordTerms = /(ticket|technician|tech request|load request|payment)/i;
-  const ownershipOrStatusTerms = /(my|mine|ko|akin|aking|status|latest|update|progress|ano na|kamusta|where is|what happened)/i;
+  const ownershipOrStatusTerms = /(my|mine|ko|akin|aking|status|latest|update|progress|ano na|kamusta|where is|what happened|#\s*\d+|number\s*\d+)/i;
 
   return recordTerms.test(text) && ownershipOrStatusTerms.test(text);
 }
@@ -80,17 +82,24 @@ async function sendChatbotMessage(req, res) {
   try {
     let knowledgeText = '';
     let hasPersonalData = false;
+    let knowledgeMeta = null;
 
     try {
       const knowledge = await getChatbotKnowledge({
         userId: req.user?.id,
         includePersonalData,
+        message,
+        context,
       });
       knowledgeText = knowledge.text;
       hasPersonalData = Boolean(knowledge.personalSupport);
+      knowledgeMeta = {
+        needs: knowledge.needs,
+        requestedIds: knowledge.requestedIds,
+      };
     } catch (knowledgeError) {
       console.error('CHATBOT KNOWLEDGE ERROR:', knowledgeError?.message);
-      // Gemini remains available even if the system-data lookup temporarily fails.
+      // Gemini remains available even if a system-data lookup temporarily fails.
     }
 
     const result = await generateGeminiReply({
@@ -99,7 +108,7 @@ async function sendChatbotMessage(req, res) {
       knowledgeText,
     });
 
-    const hints = buildChatbotUiHints(message);
+    const hints = buildChatbotUiHints(message, context);
 
     return res.json({
       reply: result.reply,
@@ -110,6 +119,7 @@ async function sendChatbotMessage(req, res) {
           : 'gemini',
       quickReplies: hints.quickReplies,
       actions: hints.actions,
+      knowledge: knowledgeMeta,
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode || 0);
@@ -143,7 +153,43 @@ async function sendChatbotMessage(req, res) {
   }
 }
 
+async function prepareSupportDraft(req, res) {
+  const target = String(req.body?.target || 'ticket').trim().toLowerCase();
+
+  if (!['ticket', 'technician'].includes(target)) {
+    return res.status(400).json({ error: 'Invalid support draft target' });
+  }
+
+  const context = sanitizeContext(req.body?.context, 12);
+  const hasUserContent = context.some(
+    (item) => item.role === 'user' && String(item.text || '').trim()
+  );
+
+  if (!hasUserContent) {
+    return res.status(400).json({ error: 'Conversation context is required' });
+  }
+
+  try {
+    const draft = await generateGeminiSupportDraft({ context, target });
+
+    return res.json({
+      draft,
+      source: 'gemini',
+      requiresReview: true,
+    });
+  } catch (error) {
+    console.error('CIGNALBOT SUPPORT DRAFT FALLBACK:', error?.message || error);
+
+    return res.json({
+      draft: buildFallbackSupportDraft({ context, target }),
+      source: 'built-in-fallback',
+      requiresReview: true,
+    });
+  }
+}
+
 module.exports = {
   sendChatbotMessage,
+  prepareSupportDraft,
   shouldIncludePersonalData,
 };

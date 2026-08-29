@@ -2,6 +2,25 @@ const CIGNALCARE_ASSISTANT_PROMPT = require('../prompts/cignalCareAssistantPromp
 
 let clientPromise = null;
 
+const TICKET_CATEGORIES = [
+  'Connection Issue',
+  'Technical Problem',
+  'Billing Concern',
+  'Channel Concern',
+  'Technician Request',
+  'Other',
+];
+
+const TECHNICIAN_SERVICES = [
+  'Signal / Dish Repair',
+  'Dish Realignment',
+  'Cable Replacement',
+  'Box Replacement',
+  'New Installation',
+  'Relocation',
+  'Other',
+];
+
 function getGeminiApiKey() {
   return String(process.env.GEMINI_API_KEY || '').trim();
 }
@@ -36,11 +55,11 @@ async function getGeminiClient() {
   return clientPromise;
 }
 
-function sanitizeContext(context = []) {
+function sanitizeContext(context = [], limit = 8) {
   if (!Array.isArray(context)) return [];
 
   return context
-    .slice(-8)
+    .slice(-limit)
     .map((item) => ({
       role: item?.role === 'assistant' ? 'Assistant' : 'User',
       text: String(item?.text || '').trim().slice(0, 700),
@@ -117,8 +136,207 @@ async function generateGeminiReply({ message, context = [], knowledgeText = '' }
   };
 }
 
+function getUserTranscript(context = []) {
+  return sanitizeContext(context, 12)
+    .filter((item) => item.role === 'User')
+    .map((item) => item.text)
+    .filter(Boolean);
+}
+
+function classifyTicketCategory(text = '') {
+  const normalized = String(text).toLowerCase();
+
+  if (/(load|reload|payment|paymongo|billing|bayad|charge|receipt)/i.test(normalized)) {
+    return 'Billing Concern';
+  }
+
+  if (/(channel|missing channel|skipping channel|subscription channel)/i.test(normalized)) {
+    return 'Channel Concern';
+  }
+
+  if (/(technician|dish alignment|realign|repair visit)/i.test(normalized)) {
+    return 'Technician Request';
+  }
+
+  if (/(no signal|walang signal|weak signal|connection|cable|lnb)/i.test(normalized)) {
+    return 'Connection Issue';
+  }
+
+  if (/(remote|receiver|decoder|box|screen|audio|sound|power|error|smart card|hdmi|video)/i.test(normalized)) {
+    return 'Technical Problem';
+  }
+
+  return 'Other';
+}
+
+function classifyTechnicianService(text = '') {
+  const normalized = String(text).toLowerCase();
+
+  if (/(realign|alignment|dish alignment)/i.test(normalized)) return 'Dish Realignment';
+  if (/(cable|wire|coax|connector)/i.test(normalized)) return 'Cable Replacement';
+  if (/(box replacement|replace.*box|receiver replacement|decoder replacement)/i.test(normalized)) return 'Box Replacement';
+  if (/(new installation|install new|new install)/i.test(normalized)) return 'New Installation';
+  if (/(relocation|relocate|transfer.*dish|move.*dish)/i.test(normalized)) return 'Relocation';
+  if (/(signal|dish|no signal|weak signal|lnb)/i.test(normalized)) return 'Signal / Dish Repair';
+
+  return 'Other';
+}
+
+function inferSubject(text = '') {
+  const normalized = String(text).toLowerCase();
+
+  if (/(no signal|walang signal)/i.test(normalized)) return 'No Signal concern';
+  if (/(remote)/i.test(normalized)) return 'Remote control concern';
+  if (/(missing channel|channel)/i.test(normalized)) return 'Channel availability concern';
+  if (/(smart card|e1|e2|e11)/i.test(normalized)) return 'Smart Card concern';
+  if (/(payment|paymongo|load|reload)/i.test(normalized)) return 'Load or payment concern';
+  if (/(box|receiver|decoder)/i.test(normalized)) return 'Cignal box concern';
+  if (/(audio|sound)/i.test(normalized)) return 'Audio concern';
+  if (/(screen|picture|video|display)/i.test(normalized)) return 'TV display concern';
+
+  return 'Cignal service concern';
+}
+
+function normalizeAllowed(value, allowed, fallback) {
+  const clean = String(value || '').trim();
+  const match = allowed.find((item) => item.toLowerCase() === clean.toLowerCase());
+  return match || fallback;
+}
+
+function cleanDraftText(value, maxLength) {
+  return String(value || '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function buildFallbackSupportDraft({ context = [], target = 'ticket' }) {
+  const userMessages = getUserTranscript(context)
+    .filter((message) => !/^(file a ticket|ticket|request technician|technician|tech)$/i.test(message.trim()))
+    .slice(-5);
+
+  const combined = userMessages.join(' ');
+  const subject = inferSubject(combined);
+  const description = userMessages.length
+    ? [
+        'CignalBot-assisted draft. Please review and edit before submitting.',
+        '',
+        'Subscriber messages:',
+        ...userMessages.map((message) => `• ${message}`),
+      ].join('\n')
+    : 'CignalBot-assisted draft. Please describe the concern and review all details before submitting.';
+
+  return {
+    subject,
+    category: classifyTicketCategory(combined),
+    serviceType: classifyTechnicianService(combined),
+    description: description.slice(0, 1800),
+    target,
+  };
+}
+
+function parseSupportDraft(outputText, { context = [], target = 'ticket' } = {}) {
+  const fallback = buildFallbackSupportDraft({ context, target });
+  const text = String(outputText || '').replace(/\r/g, '').trim();
+
+  const subjectMatch = text.match(/^SUBJECT:\s*(.+)$/im);
+  const categoryMatch = text.match(/^CATEGORY:\s*(.+)$/im);
+  const serviceMatch = text.match(/^SERVICE_TYPE:\s*(.+)$/im);
+  const descriptionMatch = text.match(/^DESCRIPTION:\s*\n?([\s\S]*)$/im);
+
+  const subject = cleanDraftText(subjectMatch?.[1] || fallback.subject, 100) || fallback.subject;
+  const category = normalizeAllowed(
+    categoryMatch?.[1],
+    TICKET_CATEGORIES,
+    fallback.category
+  );
+  const serviceType = normalizeAllowed(
+    serviceMatch?.[1],
+    TECHNICIAN_SERVICES,
+    fallback.serviceType
+  );
+  const description = cleanDraftText(
+    descriptionMatch?.[1] || fallback.description,
+    1800
+  ) || fallback.description;
+
+  return {
+    subject,
+    category,
+    serviceType,
+    description,
+    target,
+  };
+}
+
+async function generateGeminiSupportDraft({ context = [], target = 'ticket' }) {
+  const ai = await getGeminiClient();
+  const timeoutMs = getGeminiTimeoutMs();
+  const recentConversation = sanitizeContext(context, 12);
+  const transcript = recentConversation
+    .map((item) => `${item.role}: ${item.text}`)
+    .join('\n');
+
+  if (!transcript) {
+    return buildFallbackSupportDraft({ context, target });
+  }
+
+  const input = `
+Create a concise CignalCare+ support draft from the conversation below.
+The subscriber will review and edit this before submitting it through the normal system form.
+
+STRICT FACT RULES:
+- Use only facts present in the transcript.
+- Never claim the subscriber performed a troubleshooting step unless the subscriber explicitly said they did it.
+- Bot recommendations alone are not completed troubleshooting.
+- Do not invent dates, error codes, account details, diagnoses, technician findings, or payment results.
+- If a detail is unclear, leave it out rather than guessing.
+- Keep the description practical and under 1200 characters.
+
+Choose CATEGORY from exactly one of:
+${TICKET_CATEGORIES.join(' | ')}
+
+Choose SERVICE_TYPE from exactly one of:
+${TECHNICIAN_SERVICES.join(' | ')}
+
+Return exactly this plain-text format and nothing else:
+SUBJECT: <short subject>
+CATEGORY: <allowed category>
+SERVICE_TYPE: <allowed service type>
+DESCRIPTION:
+<summary with Reported concern, Customer-confirmed troubleshooting if any, and Current result if known>
+
+TARGET FORM: ${target}
+
+CONVERSATION:
+${transcript}
+  `.trim();
+
+  const interaction = await withTimeout(
+    ai.interactions.create({
+      model: getGeminiModel(),
+      store: false,
+      system_instruction: 'You prepare factual support-form drafts for CignalCare+. Never invent facts and never perform system actions.',
+      input,
+      generation_config: {
+        thinking_level: 'low',
+        temperature: 0.1,
+      },
+    }),
+    timeoutMs
+  );
+
+  const output = String(interaction.output_text || '').trim();
+  if (!output) return buildFallbackSupportDraft({ context, target });
+
+  return parseSupportDraft(output, { context, target });
+}
+
 module.exports = {
   generateGeminiReply,
+  generateGeminiSupportDraft,
+  buildFallbackSupportDraft,
   getGeminiModel,
   getGeminiTimeoutMs,
 };
