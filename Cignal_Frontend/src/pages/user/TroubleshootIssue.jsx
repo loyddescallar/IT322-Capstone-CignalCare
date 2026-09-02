@@ -27,6 +27,7 @@ import UserLayout from '../../components/UserLayout';
 
 const SAFETY_REMINDER =
   'Do not open the receiver or power adapter, touch exposed wiring, climb onto the roof, or adjust the satellite dish yourself. Stop and request professional assistance whenever a step cannot be completed safely.';
+const ACTIVE_TROUBLESHOOT_SESSION_KEY = 'cignalcare-active-troubleshoot-session';
 
 function ComponentIcon({ kind, size = 17 }) {
   if (kind === 'power') return <Power size={size} />;
@@ -97,6 +98,9 @@ export default function TroubleshootIssue() {
   const [result, setResult] = useState(null);
   const [guideMode, setGuideMode] = useState('written');
   const [activeOption, setActiveOption] = useState('recommended');
+  const [videoWatched, setVideoWatched] = useState(false);
+  const [videoResult, setVideoResult] = useState('');
+  const [shortcutResults, setShortcutResults] = useState({ quick: '', factory: '' });
 
   const steps = useMemo(
     () =>
@@ -184,6 +188,9 @@ export default function TroubleshootIssue() {
       setResult(null);
       setGuideMode('written');
       setActiveOption('recommended');
+      setVideoWatched(false);
+      setVideoResult('');
+      setShortcutResults({ quick: '', factory: '' });
 
       try {
         const [modelsResponse, issuesResponse, stepsResponse] = await Promise.all([
@@ -244,6 +251,12 @@ export default function TroubleshootIssue() {
 
           setCompletedSteps(savedCompleted);
           setActiveOption(optionAvailable ? savedOption : 'recommended');
+          setVideoWatched(saved.videoWatched === true);
+          setVideoResult(typeof saved.videoResult === 'string' ? saved.videoResult : '');
+          setShortcutResults({
+            quick: typeof saved.shortcutResults?.quick === 'string' ? saved.shortcutResults.quick : '',
+            factory: typeof saved.shortcutResults?.factory === 'string' ? saved.shortcutResults.factory : '',
+          });
           setCurrentStep(
             Number.isInteger(savedCurrent) && savedCurrent >= 0
               ? savedCurrent
@@ -253,6 +266,9 @@ export default function TroubleshootIssue() {
           localStorage.removeItem(storageKey);
           setCompletedSteps([]);
           setCurrentStep(0);
+          setVideoWatched(false);
+          setVideoResult('');
+          setShortcutResults({ quick: '', factory: '' });
         }
       } catch (loadError) {
         console.error('LOAD TROUBLESHOOT GUIDE ERROR:', loadError);
@@ -281,9 +297,83 @@ export default function TroubleshootIssue() {
         currentStep,
         completedSteps,
         activeOption: guideMode === 'written' ? activeOption : 'recommended',
+        videoWatched,
+        videoResult,
+        shortcutResults,
       })
     );
-  }, [activeOption, completedSteps, currentStep, guideMode, issue, loading, steps.length, storageKey]);
+  }, [
+    activeOption,
+    completedSteps,
+    currentStep,
+    guideMode,
+    issue,
+    loading,
+    shortcutResults,
+    steps.length,
+    storageKey,
+    videoResult,
+    videoWatched,
+  ]);
+
+  useEffect(() => {
+    if (loading || !model || !issue || steps.length === 0) return;
+
+    const safeIndex = Math.min(currentStep, Math.max(writtenSteps.length - 1, 0));
+    const currentSessionStep =
+      guideMode === 'written' && writtenSteps.length > 0
+        ? writtenSteps[safeIndex]
+        : null;
+    const quickStepIds = new Set(quickRestartSteps.map((step) => step.id));
+    const factoryStepIds = new Set(factoryResetSteps.map((step) => step.id));
+
+    const session = {
+      version: 1,
+      modelId: String(model.id),
+      issueId: String(issue.id),
+      guideMode,
+      activeOption: guideMode === 'video' ? 'video' : activeOption,
+      currentStepId: currentSessionStep?.id || '',
+      currentStepIndex: currentSessionStep ? safeIndex : -1,
+      completedStepIds: completedSteps,
+      quickRestartAttempted:
+        shortcutResults.quick !== '' ||
+        completedSteps.some((id) => quickStepIds.has(id)),
+      quickRestartResult: shortcutResults.quick,
+      factoryResetAttempted:
+        shortcutResults.factory !== '' ||
+        completedSteps.some((id) => factoryStepIds.has(id)),
+      factoryResetResult: shortcutResults.factory,
+      videoWatched,
+      videoId: videoWatched ? String(video?.id || '') : '',
+      videoResult,
+      overallResult:
+        result === 'solved' ? 'resolved' : result === 'unsolved' ? 'unresolved' : '',
+      updatedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(
+      ACTIVE_TROUBLESHOOT_SESSION_KEY,
+      JSON.stringify(session)
+    );
+  }, [
+    activeOption,
+    completedSteps,
+    currentStep,
+    factoryResetSteps,
+    guideMode,
+    issue,
+    loading,
+    model,
+    quickRestartSteps,
+    result,
+    shortcutResults,
+    steps.length,
+    video,
+    videoResult,
+    videoWatched,
+    writtenSteps,
+  ]);
 
   if (loading) {
     return (
@@ -344,14 +434,32 @@ export default function TroubleshootIssue() {
     : 0;
   const issueTitle = issue.title || 'Troubleshooting issue';
   const completedSummary = `${completedSteps.length} of ${steps.length} troubleshooting steps completed`;
+  const completedStepSummary = steps
+    .map((step, index) => ({ step, index }))
+    .filter(({ step }) => completedSteps.includes(step.id))
+    .map(
+      ({ step, index }) =>
+        `- Step ${index + 1}${step.sectionTitle ? ` (${step.sectionTitle})` : ''}`
+    );
   const ticketDescription = [
     `Box model: ${model.name}`,
     `Issue: ${issueTitle}`,
     completedSummary,
+    shortcutResults.quick
+      ? `Quick Restart: attempted (${shortcutResults.quick})`
+      : '',
+    shortcutResults.factory
+      ? `Factory Reset: attempted (${shortcutResults.factory})`
+      : '',
+    videoWatched
+      ? `Video Guide: viewed${video?.title ? ` (${video.title})` : ''}${videoResult ? ` — ${videoResult}` : ''}`
+      : '',
+    completedStepSummary.length ? 'Steps marked completed in CignalCare+:' : '',
+    ...completedStepSummary,
     'Troubleshooting result: Issue still persists',
     '',
     'Additional details:',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   const scrollToGuide = () => {
     window.setTimeout(() => {
@@ -409,15 +517,39 @@ export default function TroubleshootIssue() {
     setResult(null);
     setGuideMode('written');
     setActiveOption('recommended');
+    setVideoWatched(false);
+    setVideoResult('');
+    setShortcutResults({ quick: '', factory: '' });
     localStorage.removeItem(storageKey);
+    localStorage.removeItem(ACTIVE_TROUBLESHOOT_SESSION_KEY);
   };
 
   const markSolved = () => {
+    if (guideMode === 'video') {
+      setVideoWatched(true);
+      setVideoResult('resolved');
+    } else if (activeOption === 'quick' || activeOption === 'factory') {
+      setShortcutResults((previous) => ({
+        ...previous,
+        [activeOption]: 'resolved',
+      }));
+    }
+
     setResult('solved');
     recordSupportOutcome('resolved');
   };
 
   const markUnsolved = () => {
+    if (guideMode === 'video') {
+      setVideoWatched(true);
+      setVideoResult('not_resolved');
+    } else if (activeOption === 'quick' || activeOption === 'factory') {
+      setShortcutResults((previous) => ({
+        ...previous,
+        [activeOption]: 'not_resolved',
+      }));
+    }
+
     setResult('unsolved');
     recordSupportOutcome('unresolved');
   };
@@ -425,8 +557,26 @@ export default function TroubleshootIssue() {
   const openVideo = () => {
     setGuideMode('video');
     setActiveOption('video');
+    setVideoWatched(true);
+    setVideoResult((previous) => previous || 'viewed');
     setResult(null);
     scrollToGuide();
+  };
+
+  const continueFromVideo = () => {
+    setVideoWatched(true);
+    setVideoResult('not_resolved');
+    startRecommended();
+  };
+
+  const continueFromShortcut = () => {
+    if (activeOption === 'quick' || activeOption === 'factory') {
+      setShortcutResults((previous) => ({
+        ...previous,
+        [activeOption]: 'not_resolved',
+      }));
+    }
+    startRecommended();
   };
 
   return (
@@ -670,7 +820,7 @@ export default function TroubleshootIssue() {
                       ) : (
                         <button
                           type="button"
-                          onClick={startRecommended}
+                          onClick={continueFromVideo}
                           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
                         >
                           <BookOpen size={17} /> Continue Written Guide
@@ -885,7 +1035,7 @@ export default function TroubleshootIssue() {
                 ) : (
                   <button
                     type="button"
-                    onClick={startRecommended}
+                    onClick={continueFromShortcut}
                     className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800"
                   >
                     <BookOpen size={18} /> Continue Full Troubleshooting

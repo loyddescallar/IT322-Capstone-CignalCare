@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Bot,
   ChevronDown,
@@ -116,8 +116,65 @@ function inferDraftTarget(action) {
   return null;
 }
 
+const ACTIVE_TROUBLESHOOT_SESSION_KEY = 'cignalcare-active-troubleshoot-session';
+
+function readActiveTroubleshootingSession(pathname = '') {
+  const match = String(pathname || '').match(/^\/troubleshoot\/([^/]+)\/([^/?#]+)/);
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(ACTIVE_TROUBLESHOOT_SESSION_KEY) || 'null'
+    );
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const modelId = decodeURIComponent(match[1]);
+    const issueId = decodeURIComponent(match[2]);
+    if (
+      String(parsed.modelId || '') !== modelId ||
+      String(parsed.issueId || '') !== issueId
+    ) {
+      return null;
+    }
+
+    const updatedAt = new Date(parsed.updatedAt || 0).getTime();
+    if (!Number.isFinite(updatedAt) || Date.now() - updatedAt > 6 * 60 * 60 * 1000) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      modelId,
+      issueId,
+      guideMode: parsed.guideMode === 'video' ? 'video' : 'written',
+      activeOption: ['recommended', 'quick', 'factory', 'video'].includes(parsed.activeOption)
+        ? parsed.activeOption
+        : 'recommended',
+      currentStepId: String(parsed.currentStepId || '').slice(0, 160),
+      currentStepIndex: Number.isInteger(Number(parsed.currentStepIndex))
+        ? Number(parsed.currentStepIndex)
+        : -1,
+      completedStepIds: Array.isArray(parsed.completedStepIds)
+        ? parsed.completedStepIds.map(String).slice(0, 40)
+        : [],
+      quickRestartAttempted: parsed.quickRestartAttempted === true,
+      quickRestartResult: String(parsed.quickRestartResult || '').slice(0, 40),
+      factoryResetAttempted: parsed.factoryResetAttempted === true,
+      factoryResetResult: String(parsed.factoryResetResult || '').slice(0, 40),
+      videoWatched: parsed.videoWatched === true,
+      videoId: String(parsed.videoId || '').slice(0, 120),
+      videoResult: String(parsed.videoResult || '').slice(0, 40),
+      overallResult: String(parsed.overallResult || '').slice(0, 40),
+      updatedAt: parsed.updatedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function CignalBot() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState(INIT);
@@ -142,7 +199,9 @@ export default function CignalBot() {
     setInput('');
     setTyping(true);
 
-    const shouldUseLiveData = shouldUseLiveSystemData(cleanText);
+    const troubleshootingSession = readActiveTroubleshootingSession(location.pathname);
+    const shouldUseLiveData =
+      shouldUseLiveSystemData(cleanText) || Boolean(troubleshootingSession);
     const ruleResponse = shouldUseLiveData ? null : getRuleBasedResponse(cleanText);
 
     if (ruleResponse) {
@@ -165,6 +224,7 @@ export default function CignalBot() {
       const data = await sendChatbotMessage({
         message: cleanText,
         context: conversationContext,
+        troubleshootingSession,
       });
 
       setMessages((previous) => [
@@ -203,7 +263,10 @@ export default function CignalBot() {
     if (!action?.path || preparingAction) return;
 
     const draftTarget = inferDraftTarget(action);
-    const shouldPrepareDraft = draftTarget && hasUsefulSupportContext(messages);
+    const troubleshootingSession = readActiveTroubleshootingSession(location.pathname);
+    const shouldPrepareDraft =
+      draftTarget &&
+      (hasUsefulSupportContext(messages) || Boolean(troubleshootingSession));
 
     if (!shouldPrepareDraft) {
       setOpen(false);
@@ -218,6 +281,7 @@ export default function CignalBot() {
       const data = await prepareChatbotSupportDraft({
         target: draftTarget,
         context: buildConversationContext(messages, 12),
+        troubleshootingSession,
       });
       const draft = data?.draft || {};
 

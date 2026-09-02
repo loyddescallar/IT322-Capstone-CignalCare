@@ -211,21 +211,41 @@ function cleanDraftText(value, maxLength) {
     .slice(0, maxLength);
 }
 
-function buildFallbackSupportDraft({ context = [], target = 'ticket' }) {
+function buildFallbackSupportDraft({ context = [], target = 'ticket', troubleshootingSessionText = '' }) {
   const userMessages = getUserTranscript(context)
     .filter((message) => !/^(file a ticket|ticket|request technician|technician|tech)$/i.test(message.trim()))
     .slice(-5);
 
-  const combined = userMessages.join(' ');
+  const combined = [troubleshootingSessionText, ...userMessages]
+    .filter(Boolean)
+    .join(' ');
   const subject = inferSubject(combined);
-  const description = userMessages.length
-    ? [
-        'CignalBot-assisted draft. Please review and edit before submitting.',
-        '',
-        'Subscriber messages:',
-        ...userMessages.map((message) => `• ${message}`),
-      ].join('\n')
-    : 'CignalBot-assisted draft. Please describe the concern and review all details before submitting.';
+  const descriptionParts = [
+    'CignalBot-assisted draft. Please review and edit before submitting.',
+  ];
+
+  if (troubleshootingSessionText) {
+    descriptionParts.push(
+      '',
+      'CignalCare+ troubleshooting session:',
+      troubleshootingSessionText
+    );
+  }
+
+  if (userMessages.length) {
+    descriptionParts.push(
+      '',
+      'Subscriber messages:',
+      ...userMessages.map((message) => `• ${message}`)
+    );
+  } else if (!troubleshootingSessionText) {
+    descriptionParts.push(
+      '',
+      'Please describe the concern and review all details before submitting.'
+    );
+  }
+
+  const description = descriptionParts.join('\n');
 
   return {
     subject,
@@ -236,8 +256,8 @@ function buildFallbackSupportDraft({ context = [], target = 'ticket' }) {
   };
 }
 
-function parseSupportDraft(outputText, { context = [], target = 'ticket' } = {}) {
-  const fallback = buildFallbackSupportDraft({ context, target });
+function parseSupportDraft(outputText, { context = [], target = 'ticket', troubleshootingSessionText = '' } = {}) {
+  const fallback = buildFallbackSupportDraft({ context, target, troubleshootingSessionText });
   const text = String(outputText || '').replace(/\r/g, '').trim();
 
   const subjectMatch = text.match(/^SUBJECT:\s*(.+)$/im);
@@ -270,7 +290,7 @@ function parseSupportDraft(outputText, { context = [], target = 'ticket' } = {})
   };
 }
 
-async function generateGeminiSupportDraft({ context = [], target = 'ticket' }) {
+async function generateGeminiSupportDraft({ context = [], target = 'ticket', troubleshootingSessionText = '' }) {
   const ai = await getGeminiClient();
   const timeoutMs = getGeminiTimeoutMs();
   const recentConversation = sanitizeContext(context, 12);
@@ -278,17 +298,19 @@ async function generateGeminiSupportDraft({ context = [], target = 'ticket' }) {
     .map((item) => `${item.role}: ${item.text}`)
     .join('\n');
 
-  if (!transcript) {
-    return buildFallbackSupportDraft({ context, target });
+  if (!transcript && !troubleshootingSessionText) {
+    return buildFallbackSupportDraft({ context, target, troubleshootingSessionText });
   }
 
   const input = `
-Create a concise CignalCare+ support draft from the conversation below.
+Create a concise CignalCare+ support draft from the verified troubleshooting session and/or conversation below.
 The subscriber will review and edit this before submitting it through the normal system form.
 
 STRICT FACT RULES:
-- Use only facts present in the transcript.
-- Never claim the subscriber performed a troubleshooting step unless the subscriber explicitly said they did it.
+- Use only facts present in the verified troubleshooting session and transcript.
+- Steps listed as "Marked completed in CignalCare+" may be described as steps the subscriber marked completed in the app.
+- Never upgrade "marked completed" into a technician-confirmed diagnosis or inspection.
+- Never claim the subscriber performed another troubleshooting step unless the transcript explicitly says they did it.
 - Bot recommendations alone are not completed troubleshooting.
 - Do not invent dates, error codes, account details, diagnoses, technician findings, or payment results.
 - If a detail is unclear, leave it out rather than guessing.
@@ -305,12 +327,15 @@ SUBJECT: <short subject>
 CATEGORY: <allowed category>
 SERVICE_TYPE: <allowed service type>
 DESCRIPTION:
-<summary with Reported concern, Customer-confirmed troubleshooting if any, and Current result if known>
+<summary with Reported concern, CignalCare+ troubleshooting marked completed, shortcut/video results when available, and Current result if known>
 
 TARGET FORM: ${target}
 
+VERIFIED TROUBLESHOOTING SESSION:
+${troubleshootingSessionText || 'None provided'}
+
 CONVERSATION:
-${transcript}
+${transcript || 'No additional chat messages provided'}
   `.trim();
 
   const interaction = await withTimeout(
@@ -328,9 +353,9 @@ ${transcript}
   );
 
   const output = String(interaction.output_text || '').trim();
-  if (!output) return buildFallbackSupportDraft({ context, target });
+  if (!output) return buildFallbackSupportDraft({ context, target, troubleshootingSessionText });
 
-  return parseSupportDraft(output, { context, target });
+  return parseSupportDraft(output, { context, target, troubleshootingSessionText });
 }
 
 module.exports = {

@@ -234,6 +234,179 @@ async function getTroubleshootingKnowledge(queryText = '') {
     .map((entry) => entry.issue);
 }
 
+function buildTroubleshootingSessionContext(session = null) {
+  if (!session || typeof session !== 'object') {
+    return { valid: false, text: '', draftText: '', issueKnowledge: null, meta: null };
+  }
+
+  const modelId = String(session.modelId || '').trim();
+  const issueId = String(session.issueId || '').trim();
+  const issueKnowledge = buildAllTroubleshootingKnowledge().find(
+    (entry) => entry.modelId === modelId && entry.issueId === issueId
+  );
+
+  if (!issueKnowledge) {
+    return { valid: false, text: '', draftText: '', issueKnowledge: null, meta: null };
+  }
+
+  const model = boxModels.find((entry) => entry.id === modelId);
+  const issue = model?.issues?.find((entry) => entry.id === issueId);
+  if (!model || !issue) {
+    return { valid: false, text: '', draftText: '', issueKnowledge: null, meta: null };
+  }
+
+  const verifiedSteps = [];
+  let sequence = 0;
+  (issue.sections || []).forEach((section, sectionIndex) => {
+    (section.steps || []).forEach((instruction, stepIndex) => {
+      sequence += 1;
+      verifiedSteps.push({
+        id: `${model.id}:${issue.id}:${sectionIndex + 1}:${stepIndex + 1}`,
+        number: sequence,
+        sectionTitle: String(section.title || '').trim(),
+        instruction: String(instruction || '').trim(),
+      });
+    });
+  });
+
+  const validStepIds = new Set(verifiedSteps.map((step) => step.id));
+  const completedStepIds = Array.isArray(session.completedStepIds)
+    ? session.completedStepIds
+        .map(String)
+        .filter((id) => validStepIds.has(id))
+        .slice(0, 40)
+    : [];
+
+  const completedSet = new Set(completedStepIds);
+  const completedSteps = verifiedSteps.filter((step) => completedSet.has(step.id));
+
+  let currentStep = verifiedSteps.find(
+    (step) => step.id === String(session.currentStepId || '')
+  ) || null;
+
+  if (!currentStep) {
+    const submittedIndex = Number(session.currentStepIndex);
+    if (
+      Number.isInteger(submittedIndex) &&
+      submittedIndex >= 0 &&
+      submittedIndex < verifiedSteps.length
+    ) {
+      currentStep = verifiedSteps[submittedIndex];
+    }
+  }
+
+  const activeOption = ['recommended', 'quick', 'factory', 'video'].includes(
+    String(session.activeOption || '')
+  )
+    ? String(session.activeOption)
+    : 'recommended';
+  const guideMode = session.guideMode === 'video' ? 'video' : 'written';
+
+  const modeLabels = {
+    recommended: 'Full Troubleshooting Guide',
+    quick: 'Quick Restart',
+    factory: 'Factory Reset',
+    video: 'Video Guide',
+  };
+
+  const normalizedResult = (value) => {
+    const clean = String(value || '').trim().toLowerCase();
+    if (['resolved', 'not_resolved', 'viewed', 'unresolved'].includes(clean)) {
+      return clean;
+    }
+    return '';
+  };
+
+  const quickRestartResult = normalizedResult(session.quickRestartResult);
+  const factoryResetResult = normalizedResult(session.factoryResetResult);
+  const videoResult = normalizedResult(session.videoResult);
+  const overallResult = normalizedResult(session.overallResult);
+
+  const video = session.videoWatched
+    ? (issue.videoGuides || []).find(
+        (entry) => String(entry.id || '') === String(session.videoId || '')
+      ) || (issue.videoGuides || [])[0] || null
+    : null;
+
+  const completedLines = completedSteps.length
+    ? completedSteps
+        .slice(0, 14)
+        .map(
+          (step) =>
+            `- Step ${step.number}${step.sectionTitle ? ` [${step.sectionTitle}]` : ''}: ${step.instruction}`
+        )
+    : ['- None marked completed yet.'];
+
+  const currentStepLine = currentStep
+    ? `Current displayed step: Step ${currentStep.number}${currentStep.sectionTitle ? ` [${currentStep.sectionTitle}]` : ''}: ${currentStep.instruction}`
+    : guideMode === 'video'
+      ? 'Current displayed content: Verified video guide.'
+      : 'Current displayed step: Not available.';
+
+  const textLines = [
+    'ACTIVE CIGNALCARE TROUBLESHOOTING SESSION (server-verified model, issue, and step mapping):',
+    `Box model: ${model.name}`,
+    `Issue: ${issue.shortTitle}`,
+    `Selected support mode: ${modeLabels[activeOption] || modeLabels.recommended}`,
+    currentStepLine,
+    `Progress marked in CignalCare+: ${completedSteps.length} of ${verifiedSteps.length} full-guide steps marked completed`,
+    'Steps marked completed in this session:',
+    ...completedLines,
+    session.quickRestartAttempted
+      ? `Quick Restart: attempted${quickRestartResult ? ` | result: ${quickRestartResult}` : ''}`
+      : 'Quick Restart: not recorded as attempted',
+    session.factoryResetAttempted
+      ? `Factory Reset: attempted${factoryResetResult ? ` | result: ${factoryResetResult}` : ''}`
+      : 'Factory Reset: not recorded as attempted',
+    session.videoWatched
+      ? `Video Guide: viewed${video ? ` | ${video.title}` : ''}${videoResult ? ` | result: ${videoResult}` : ''}`
+      : 'Video Guide: not recorded as viewed',
+    overallResult ? `Overall troubleshooting result: ${overallResult}` : '',
+    'SESSION RULE: Do not restart from Step 1 or repeat steps marked completed unless the customer asks to review them. When asked what to do next, explain the current displayed step or the next relevant uncompleted verified step. A failed Quick Restart or Factory Reset should return to the Full Troubleshooting Guide unless the full guide is already unresolved or a safety issue requires technician assistance.',
+  ].filter(Boolean);
+
+  const draftLines = [
+    `Box: ${model.name}`,
+    `Issue: ${issue.shortTitle}`,
+    `Selected support mode: ${modeLabels[activeOption] || modeLabels.recommended}`,
+    completedSteps.length
+      ? `Marked completed in CignalCare+: ${completedSteps.map((step) => `Step ${step.number} ${step.sectionTitle || ''}`.trim()).join(', ')}`
+      : 'Marked completed in CignalCare+: None',
+    session.quickRestartAttempted
+      ? `Quick Restart: attempted${quickRestartResult ? ` (${quickRestartResult})` : ''}`
+      : '',
+    session.factoryResetAttempted
+      ? `Factory Reset: attempted${factoryResetResult ? ` (${factoryResetResult})` : ''}`
+      : '',
+    session.videoWatched
+      ? `Video Guide: viewed${video ? ` (${video.title})` : ''}${videoResult ? ` — ${videoResult}` : ''}`
+      : '',
+    overallResult ? `Overall result: ${overallResult}` : '',
+  ].filter(Boolean);
+
+  return {
+    valid: true,
+    text: textLines.join('\n'),
+    draftText: draftLines.join('\n'),
+    issueKnowledge,
+    meta: {
+      modelId,
+      modelName: model.name,
+      issueId,
+      issueTitle: issue.shortTitle,
+      activeOption,
+      guideMode,
+      currentStepId: currentStep?.id || '',
+      completedStepCount: completedSteps.length,
+      fullStepCount: verifiedSteps.length,
+      quickRestartAttempted: session.quickRestartAttempted === true,
+      factoryResetAttempted: session.factoryResetAttempted === true,
+      videoWatched: session.videoWatched === true,
+      overallResult,
+    },
+  };
+}
+
 async function getLatestPersonalSupportRecords(userId) {
   if (!userId) {
     return {
@@ -549,18 +722,26 @@ async function getChatbotKnowledge({
   includePersonalData = false,
   message = '',
   context = [],
+  troubleshootingSession = null,
 } = {}) {
   const needs = getKnowledgeNeeds(message, context);
+  const activeSession = buildTroubleshootingSessionContext(troubleshootingSession);
+  if (activeSession.valid) needs.troubleshooting = true;
   const searchText = getConversationSearchText(message, context);
   const requestedIds = extractRequestedRecordIds(message, context);
 
   const allTroubleshooting = needs.troubleshooting
     ? buildAllTroubleshootingKnowledge()
     : [];
-  const relevantTroubleshooting = needs.troubleshooting
-    ? await getTroubleshootingKnowledge(searchText)
-    : [];
-  const catalogOnly = needs.troubleshooting && relevantTroubleshooting.length === 0;
+  const relevantTroubleshooting = activeSession.valid
+    ? [activeSession.issueKnowledge]
+    : needs.troubleshooting
+      ? await getTroubleshootingKnowledge(searchText)
+      : [];
+  const catalogOnly =
+    !activeSession.valid &&
+    needs.troubleshooting &&
+    relevantTroubleshooting.length === 0;
   const troubleshooting = catalogOnly
     ? allTroubleshooting
     : relevantTroubleshooting;
@@ -588,6 +769,8 @@ async function getChatbotKnowledge({
 
   const planText = buildPlanKnowledgeText(plans);
   if (planText) sections.push(planText);
+
+  if (activeSession.text) sections.push(activeSession.text);
 
   const troubleshootingText = buildTroubleshootingKnowledgeText(
     troubleshooting,
@@ -619,6 +802,7 @@ async function getChatbotKnowledge({
     confirmedIncidents,
     requestedIds,
     needs,
+    activeTroubleshootingSession: activeSession.valid ? activeSession.meta : null,
     availability: {
       plans: needs.loadPlans ? plansResult.ok : null,
       troubleshooting: needs.troubleshooting ? true : null,
@@ -629,10 +813,11 @@ async function getChatbotKnowledge({
   };
 }
 
-function buildChatbotUiHints(message = '', context = []) {
+function buildChatbotUiHints(message = '', context = [], troubleshootingSession = null) {
   const normalized = getConversationSearchText(message, context);
   const actions = [];
   const quickReplies = [];
+  const activeSession = buildTroubleshootingSessionContext(troubleshootingSession);
 
   const modelMatchers = [
     { id: 'samsung-pvr-hd', label: 'Samsung PVR', test: /samsung\s+pvr/i },
@@ -686,8 +871,8 @@ function buildChatbotUiHints(message = '', context = []) {
     );
   }
 
-  if (troubleshootIntent) {
-    if (!unresolvedIntent) {
+  if (troubleshootIntent || activeSession.valid) {
+    if (!unresolvedIntent && !activeSession.valid) {
       if (matchedModel) {
         const query = focusedComponent
           ? `?component=${encodeURIComponent(focusedComponent)}`
@@ -717,8 +902,13 @@ function buildChatbotUiHints(message = '', context = []) {
       }
     );
 
-    quickReplies.push('No Signal', 'Remote not working');
-    if (!unresolvedIntent) quickReplies.push('Still not working');
+    if (activeSession.valid) {
+      quickReplies.push('What should I do next?', 'Explain this step');
+      if (!unresolvedIntent) quickReplies.push('Still not working');
+    } else {
+      quickReplies.push('No Signal', 'Remote not working');
+      if (!unresolvedIntent) quickReplies.push('Still not working');
+    }
   }
 
   const uniqueActions = actions.filter(
@@ -742,4 +932,5 @@ module.exports = {
   extractRequestedRecordIds,
   getChatbotKnowledge,
   buildChatbotUiHints,
+  buildTroubleshootingSessionContext,
 };

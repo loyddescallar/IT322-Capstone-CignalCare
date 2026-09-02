@@ -7,6 +7,7 @@ const {
 const {
   getChatbotKnowledge,
   buildChatbotUiHints,
+  buildTroubleshootingSessionContext,
 } = require('../services/chatbotKnowledgeService');
 
 const RATE_WINDOW_MS = 60 * 1000;
@@ -38,6 +39,47 @@ function sanitizeContext(context, limit = 8) {
     role: item?.role === 'assistant' ? 'assistant' : 'user',
     text: String(item?.text || '').trim().slice(0, 700),
   }));
+}
+
+function sanitizeTroubleshootingSession(session) {
+  if (!session || typeof session !== 'object') return null;
+
+  const cleanResult = (value) => {
+    const clean = String(value || '').trim().toLowerCase();
+    return ['resolved', 'not_resolved', 'viewed', 'unresolved'].includes(clean)
+      ? clean
+      : '';
+  };
+
+  return {
+    version: 1,
+    modelId: String(session.modelId || '').trim().slice(0, 100),
+    issueId: String(session.issueId || '').trim().slice(0, 100),
+    guideMode: session.guideMode === 'video' ? 'video' : 'written',
+    activeOption: ['recommended', 'quick', 'factory', 'video'].includes(
+      String(session.activeOption || '')
+    )
+      ? String(session.activeOption)
+      : 'recommended',
+    currentStepId: String(session.currentStepId || '').trim().slice(0, 160),
+    currentStepIndex: Math.max(
+      -1,
+      Math.min(100, Number.isFinite(Number(session.currentStepIndex))
+        ? Math.trunc(Number(session.currentStepIndex))
+        : -1)
+    ),
+    completedStepIds: Array.isArray(session.completedStepIds)
+      ? session.completedStepIds.map((id) => String(id).slice(0, 160)).slice(0, 40)
+      : [],
+    quickRestartAttempted: session.quickRestartAttempted === true,
+    quickRestartResult: cleanResult(session.quickRestartResult),
+    factoryResetAttempted: session.factoryResetAttempted === true,
+    factoryResetResult: cleanResult(session.factoryResetResult),
+    videoWatched: session.videoWatched === true,
+    videoId: String(session.videoId || '').trim().slice(0, 120),
+    videoResult: cleanResult(session.videoResult),
+    overallResult: cleanResult(session.overallResult),
+  };
 }
 
 function shouldIncludePersonalData(message, context = []) {
@@ -77,6 +119,9 @@ async function sendChatbotMessage(req, res) {
   }
 
   const context = sanitizeContext(req.body?.context);
+  const troubleshootingSession = sanitizeTroubleshootingSession(
+    req.body?.troubleshootingSession
+  );
   const includePersonalData = shouldIncludePersonalData(message, context);
 
   try {
@@ -90,12 +135,14 @@ async function sendChatbotMessage(req, res) {
         includePersonalData,
         message,
         context,
+        troubleshootingSession,
       });
       knowledgeText = knowledge.text;
       hasPersonalData = Boolean(knowledge.personalSupport);
       knowledgeMeta = {
         needs: knowledge.needs,
         requestedIds: knowledge.requestedIds,
+        activeTroubleshootingSession: knowledge.activeTroubleshootingSession,
       };
     } catch (knowledgeError) {
       console.error('CHATBOT KNOWLEDGE ERROR:', knowledgeError?.message);
@@ -108,7 +155,7 @@ async function sendChatbotMessage(req, res) {
       knowledgeText,
     });
 
-    const hints = buildChatbotUiHints(message, context);
+    const hints = buildChatbotUiHints(message, context, troubleshootingSession);
 
     return res.json({
       reply: result.reply,
@@ -161,16 +208,26 @@ async function prepareSupportDraft(req, res) {
   }
 
   const context = sanitizeContext(req.body?.context, 12);
+  const troubleshootingSession = sanitizeTroubleshootingSession(
+    req.body?.troubleshootingSession
+  );
+  const verifiedSession = buildTroubleshootingSessionContext(
+    troubleshootingSession
+  );
   const hasUserContent = context.some(
     (item) => item.role === 'user' && String(item.text || '').trim()
   );
 
-  if (!hasUserContent) {
-    return res.status(400).json({ error: 'Conversation context is required' });
+  if (!hasUserContent && !verifiedSession.valid) {
+    return res.status(400).json({ error: 'Conversation or troubleshooting context is required' });
   }
 
   try {
-    const draft = await generateGeminiSupportDraft({ context, target });
+    const draft = await generateGeminiSupportDraft({
+      context,
+      target,
+      troubleshootingSessionText: verifiedSession.draftText,
+    });
 
     return res.json({
       draft,
@@ -181,7 +238,11 @@ async function prepareSupportDraft(req, res) {
     console.error('CIGNALBOT SUPPORT DRAFT FALLBACK:', error?.message || error);
 
     return res.json({
-      draft: buildFallbackSupportDraft({ context, target }),
+      draft: buildFallbackSupportDraft({
+        context,
+        target,
+        troubleshootingSessionText: verifiedSession.draftText,
+      }),
       source: 'built-in-fallback',
       requiresReview: true,
     });
@@ -192,4 +253,5 @@ module.exports = {
   sendChatbotMessage,
   prepareSupportDraft,
   shouldIncludePersonalData,
+  sanitizeTroubleshootingSession,
 };
