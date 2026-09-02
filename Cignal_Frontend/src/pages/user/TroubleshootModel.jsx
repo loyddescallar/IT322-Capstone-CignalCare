@@ -6,12 +6,23 @@ import {
   ArrowRight,
   ExternalLink,
   PlayCircle,
+  Power,
   RefreshCcw,
+  RotateCcw,
   ShieldCheck,
   Tv,
 } from 'lucide-react';
 import troubleshootApi from '../../api/troubleshootApi';
 import UserLayout from '../../components/UserLayout';
+
+function OptionTag({ icon: Icon, children }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+      <Icon size={11} strokeWidth={2.2} />
+      {children}
+    </span>
+  );
+}
 
 export default function TroubleshootModel() {
   const { modelId } = useParams();
@@ -101,7 +112,7 @@ export default function TroubleshootModel() {
               <button
                 type="button"
                 onClick={() => setReloadKey((value) => value + 1)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
                 <RefreshCcw size={16} />
                 Try Again
@@ -109,7 +120,7 @@ export default function TroubleshootModel() {
               <button
                 type="button"
                 onClick={() => navigate('/troubleshoot')}
-                className="rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-bold text-white transition hover:bg-red-700"
+                className="min-h-11 rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-bold text-white transition hover:bg-red-700"
               >
                 Return to Box Models
               </button>
@@ -124,17 +135,17 @@ export default function TroubleshootModel() {
     <UserLayout>
       <div className="min-h-screen bg-slate-50">
         <section className="border-b border-slate-200 bg-white">
-          <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-7 lg:px-8">
             <button
               type="button"
               onClick={() => navigate('/troubleshoot')}
-              className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-500 transition hover:text-[#cc0000]"
+              className="mb-5 inline-flex min-h-10 items-center gap-2 text-xs font-bold text-slate-500 transition hover:text-[#cc0000]"
             >
               <ArrowLeft size={15} />
               Back to Box Models
             </button>
 
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <div className="flex h-28 w-36 flex-shrink-0 items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-4 text-[#cc0000]">
                   {model.image ? (
@@ -147,15 +158,16 @@ export default function TroubleshootModel() {
                     <Tv size={54} strokeWidth={1.6} />
                   )}
                 </div>
+
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     {model.type && (
-                      <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
+                      <span className="rounded-md bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
                         {model.type} Receiver
                       </span>
                     )}
                     {model.guide?.verified && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
                         <ShieldCheck size={12} /> Verified guide
                       </span>
                     )}
@@ -175,7 +187,7 @@ export default function TroubleshootModel() {
                   href={model.source_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-[#cc0000] sm:self-auto"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-[#cc0000] md:self-auto"
                 >
                   Official Cignal Guide
                   <ExternalLink size={14} />
@@ -185,64 +197,66 @@ export default function TroubleshootModel() {
           </div>
         </section>
 
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-8 lg:px-8">
           <div className="mb-5">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#cc0000]">
               Available fixes
             </p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">
+            <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">
               What problem are you experiencing?
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Open a guide to follow the written steps or watch a verified video when one is available.
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              Open an issue to use the recommended receiver-specific guide. Quick restart,
+              factory reset, and official video help only appear when they are configured for that issue.
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {issues.map((issue) => {
               const hasVideo = (issue.video_guides || []).length > 0;
+              const quickRestart = issue.support_options?.quick_restart?.available;
+              const factoryReset = issue.support_options?.factory_reset?.available;
+
               return (
                 <button
                   key={issue.id}
                   type="button"
-                  onClick={() =>
-                    navigate(`/troubleshoot/${model.id}/${issue.id}`)
-                  }
-                  className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:border-red-200 hover:shadow-lg"
+                  onClick={() => navigate(`/troubleshoot/${model.id}/${issue.id}`)}
+                  className="group min-h-[188px] rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition duration-200 hover:border-red-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-200 sm:p-6"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-lg font-bold text-slate-900 transition-colors group-hover:text-[#cc0000]">
-                          {issue.title}
-                        </h2>
-                        {issue.error_code && (
-                          <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
-                            {issue.error_code}
-                          </span>
-                        )}
-                        {hasVideo && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                            <PlayCircle size={11} /> Video available
-                          </span>
+                  <div className="flex h-full flex-col">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-bold text-slate-900 transition-colors group-hover:text-[#cc0000]">
+                            {issue.title}
+                          </h3>
+                          {issue.error_code && (
+                            <span className="rounded-md bg-red-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#cc0000]">
+                              {issue.error_code}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          {issue.description ||
+                            'Open this guide to view the configured troubleshooting steps.'}
+                        </p>
+                      </div>
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-[#cc0000] transition group-hover:bg-[#cc0000] group-hover:text-white">
+                        <ArrowRight size={17} />
+                      </div>
+                    </div>
+
+                    <div className="mt-auto pt-5">
+                      <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                        {quickRestart && <OptionTag icon={Power}>Quick restart</OptionTag>}
+                        {factoryReset && <OptionTag icon={RotateCcw}>Factory reset</OptionTag>}
+                        {hasVideo && <OptionTag icon={PlayCircle}>Video guide</OptionTag>}
+                        {!quickRestart && !factoryReset && !hasVideo && (
+                          <OptionTag icon={ShieldCheck}>Guided steps</OptionTag>
                         )}
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {issue.description ||
-                          'Open this guide to view the configured troubleshooting steps.'}
-                      </p>
-                      {issue.category && (
-                        <p className="mt-3 text-xs font-bold text-slate-400">
-                          {issue.category}
-                        </p>
-                      )}
                     </div>
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-[#cc0000] transition group-hover:bg-[#cc0000] group-hover:text-white">
-                      <ArrowRight size={17} />
-                    </div>
-                  </div>
-                  <div className="mt-5 border-t border-slate-100 pt-4 text-xs font-bold text-[#cc0000]">
-                    {hasVideo ? 'Choose written or video guide' : 'Start guided troubleshooting'}
                   </div>
                 </button>
               );

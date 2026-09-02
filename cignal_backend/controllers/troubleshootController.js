@@ -12,7 +12,6 @@ function getErrorCode(issue) {
 
 function toGuideResponse(model) {
   const guide = model?.guide || {};
-
   return {
     verified: guide.verified === true,
     cardless: guide.cardless === true,
@@ -56,11 +55,34 @@ function toModelResponse(model, { includeGuide = false } = {}) {
     source_label: model.sourceLabel || '',
   };
 
-  if (includeGuide) {
-    response.guide = toGuideResponse(model);
-  }
-
+  if (includeGuide) response.guide = toGuideResponse(model);
   return response;
+}
+
+function toSupportAction(action = {}) {
+  return {
+    available: action.available === true,
+    title: action.title || '',
+    description: action.description || '',
+    stage: action.stage || '',
+    section_title: action.sectionTitle || '',
+    warning: action.warning || '',
+  };
+}
+
+function toSupportOptions(issue) {
+  const options = issue?.supportOptions || {};
+  return {
+    recommended: {
+      available: options.recommended?.available !== false,
+      title: options.recommended?.title || 'Recommended troubleshooting',
+      description:
+        options.recommended?.description ||
+        'Follow the complete receiver-specific guide in the recommended order.',
+    },
+    quick_restart: toSupportAction(options.quickRestart),
+    factory_reset: toSupportAction(options.factoryReset),
+  };
 }
 
 function toIssueResponse(modelId, issue) {
@@ -91,10 +113,14 @@ function toIssueResponse(modelId, issue) {
           source_label: video.sourceLabel || '',
           verified: video.verified === true,
           coverage: video.coverage || 'full',
+          type: video.type || (video.coverage === 'partial' ? 'supplemental' : 'full'),
+          action: video.action || '',
+          applicability: video.applicability || '',
           purpose: video.purpose || '',
           note: video.note || '',
         }))
       : [],
+    support_options: toSupportOptions(issue),
     note: issue.note || '',
     section_count: sections.length,
     step_count: stepCount,
@@ -107,10 +133,7 @@ function getModels(req, res) {
 
 function getIssuesByModel(req, res) {
   const model = findBoxModel(req.params.modelId);
-
-  if (!model) {
-    return res.status(404).json({ error: 'Troubleshooting model not found' });
-  }
+  if (!model) return res.status(404).json({ error: 'Troubleshooting model not found' });
 
   return res.json({
     model: toModelResponse(model, { includeGuide: true }),
@@ -142,7 +165,6 @@ function getStepsByIssue(req, res) {
 
   let stepNumber = 0;
   const steps = [];
-
   issue.sections.forEach((section, sectionIndex) => {
     (section.steps || []).forEach((instruction, stepIndex) => {
       stepNumber += 1;
@@ -174,11 +196,17 @@ async function recordTroubleshootOutcome(req, res) {
     const { modelId, issueId, outcome } = req.body || {};
     const allowed = new Set(['resolved', 'unresolved', 'ticket', 'technician']);
     if (!modelId || !issueId || !allowed.has(String(outcome || ''))) {
-      return res.status(400).json({ error: 'Valid modelId, issueId, and outcome are required.' });
+      return res.status(400).json({
+        error: 'Valid modelId, issueId, and outcome are required.',
+      });
     }
+
     const model = findBoxModel(modelId);
     const issue = model ? findTroubleshootIssue(model.id, issueId) : null;
-    if (!model || !issue) return res.status(404).json({ error: 'Troubleshooting guide not found.' });
+    if (!model || !issue) {
+      return res.status(404).json({ error: 'Troubleshooting guide not found.' });
+    }
+
     const id = await recordOutcome({
       userId: req.user.id,
       accountNumber: req.user.accountNumber,
@@ -189,6 +217,7 @@ async function recordTroubleshootOutcome(req, res) {
       issueLabel: issue.shortTitle,
       outcome: String(outcome),
     });
+
     return res.status(201).json({ ok: true, id });
   } catch (error) {
     console.error('RECORD TROUBLESHOOT OUTCOME ERROR:', error);

@@ -23,8 +23,13 @@ const OFFICIAL_VIDEOS = {
     sourceLabel: 'Official Cignal YouTube',
     verified: true,
     coverage: 'partial',
-    purpose: 'Shows the official Cignal hard-reset / factory-reset process as a visual reference.',
-    note: 'This official video demonstrates the reset portion of troubleshooting. Receiver menu names can differ by model, so use the written model-specific guide whenever the on-screen menu does not match the video.',
+    type: 'supplemental',
+    action: 'factory-reset',
+    applicability: 'receiver-reset',
+    purpose:
+      'Shows the official Cignal reset process as a visual reference while the written guide keeps the receiver-specific menu path.',
+    note:
+      'This video demonstrates the reset portion of troubleshooting. Receiver menu names can differ by model, so follow the written model-specific guide whenever the on-screen menu does not match the video.',
   },
 };
 
@@ -281,6 +286,33 @@ const audioSections = (profile) => [
   factoryResetSections[profile](),
 ];
 
+function createSupportOptions({ profile, quickRestart = true, factoryReset = true, quickStage = 'later', factoryStage = 'later' }) {
+  const factorySection = factoryReset ? factoryResetSections[profile]() : null;
+  return {
+    recommended: {
+      available: true,
+      title: 'Recommended troubleshooting',
+      description: 'Follow the complete receiver-specific guide in the recommended order.',
+    },
+    quickRestart: {
+      available: quickRestart,
+      title: 'Quick restart',
+      description: 'Power-cycle the receiver without changing its saved setup.',
+      stage: quickStage,
+      sectionTitle: quickRestart ? hardReset15().title : '',
+    },
+    factoryReset: {
+      available: factoryReset,
+      title: 'Factory reset',
+      description: 'Restore receiver settings and complete the required setup again.',
+      stage: factoryStage,
+      sectionTitle: factorySection?.title || '',
+      warning:
+        'Factory Reset is not guaranteed to solve every problem. Use the receiver-specific steps and complete First Time Installation when the guide requires it.',
+    },
+  };
+}
+
 function createIssues({ profile, smartCard }) {
   const e1Sections = smartCard
     ? [smartCardReset(), hardReset15(), factoryResetSections[profile]()]
@@ -295,10 +327,15 @@ function createIssues({ profile, smartCard }) {
         ? 'Follow the receiver-specific Cignal procedure for E1, E2, or E11, including Smart Card checks on this model.'
         : 'Follow the receiver-specific Cignal reset procedure for E1, E2, or E11 on this model.',
       keywords: ['e1', 'e2', 'e11', smartCard ? 'smart card' : 'receiver error', 'error code'],
-      relatedComponents: smartCard
-        ? ['smart-card-slot', 'power-input']
-        : ['power-input'],
+      relatedComponents: smartCard ? ['smart-card-slot', 'power-input'] : ['power-input'],
       videoGuides: [resetVideoGuide()],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: true,
+        factoryReset: true,
+        quickStage: smartCard ? 'later' : 'early',
+        factoryStage: 'later',
+      }),
       sections: e1Sections,
       note: smartCard
         ? 'Handle the Smart Card gently. Do not bend, wet, or scratch it.'
@@ -312,6 +349,13 @@ function createIssues({ profile, smartCard }) {
       keywords: ['e4', 'e6', 'e14', 'account active', 'outstanding balance', 'receiver error'],
       relatedComponents: ['power-input'],
       videoGuides: [resetVideoGuide()],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: true,
+        factoryReset: true,
+        quickStage: 'later',
+        factoryStage: 'later',
+      }),
       sections: [accountStatusCheck(), hardReset15(), factoryResetSections[profile]()],
       note: 'Do not assume a receiver fault when the account is inactive or has an outstanding balance.',
     },
@@ -323,6 +367,13 @@ function createIssues({ profile, smartCard }) {
       keywords: ['missing channels', 'skipping channels', 'channel line-up', 'channel lineup'],
       relatedComponents: ['power-input'],
       videoGuides: [resetVideoGuide()],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: profile === 'legacySmartCard',
+        factoryReset: true,
+        quickStage: 'later',
+        factoryStage: 'later',
+      }),
       sections: [
         channelLineupCheck(),
         ...(profile === 'legacySmartCard' ? [hardReset15()] : []),
@@ -338,6 +389,13 @@ function createIssues({ profile, smartCard }) {
       keywords: ['technical problem', 'signal input', 'no signal', 'lnb', 'lnb in', 'coaxial', 'weather'],
       relatedComponents: ['lnb-in', 'power-input'],
       videoGuides: [resetVideoGuide()],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: true,
+        factoryReset: true,
+        quickStage: 'later',
+        factoryStage: 'later',
+      }),
       sections: technicalSignalSections(profile),
       note: 'Do not climb onto the roof or realign the satellite dish yourself. Request a technician when dish alignment or outdoor cabling is suspected.',
     },
@@ -348,6 +406,12 @@ function createIssues({ profile, smartCard }) {
       description: 'For a black, blue, blank, snowy, or missing TV picture, check power, input source, ports, and cables.',
       keywords: ['audio video failure', 'black screen', 'blue screen', 'snow', 'no picture', 'hdmi', 'rca', 'av'],
       relatedComponents: ['power-button', 'hdmi-av-out'],
+      videoGuides: [],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: false,
+        factoryReset: false,
+      }),
       sections: avFailureSections(),
       note: 'Use only external connections. Do not open the receiver casing.',
     },
@@ -358,6 +422,12 @@ function createIssues({ profile, smartCard }) {
       description: 'Check the power source, front-panel Power button, and a compatible adapter when one is safely available.',
       keywords: ['not powering on', 'no power', 'power button', 'adapter', 'outlet'],
       relatedComponents: ['power-input', 'power-button'],
+      videoGuides: [],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: false,
+        factoryReset: false,
+      }),
       sections: powerSections(),
       note: 'Never open the power adapter or receiver casing. Stop using visibly damaged or overheating power equipment.',
     },
@@ -369,6 +439,13 @@ function createIssues({ profile, smartCard }) {
       keywords: ['delayed audio', 'no audio', 'distorted audio', 'low audio', 'sound', 'volume'],
       relatedComponents: ['hdmi-av-out', 'power-input'],
       videoGuides: [resetVideoGuide()],
+      supportOptions: createSupportOptions({
+        profile,
+        quickRestart: true,
+        factoryReset: true,
+        quickStage: 'later',
+        factoryStage: 'later',
+      }),
       sections: audioSections(profile),
       note: 'If only one channel is affected, the problem may be with that channel feed rather than the receiver.',
     },
