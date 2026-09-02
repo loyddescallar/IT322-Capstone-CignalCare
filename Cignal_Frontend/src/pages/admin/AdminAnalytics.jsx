@@ -122,6 +122,9 @@ export default function AdminAnalytics() {
   );
   const topIssues = (data?.topIssues || []).slice(0, 6);
   const issueTotal = topIssues.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const selfServiceMethods = data?.selfServiceMethods || [];
+  const boxIssueEffectiveness = data?.boxIssueEffectiveness || data?.guidePerformance || [];
+  const supportFunnel = data?.supportFunnel || {};
 
   const exportCsv = () => {
     const rows = [
@@ -147,9 +150,33 @@ export default function AdminAnalytics() {
       ['Location', 'Subscribers', 'Support', 'Support per 100'],
       ...(data?.locations || []).map((item) => [item.location, item.subscribers, item.support, item.supportPer100]),
       [],
-      ['TROUBLESHOOTING GUIDE PERFORMANCE'],
-      ['Guide', 'Resolved', 'Unresolved', 'Resolution Rate'],
-      ...(data?.guidePerformance || []).map((item) => [item.guide, item.resolved, item.unresolved, `${item.resolutionRate}%`]),
+      ['BOX / ISSUE EFFECTIVENESS'],
+      ['Receiver / Issue', 'Resolved', 'Unresolved', 'Completed Sessions', 'Resolution Rate'],
+      ...boxIssueEffectiveness.map((item) => [
+        item.guide,
+        item.resolved,
+        item.unresolved,
+        item.total,
+        `${item.resolutionRate}%`,
+      ]),
+      [],
+      ['SELF-SERVICE METHOD PERFORMANCE'],
+      ['Method', 'Attempts', 'Completed', 'Resolved', 'Unresolved', 'Success Rate'],
+      ...selfServiceMethods.map((item) => [
+        item.label,
+        item.attempts,
+        item.completed,
+        item.resolved,
+        item.unresolved,
+        `${item.successRate}%`,
+      ]),
+      [],
+      ['SUPPORT FUNNEL'],
+      ['Stage', 'Sessions'],
+      ['Troubleshooting Sessions', supportFunnel.sessions || 0],
+      ['Self-Service Resolved', supportFunnel.selfResolved || 0],
+      ['Ticket Escalations', supportFunnel.ticketEscalations || 0],
+      ['Technician Escalations', supportFunnel.technicianEscalations || 0],
     ];
 
     const csv = rows
@@ -342,23 +369,120 @@ export default function AdminAnalytics() {
             <Section title="Location Hotspots" subtitle="Support interactions per 100 active subscribers—not raw counts alone.">
               <HorizontalBars items={locations} labelKey="location" valueKey="supportPer100" format={(v) => `${v} / 100 subscribers`} />
             </Section>
-            <Section title="Troubleshooting Guide Performance" subtitle="Measured directly from the existing “Did these steps solve the problem?” customer flow." className="xl:col-span-2">
+            <Section
+              title="Self-Service Method Performance"
+              subtitle="Compare how the Full Guide, Quick Restart, Factory Reset, and Video Guide perform using recorded subscriber sessions."
+            >
               <div className="overflow-x-auto">
                 <table className="min-w-full text-xs">
-                  <thead><tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400"><th className="px-3 py-3">Guide</th><th className="px-3 py-3">Resolved</th><th className="px-3 py-3">Unresolved</th><th className="px-3 py-3">Success Rate</th><th className="px-3 py-3">Decision Signal</th></tr></thead>
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400">
+                      <th className="px-3 py-3">Support Method</th>
+                      <th className="px-3 py-3">Attempts</th>
+                      <th className="px-3 py-3">Resolved</th>
+                      <th className="px-3 py-3">Unresolved</th>
+                      <th className="px-3 py-3">Success Rate</th>
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(data?.guidePerformance || []).map((row) => (
-                      <tr key={row.guide}>
-                        <td className="max-w-md px-3 py-3 font-semibold text-slate-700">{row.guide}</td>
-                        <td className="px-3 py-3 text-emerald-700">{row.resolved}</td>
-                        <td className="px-3 py-3 text-amber-700">{row.unresolved}</td>
-                        <td className="px-3 py-3"><span className="rounded-full bg-blue-50 px-2 py-1 font-bold text-blue-700">{row.resolutionRate}%</span></td>
-                        <td className="px-3 py-3 text-[11px] text-slate-500">{row.resolutionRate}% of {row.total} completed assessment{Number(row.total) === 1 ? '' : 's'} reported resolved.</td>
+                    {selfServiceMethods.map((row) => (
+                      <tr key={row.mode}>
+                        <td className="px-3 py-3 font-semibold text-slate-700">{row.label}</td>
+                        <td className="px-3 py-3 text-slate-600">{row.attempts || 0}</td>
+                        <td className="px-3 py-3 text-emerald-700">{row.resolved || 0}</td>
+                        <td className="px-3 py-3 text-amber-700">{row.unresolved || 0}</td>
+                        <td className="px-3 py-3">
+                          <span className="rounded-full bg-blue-50 px-2 py-1 font-bold text-blue-700">
+                            {row.completed ? `${row.successRate || 0}%` : 'No result yet'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {!(data?.guidePerformance || []).length && <p className="py-8 text-center text-xs text-slate-400">No troubleshooting outcomes recorded yet.</p>}
+                {!selfServiceMethods.some((row) => Number(row.attempts || 0) > 0) && (
+                  <p className="py-8 text-center text-xs text-slate-400">
+                    No support-method sessions recorded yet. New troubleshooting activity will populate this section.
+                  </p>
+                )}
+              </div>
+            </Section>
+
+            <Section
+              title="Support Funnel"
+              subtitle="Distinct troubleshooting sessions reaching each support stage. Ticket and technician counts may overlap when one concern escalates through both."
+            >
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
+                {[
+                  ['Troubleshooting Sessions', supportFunnel.sessions || 0, 'Started self-service'],
+                  ['Self-Service Resolved', supportFunnel.selfResolved || 0, 'Resolved without escalation'],
+                  ['Ticket Escalations', supportFunnel.ticketEscalations || 0, 'Reached support ticket'],
+                  ['Technician Escalations', supportFunnel.technicianEscalations || 0, 'Reached technician request'],
+                ].map(([label, value, sub], index) => (
+                  <div
+                    key={label}
+                    className={`rounded-xl border p-3 ${
+                      index === 0
+                        ? 'border-slate-200 bg-slate-50'
+                        : index === 1
+                          ? 'border-emerald-100 bg-emerald-50/60'
+                          : 'border-red-100 bg-red-50/50'
+                    }`}
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">{sub}</p>
+                  </div>
+                ))}
+              </div>
+              {!supportFunnel.sessions && (
+                <p className="mt-4 text-center text-xs text-slate-400">
+                  Funnel data will appear after subscribers use the updated troubleshooting flow.
+                </p>
+              )}
+            </Section>
+
+            <Section
+              title="Box / Issue Effectiveness"
+              subtitle="Final self-service results by receiver and issue. Use this to identify guides with frequent unresolved sessions."
+              className="xl:col-span-2"
+            >
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400">
+                      <th className="px-3 py-3">Receiver</th>
+                      <th className="px-3 py-3">Issue</th>
+                      <th className="px-3 py-3">Sessions</th>
+                      <th className="px-3 py-3">Resolved</th>
+                      <th className="px-3 py-3">Unresolved</th>
+                      <th className="px-3 py-3">Success Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {boxIssueEffectiveness.map((row) => (
+                      <tr key={row.guide}>
+                        <td className="max-w-[220px] px-3 py-3 font-semibold text-slate-700">
+                          {row.model || String(row.guide || '').split(' — ')[0]}
+                        </td>
+                        <td className="max-w-[260px] px-3 py-3 text-slate-600">
+                          {row.issue || String(row.guide || '').split(' — ').slice(1).join(' — ')}
+                        </td>
+                        <td className="px-3 py-3 text-slate-600">{row.total || 0}</td>
+                        <td className="px-3 py-3 text-emerald-700">{row.resolved || 0}</td>
+                        <td className="px-3 py-3 text-amber-700">{row.unresolved || 0}</td>
+                        <td className="px-3 py-3">
+                          <span className="rounded-full bg-blue-50 px-2 py-1 font-bold text-blue-700">
+                            {row.resolutionRate || 0}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!boxIssueEffectiveness.length && (
+                  <p className="py-8 text-center text-xs text-slate-400">No completed troubleshooting sessions recorded yet.</p>
+                )}
               </div>
             </Section>
           </div>

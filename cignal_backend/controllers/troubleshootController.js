@@ -193,9 +193,38 @@ function getStepsByIssue(req, res) {
 
 async function recordTroubleshootOutcome(req, res) {
   try {
-    const { modelId, issueId, outcome } = req.body || {};
-    const allowed = new Set(['resolved', 'unresolved', 'ticket', 'technician']);
-    if (!modelId || !issueId || !allowed.has(String(outcome || ''))) {
+    const {
+      modelId,
+      issueId,
+      outcome,
+      sessionId,
+      supportMode,
+      isFinal,
+      videoWatched,
+      stepsCompleted,
+      totalSteps,
+      lastStepId,
+    } = req.body || {};
+
+    const allowedOutcomes = new Set([
+      'started',
+      'viewed',
+      'resolved',
+      'unresolved',
+      'ticket',
+      'technician',
+    ]);
+    const allowedModes = new Set([
+      'full',
+      'quick_restart',
+      'factory_reset',
+      'video',
+    ]);
+    const normalizedOutcome = String(outcome || '').trim();
+    const requestedMode = String(supportMode || '').trim();
+    const normalizedMode = allowedModes.has(requestedMode) ? requestedMode : 'full';
+
+    if (!modelId || !issueId || !allowedOutcomes.has(normalizedOutcome)) {
       return res.status(400).json({
         error: 'Valid modelId, issueId, and outcome are required.',
       });
@@ -207,6 +236,17 @@ async function recordTroubleshootOutcome(req, res) {
       return res.status(404).json({ error: 'Troubleshooting guide not found.' });
     }
 
+    const safeSessionId = String(sessionId || '').trim().slice(0, 80) || null;
+    const safeLastStepId = String(lastStepId || '').trim().slice(0, 180) || null;
+    const parsedStepsCompleted = Number(stepsCompleted || 0);
+    const parsedTotalSteps = Number(totalSteps || 0);
+    const safeStepsCompleted = Number.isFinite(parsedStepsCompleted)
+      ? Math.max(0, Math.min(parsedStepsCompleted, 500))
+      : 0;
+    const safeTotalSteps = Number.isFinite(parsedTotalSteps)
+      ? Math.max(0, Math.min(parsedTotalSteps, 500))
+      : 0;
+
     const id = await recordOutcome({
       userId: req.user.id,
       accountNumber: req.user.accountNumber,
@@ -215,7 +255,14 @@ async function recordTroubleshootOutcome(req, res) {
       modelName: model.name,
       issueId: issue.id,
       issueLabel: issue.shortTitle,
-      outcome: String(outcome),
+      outcome: normalizedOutcome,
+      sessionId: safeSessionId,
+      supportMode: normalizedMode,
+      isFinal: isFinal !== false,
+      videoWatched: videoWatched === true,
+      stepsCompleted: safeStepsCompleted,
+      totalSteps: safeTotalSteps,
+      lastStepId: safeLastStepId,
     });
 
     return res.status(201).json({ ok: true, id });

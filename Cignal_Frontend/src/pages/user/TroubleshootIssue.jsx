@@ -28,6 +28,12 @@ import UserLayout from '../../components/UserLayout';
 const SAFETY_REMINDER =
   'Do not open the receiver or power adapter, touch exposed wiring, climb onto the roof, or adjust the satellite dish yourself. Stop and request professional assistance whenever a step cannot be completed safely.';
 const ACTIVE_TROUBLESHOOT_SESSION_KEY = 'cignalcare-active-troubleshoot-session';
+function createTroubleshootSessionId() {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `ts-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function ComponentIcon({ kind, size = 17 }) {
   if (kind === 'power') return <Power size={size} />;
@@ -101,6 +107,7 @@ export default function TroubleshootIssue() {
   const [videoWatched, setVideoWatched] = useState(false);
   const [videoResult, setVideoResult] = useState('');
   const [shortcutResults, setShortcutResults] = useState({ quick: '', factory: '' });
+  const [sessionId, setSessionId] = useState(() => createTroubleshootSessionId());
 
   const steps = useMemo(
     () =>
@@ -240,6 +247,14 @@ export default function TroubleshootIssue() {
             ? saved.completedSteps.map(String).filter((id) => validStepIds.has(id))
             : [];
           const savedCurrent = Number(saved.currentStep);
+          const savedSessionId = String(saved.sessionId || '').trim();
+          const savedFinalResult = String(saved.finalResult || '').trim();
+          const previousSessionClosed = ['resolved', 'unresolved'].includes(savedFinalResult);
+          setSessionId(
+            previousSessionClosed || !savedSessionId
+              ? createTroubleshootSessionId()
+              : savedSessionId
+          );
           const savedOption = ['recommended', 'quick', 'factory'].includes(saved.activeOption)
             ? saved.activeOption
             : 'recommended';
@@ -249,21 +264,40 @@ export default function TroubleshootIssue() {
             (savedOption === 'quick' && selectedSupport.quick_restart?.available) ||
             (savedOption === 'factory' && selectedSupport.factory_reset?.available);
 
-          setCompletedSteps(savedCompleted);
-          setActiveOption(optionAvailable ? savedOption : 'recommended');
-          setVideoWatched(saved.videoWatched === true);
-          setVideoResult(typeof saved.videoResult === 'string' ? saved.videoResult : '');
-          setShortcutResults({
-            quick: typeof saved.shortcutResults?.quick === 'string' ? saved.shortcutResults.quick : '',
-            factory: typeof saved.shortcutResults?.factory === 'string' ? saved.shortcutResults.factory : '',
-          });
+          setCompletedSteps(previousSessionClosed ? [] : savedCompleted);
+          setActiveOption(
+            previousSessionClosed ? 'recommended' : optionAvailable ? savedOption : 'recommended'
+          );
+          setVideoWatched(previousSessionClosed ? false : saved.videoWatched === true);
+          setVideoResult(
+            previousSessionClosed
+              ? ''
+              : typeof saved.videoResult === 'string'
+                ? saved.videoResult
+                : ''
+          );
+          setShortcutResults(
+            previousSessionClosed
+              ? { quick: '', factory: '' }
+              : {
+                  quick:
+                    typeof saved.shortcutResults?.quick === 'string'
+                      ? saved.shortcutResults.quick
+                      : '',
+                  factory:
+                    typeof saved.shortcutResults?.factory === 'string'
+                      ? saved.shortcutResults.factory
+                      : '',
+                }
+          );
           setCurrentStep(
-            Number.isInteger(savedCurrent) && savedCurrent >= 0
+            !previousSessionClosed && Number.isInteger(savedCurrent) && savedCurrent >= 0
               ? savedCurrent
               : 0
           );
         } catch {
           localStorage.removeItem(storageKey);
+          setSessionId(createTroubleshootSessionId());
           setCompletedSteps([]);
           setCurrentStep(0);
           setVideoWatched(false);
@@ -294,12 +328,15 @@ export default function TroubleshootIssue() {
     localStorage.setItem(
       storageKey,
       JSON.stringify({
+        sessionId,
         currentStep,
         completedSteps,
         activeOption: guideMode === 'written' ? activeOption : 'recommended',
         videoWatched,
         videoResult,
         shortcutResults,
+        finalResult:
+          result === 'solved' ? 'resolved' : result === 'unsolved' ? 'unresolved' : '',
       })
     );
   }, [
@@ -309,6 +346,8 @@ export default function TroubleshootIssue() {
     guideMode,
     issue,
     loading,
+    result,
+    sessionId,
     shortcutResults,
     steps.length,
     storageKey,
@@ -328,7 +367,8 @@ export default function TroubleshootIssue() {
     const factoryStepIds = new Set(factoryResetSteps.map((step) => step.id));
 
     const session = {
-      version: 1,
+      version: 2,
+      sessionId,
       modelId: String(model.id),
       issueId: String(issue.id),
       guideMode,
@@ -367,6 +407,7 @@ export default function TroubleshootIssue() {
     model,
     quickRestartSteps,
     result,
+    sessionId,
     shortcutResults,
     steps.length,
     video,
@@ -374,6 +415,15 @@ export default function TroubleshootIssue() {
     videoWatched,
     writtenSteps,
   ]);
+
+  useEffect(() => {
+    if (loading || !model || !issue || steps.length === 0) return;
+    recordSupportOutcome('started', { supportMode: 'full', isFinal: false });
+    // Intentionally runs when a new troubleshooting session becomes available.
+    // recordSupportOutcome de-duplicates the event for the active session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, modelId, issueId, sessionId]);
+
 
   if (loading) {
     return (
@@ -477,9 +527,18 @@ export default function TroubleshootIssue() {
     scrollToGuide();
   };
 
-  const startRecommended = () => selectWrittenMode('recommended', steps);
-  const startQuickRestart = () => selectWrittenMode('quick', quickRestartSteps);
-  const startFactoryReset = () => selectWrittenMode('factory', factoryResetSteps);
+  const startRecommended = () => {
+    recordSupportOutcome('started', { supportMode: 'full', isFinal: false });
+    selectWrittenMode('recommended', steps);
+  };
+  const startQuickRestart = () => {
+    recordSupportOutcome('started', { supportMode: 'quick_restart', isFinal: false });
+    selectWrittenMode('quick', quickRestartSteps);
+  };
+  const startFactoryReset = () => {
+    recordSupportOutcome('started', { supportMode: 'factory_reset', isFinal: false });
+    selectWrittenMode('factory', factoryResetSteps);
+  };
 
   const toggleCurrentStep = () => {
     setCompletedSteps((previous) =>
@@ -498,13 +557,53 @@ export default function TroubleshootIssue() {
     }
   };
 
-  const recordSupportOutcome = async (outcome) => {
-    const key = `${modelId}:${issueId}:${outcome}`;
+  const modeNameForAnalytics = (override) => {
+    if (override) return override;
+    if (guideMode === 'video' || activeOption === 'video') return 'video';
+    if (activeOption === 'quick') return 'quick_restart';
+    if (activeOption === 'factory') return 'factory_reset';
+    return 'full';
+  };
+
+  const modeStepsForAnalytics = (mode) => {
+    if (mode === 'quick_restart') return quickRestartSteps;
+    if (mode === 'factory_reset') return factoryResetSteps;
+    if (mode === 'video') return [];
+    return steps;
+  };
+
+  const recordSupportOutcome = async (outcome, overrides = {}) => {
+    const supportMode = modeNameForAnalytics(overrides.supportMode);
+    const analyticsSteps = modeStepsForAnalytics(supportMode);
+    const stepIds = new Set(analyticsSteps.map((step) => step.id));
+    const completedCount = completedSteps.filter((id) => stepIds.has(id)).length;
+    const safeIndex = Math.min(currentStep, Math.max(analyticsSteps.length - 1, 0));
+    const lastStep = analyticsSteps[safeIndex] || null;
+    const isFinal = overrides.isFinal !== undefined ? overrides.isFinal : true;
+    const key = `${sessionId}:${supportMode}:${outcome}:${isFinal ? 'final' : 'intermediate'}`;
+
     if (outcomeSentRef.current.has(key)) return;
     outcomeSentRef.current.add(key);
 
     try {
-      await troubleshootApi.recordOutcome({ modelId, issueId, outcome });
+      await troubleshootApi.recordOutcome({
+        modelId,
+        issueId,
+        outcome,
+        sessionId,
+        supportMode,
+        isFinal,
+        videoWatched: overrides.videoWatched ?? videoWatched,
+        stepsCompleted:
+          overrides.stepsCompleted !== undefined
+            ? overrides.stepsCompleted
+            : completedCount,
+        totalSteps:
+          overrides.totalSteps !== undefined
+            ? overrides.totalSteps
+            : analyticsSteps.length,
+        lastStepId: overrides.lastStepId ?? lastStep?.id ?? '',
+      });
     } catch (outcomeError) {
       outcomeSentRef.current.delete(key);
       console.error('SAVE TROUBLESHOOT OUTCOME ERROR:', outcomeError);
@@ -512,6 +611,8 @@ export default function TroubleshootIssue() {
   };
 
   const restartGuide = () => {
+    setSessionId(createTroubleshootSessionId());
+    outcomeSentRef.current.clear();
     setCurrentStep(0);
     setCompletedSteps([]);
     setResult(null);
@@ -536,7 +637,7 @@ export default function TroubleshootIssue() {
     }
 
     setResult('solved');
-    recordSupportOutcome('resolved');
+    recordSupportOutcome('resolved', { isFinal: true });
   };
 
   const markUnsolved = () => {
@@ -551,7 +652,7 @@ export default function TroubleshootIssue() {
     }
 
     setResult('unsolved');
-    recordSupportOutcome('unresolved');
+    recordSupportOutcome('unresolved', { isFinal: true });
   };
 
   const openVideo = () => {
@@ -560,12 +661,28 @@ export default function TroubleshootIssue() {
     setVideoWatched(true);
     setVideoResult((previous) => previous || 'viewed');
     setResult(null);
+    recordSupportOutcome('viewed', {
+      supportMode: 'video',
+      isFinal: false,
+      videoWatched: true,
+      stepsCompleted: 0,
+      totalSteps: 0,
+      lastStepId: '',
+    });
     scrollToGuide();
   };
 
   const continueFromVideo = () => {
     setVideoWatched(true);
     setVideoResult('not_resolved');
+    recordSupportOutcome('unresolved', {
+      supportMode: 'video',
+      isFinal: false,
+      videoWatched: true,
+      stepsCompleted: 0,
+      totalSteps: 0,
+      lastStepId: '',
+    });
     startRecommended();
   };
 
@@ -575,6 +692,10 @@ export default function TroubleshootIssue() {
         ...previous,
         [activeOption]: 'not_resolved',
       }));
+      recordSupportOutcome('unresolved', {
+        supportMode: activeOption === 'quick' ? 'quick_restart' : 'factory_reset',
+        isFinal: false,
+      });
     }
     startRecommended();
   };
