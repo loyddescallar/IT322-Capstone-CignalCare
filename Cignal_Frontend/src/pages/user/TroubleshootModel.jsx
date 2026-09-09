@@ -189,7 +189,7 @@ export default function TroubleshootModel() {
                   rel="noreferrer"
                   className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-[#cc0000] md:self-auto"
                 >
-                  Official Cignal Guide
+                  
                   <ExternalLink size={14} />
                 </a>
               )}
