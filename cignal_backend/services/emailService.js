@@ -133,30 +133,174 @@ function getTransporter() {
   return transporter;
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function buildOtpMessage({ code, purpose }) {
   const isVerification = purpose === 'verify_email';
+
   const title = isVerification
-    ? 'Verify your CignalCare+ email'
-    : 'Reset your CignalCare+ password';
+    ? 'Verify your recovery email'
+    : 'Password recovery code';
+
+  const subject = isVerification
+    ? 'CignalCare+ | Verify your recovery email'
+    : 'CignalCare+ | Password recovery code';
 
   const instruction = isVerification
-    ? 'Enter this code in CignalCare+ to verify your recovery email.'
-    : 'Enter this code in CignalCare+ to continue resetting your password.';
+    ? 'Use the verification code below to confirm this email address for CignalCare+ account recovery.'
+    : 'Use the security code below to continue resetting your CignalCare+ password.';
 
-  const text = `${instruction}\n\nVerification code: ${code}\n\nThis code expires in 10 minutes. If you did not request this, ignore this message.`;
+  const actionLabel = isVerification
+    ? 'Email verification code'
+    : 'Password recovery code';
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#1f2937">
-      <h2 style="color:#cc0000">${title}</h2>
-      <p>${instruction}</p>
-      <div style="font-size:30px;font-weight:800;letter-spacing:8px;margin:24px 0">${code}</div>
-      <p style="font-size:13px;color:#6b7280">
-        This code expires in 10 minutes. If you did not request this, you can ignore this message.
-      </p>
+  const safeCode = escapeHtml(code);
+  const year = new Date().getFullYear();
+
+  const text = [
+    'CIGNALCARE+',
+    'Descallar Satellite Services',
+    '',
+    title,
+    '',
+    instruction,
+    '',
+    `${actionLabel}: ${code}`,
+    '',
+    'This code expires in 10 minutes.',
+    'For your security, never share this code with anyone.',
+    '',
+    'If you did not request this action, you can safely ignore this email.',
+    '',
+    'This is an automated CignalCare+ account security message.',
+  ].join('\n');
+
+  // Table-based and fully inline styling for broad Gmail/Yahoo/Outlook compatibility.
+  // No external images are required, so the message remains branded even when
+  // remote images are blocked by the recipient's email client.
+  const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      ${escapeHtml(actionLabel)} for your CignalCare+ account. Expires in 10 minutes.
     </div>
-  `;
 
-  return { title, text, html };
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f3f4f6;">
+      <tr>
+        <td align="center" style="padding:32px 14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+            style="width:100%;max-width:560px;background:#ffffff;border-collapse:separate;border-spacing:0;border-radius:18px;overflow:hidden;box-shadow:0 8px 28px rgba(17,24,39,0.08);">
+
+            <tr>
+              <td style="background:#e10600;padding:28px 32px;">
+                <div style="font-size:29px;line-height:34px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
+                  CignalCare+
+                </div>
+                <div style="margin-top:5px;font-size:11px;line-height:16px;font-weight:700;color:#ffffff;letter-spacing:1.7px;text-transform:uppercase;">
+                  Descallar Satellite Services
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:34px 32px 12px 32px;">
+                <div style="font-size:11px;line-height:16px;font-weight:800;color:#e10600;letter-spacing:1.5px;text-transform:uppercase;">
+                  Account Security
+                </div>
+                <h1 style="margin:8px 0 12px 0;font-size:25px;line-height:32px;font-weight:800;color:#111827;">
+                  ${escapeHtml(title)}
+                </h1>
+                <p style="margin:0;font-size:15px;line-height:24px;color:#4b5563;">
+                  ${escapeHtml(instruction)}
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:18px 32px 8px 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                  style="width:100%;background:#fff7f7;border:1px solid #fecaca;border-radius:14px;">
+                  <tr>
+                    <td align="center" style="padding:23px 18px 20px 18px;">
+                      <div style="font-size:11px;line-height:16px;font-weight:800;color:#991b1b;letter-spacing:1.2px;text-transform:uppercase;">
+                        ${escapeHtml(actionLabel)}
+                      </div>
+                      <div style="margin-top:10px;font-size:34px;line-height:42px;font-weight:800;color:#111827;letter-spacing:9px;">
+                        ${safeCode}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td align="center" style="padding:12px 32px 6px 32px;">
+                <span style="display:inline-block;padding:7px 12px;background:#f3f4f6;border-radius:999px;font-size:12px;line-height:18px;font-weight:700;color:#374151;">
+                  Expires in 10 minutes
+                </span>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:18px 32px 10px 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                  style="width:100%;background:#f9fafb;border-left:4px solid #e10600;border-radius:8px;">
+                  <tr>
+                    <td style="padding:15px 16px;">
+                      <div style="font-size:13px;line-height:20px;font-weight:700;color:#1f2937;">
+                        Keep your code private
+                      </div>
+                      <div style="margin-top:3px;font-size:13px;line-height:20px;color:#6b7280;">
+                        CignalCare+ will never ask you to share this security code with another person.
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:12px 32px 34px 32px;">
+                <p style="margin:0;font-size:13px;line-height:21px;color:#6b7280;">
+                  If you did not request this action, you can safely ignore this email. No account change will be completed without the correct code.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="border-top:1px solid #e5e7eb;background:#fafafa;padding:20px 32px;text-align:center;">
+                <div style="font-size:12px;line-height:18px;font-weight:700;color:#374151;">
+                  CignalCare+ · Descallar Satellite Services
+                </div>
+                <div style="margin-top:4px;font-size:11px;line-height:17px;color:#9ca3af;">
+                  Automated account security message · Please do not reply<br>
+                  © ${year} Descallar Satellite Services
+                </div>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return { title: subject, text, html };
 }
 
 function emailIdempotencyKey({ to, code, purpose }) {
@@ -209,6 +353,7 @@ async function sendViaBrevo({ to, code, purpose, message }) {
         sender,
         to: [{ email: clean(to) }],
         subject: message.title,
+        textContent: message.text,
         htmlContent: message.html,
         headers: {
           'Idempotency-Key': emailIdempotencyKey({ to, code, purpose }),

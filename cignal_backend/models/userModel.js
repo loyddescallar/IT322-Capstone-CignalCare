@@ -319,6 +319,48 @@ async function setCustomerEmailVerificationChallenge(id, email, codeHash, expire
   );
 }
 
+async function rollbackCustomerEmailVerificationChallenge(
+  id,
+  expectedCodeHash,
+  previous = {}
+) {
+  await ensureAccountSchema();
+
+  const [result] = await pool.query(
+    `UPDATE users
+     SET email=?,
+         email_verified_at=?,
+         email_verification_code_hash=?,
+         email_verification_expires_at=?,
+         email_verification_attempts=?,
+         email_verification_last_sent_at=?,
+         password_reset_code_hash=?,
+         password_reset_expires_at=?,
+         password_reset_attempts=?,
+         password_reset_last_sent_at=?,
+         updated_at=NOW()
+     WHERE id=?
+       AND role='user'
+       AND email_verification_code_hash=?`,
+    [
+      previous.email || null,
+      previous.emailVerifiedAt || null,
+      previous.emailVerificationCodeHash || null,
+      previous.emailVerificationExpiresAt || null,
+      Number(previous.emailVerificationAttempts || 0),
+      previous.emailVerificationLastSentAt || null,
+      previous.passwordResetCodeHash || null,
+      previous.passwordResetExpiresAt || null,
+      Number(previous.passwordResetAttempts || 0),
+      previous.passwordResetLastSentAt || null,
+      id,
+      expectedCodeHash,
+    ]
+  );
+
+  return Number(result.affectedRows || 0);
+}
+
 async function incrementEmailVerificationAttempts(id) {
   await ensureAccountSchema();
   await pool.query(
@@ -358,6 +400,36 @@ async function setCustomerPasswordResetChallenge(id, codeHash, expiresAt) {
      WHERE id=? AND role='user'`,
     [codeHash, expiresAt, id]
   );
+}
+
+async function rollbackCustomerPasswordResetChallenge(
+  id,
+  expectedCodeHash,
+  previous = {}
+) {
+  await ensureAccountSchema();
+
+  const [result] = await pool.query(
+    `UPDATE users
+     SET password_reset_code_hash=?,
+         password_reset_expires_at=?,
+         password_reset_attempts=?,
+         password_reset_last_sent_at=?,
+         updated_at=NOW()
+     WHERE id=?
+       AND role='user'
+       AND password_reset_code_hash=?`,
+    [
+      previous.codeHash || null,
+      previous.expiresAt || null,
+      Number(previous.attempts || 0),
+      previous.lastSentAt || null,
+      id,
+      expectedCodeHash,
+    ]
+  );
+
+  return Number(result.affectedRows || 0);
 }
 
 async function incrementPasswordResetAttempts(id) {
@@ -423,9 +495,11 @@ module.exports = {
   completeCustomerPasswordChange,
   recoverCustomerAccount,
   setCustomerEmailVerificationChallenge,
+  rollbackCustomerEmailVerificationChallenge,
   incrementEmailVerificationAttempts,
   markCustomerEmailVerified,
   setCustomerPasswordResetChallenge,
+  rollbackCustomerPasswordResetChallenge,
   incrementPasswordResetAttempts,
   archiveUser,
   restoreUser,
