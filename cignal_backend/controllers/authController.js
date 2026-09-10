@@ -10,9 +10,11 @@ const {
   completeCustomerPasswordChange,
   recoverCustomerAccount,
   setCustomerEmailVerificationChallenge,
+  rollbackCustomerEmailVerificationChallenge,
   incrementEmailVerificationAttempts,
   markCustomerEmailVerified,
   setCustomerPasswordResetChallenge,
+  rollbackCustomerPasswordResetChallenge,
   incrementPasswordResetAttempts,
 } = require('../models/userModel');
 const {
@@ -353,7 +355,7 @@ async function requestCustomerEmailVerification(req, res) {
       return res.status(409).json({ error: 'This email address is already verified.' });
     }
 
-    if (sameEmail && secondsSince(user.email_verification_last_sent_at) < OTP_RESEND_COOLDOWN_SECONDS) {
+    if (secondsSince(user.email_verification_last_sent_at) < OTP_RESEND_COOLDOWN_SECONDS) {
       const wait = OTP_RESEND_COOLDOWN_SECONDS - secondsSince(user.email_verification_last_sent_at);
       return res.status(429).json({ error: `Please wait ${Math.max(1, wait)} seconds before requesting another code.` });
     }
@@ -367,8 +369,37 @@ async function requestCustomerEmailVerification(req, res) {
       code,
     });
 
-    await sendOtpEmail({ to: email, code, purpose: 'verify_email' });
+    const previousEmailSecurity = {
+      email: user.email || null,
+      emailVerifiedAt: user.email_verified_at || null,
+      emailVerificationCodeHash: user.email_verification_code_hash || null,
+      emailVerificationExpiresAt: user.email_verification_expires_at || null,
+      emailVerificationAttempts: Number(user.email_verification_attempts || 0),
+      emailVerificationLastSentAt: user.email_verification_last_sent_at || null,
+      passwordResetCodeHash: user.password_reset_code_hash || null,
+      passwordResetExpiresAt: user.password_reset_expires_at || null,
+      passwordResetAttempts: Number(user.password_reset_attempts || 0),
+      passwordResetLastSentAt: user.password_reset_last_sent_at || null,
+    };
+
+    // Save first so a successfully delivered code is already verifiable.
     await setCustomerEmailVerificationChallenge(user.id, email, codeHash, expiresAt);
+
+    try {
+      await sendOtpEmail({ to: email, code, purpose: 'verify_email' });
+    } catch (deliveryError) {
+      try {
+        // Restore only if this request's OTP is still the active challenge.
+        await rollbackCustomerEmailVerificationChallenge(
+          user.id,
+          codeHash,
+          previousEmailSecurity
+        );
+      } catch (rollbackError) {
+        console.error('CUSTOMER EMAIL VERIFICATION ROLLBACK ERROR:', rollbackError);
+      }
+      throw deliveryError;
+    }
 
     return res.json({
       message: `Verification code sent to ${maskEmail(email)}. It expires in 10 minutes.`,
@@ -481,8 +512,31 @@ async function startCustomerEmailRecovery(req, res) {
       code,
     });
 
-    await sendOtpEmail({ to: user.email, code, purpose: 'password_reset' });
+    const previousPasswordReset = {
+      codeHash: user.password_reset_code_hash || null,
+      expiresAt: user.password_reset_expires_at || null,
+      attempts: Number(user.password_reset_attempts || 0),
+      lastSentAt: user.password_reset_last_sent_at || null,
+    };
+
+    // Save first so a successfully delivered code is already verifiable.
     await setCustomerPasswordResetChallenge(user.id, codeHash, expiresAt);
+
+    try {
+      await sendOtpEmail({ to: user.email, code, purpose: 'password_reset' });
+    } catch (deliveryError) {
+      try {
+        // Restore only if this request's OTP is still the active challenge.
+        await rollbackCustomerPasswordResetChallenge(
+          user.id,
+          codeHash,
+          previousPasswordReset
+        );
+      } catch (rollbackError) {
+        console.error('CUSTOMER PASSWORD RESET ROLLBACK ERROR:', rollbackError);
+      }
+      throw deliveryError;
+    }
 
     return res.json({ message: genericMessage });
   } catch (error) {
