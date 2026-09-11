@@ -161,7 +161,7 @@ export default function UserReportProblem() {
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs leading-5 text-slate-400">Submitting creates a support ticket that you can monitor from My Tickets.</p>
-                <button type="submit" disabled={loading} className="rounded-xl bg-[#cc0000] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="submit" disabled={loading} className="w-full rounded-xl bg-[#cc0000] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
                   {loading ? 'Submitting...' : 'Submit Support Ticket'}
                 </button>
               </div>

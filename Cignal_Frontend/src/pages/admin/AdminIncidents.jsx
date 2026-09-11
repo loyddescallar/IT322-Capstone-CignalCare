@@ -80,7 +80,7 @@ function IncidentCard({ incident, busy, onAction }) {
           </p>
         </div>
 
-        <div className="space-y-1 text-right text-[11px] text-slate-400">
+        <div className="w-full space-y-1 text-left text-[11px] text-slate-400 sm:w-auto sm:text-right">
           <p>First: {formatDateTime(incident.first_reported_at)}</p>
           <p>Latest: {formatDateTime(incident.last_reported_at)}</p>
         </div>
@@ -93,11 +93,11 @@ function IncidentCard({ incident, busy, onAction }) {
       )}
 
       {incident.status === 'candidate' && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
           <button
             disabled={busy === incident.id}
             onClick={() => onAction(incident, 'confirm')}
-            className="flex items-center gap-2 rounded-lg bg-[#cc0000] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#b40000] disabled:opacity-50"
+            className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#cc0000] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#b40000] disabled:opacity-50"
           >
             <ShieldCheck size={14} />
             Confirm Incident
@@ -105,7 +105,7 @@ function IncidentCard({ incident, busy, onAction }) {
           <button
             disabled={busy === incident.id}
             onClick={() => onAction(incident, 'dismiss')}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
           >
             <XCircle size={14} />
             Dismiss
@@ -117,7 +117,7 @@ function IncidentCard({ incident, busy, onAction }) {
         <button
           disabled={busy === incident.id}
           onClick={() => onAction(incident, 'resolve')}
-          className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          className="mt-4 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
         >
           <CheckCircle2 size={14} />
           Mark Resolved
@@ -191,7 +191,7 @@ export default function AdminIncidents() {
         </div>
         <button
           onClick={load}
-          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto"
         >
           <RefreshCw size={14} />
           Refresh Detection

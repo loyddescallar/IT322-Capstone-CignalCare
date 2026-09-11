@@ -193,7 +193,7 @@ export default function AdminPlans() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-lg font-bold text-gray-800">Prepaid Plans</h1>
           <p className="mt-0.5 text-xs text-gray-500">
@@ -204,7 +204,7 @@ export default function AdminPlans() {
         <button
           type="button"
           onClick={openAddModal}
-          className="flex items-center gap-1.5 rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+          className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto"
         >
           <Plus size={14} /> Add Plan
         </button>
@@ -226,7 +226,7 @@ export default function AdminPlans() {
 
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="flex max-w-xs flex-1 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2">
+          <div className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1">
             <Search size={14} className="text-gray-400" />
             <input
               type="text"
@@ -254,7 +254,7 @@ export default function AdminPlans() {
             ))}
           </div>
 
-          <span className="ml-auto text-xs text-gray-400">{filteredPlans.length} plans</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filteredPlans.length} plans</span>
         </div>
 
         {loading ? (
@@ -332,8 +332,8 @@ export default function AdminPlans() {
       </div>
 
       {selectedPlan && !mode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[85dvh]">
             <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 bg-gradient-to-r from-[#880000] to-[#cc0000] px-5 py-4 text-white">
               <div>
                 <h2 className="text-sm font-bold">{selectedPlan.plan_name} — Channel Lineup</h2>
@@ -376,7 +376,7 @@ export default function AdminPlans() {
                     return (
                       <div key={category} className="mb-4">
                         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-600">{category}</p>
-                        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                           {channels.map((channel) => (
                             <div key={`${category}-${channel.name}`} className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2">
                               <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-red-100">
@@ -396,7 +396,7 @@ export default function AdminPlans() {
       )}
 
       {(mode === 'add' || mode === 'edit') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">{mode === 'add' ? 'Add Plan' : 'Edit Plan'}</h2>
@@ -405,14 +405,14 @@ export default function AdminPlans() {
               </button>
             </div>
 
-            <div className="max-h-[80vh] overflow-y-auto p-5">
+            <div className="max-h-[calc(100dvh-5rem)] overflow-y-auto p-4 sm:max-h-[80dvh] sm:p-5">
               {formErr && (
                 <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
                   {formErr}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   { label: 'Plan Code *', name: 'plan_code', placeholder: 'REG300' },
                   { label: 'Plan Name *', name: 'plan_name', placeholder: 'Load 300' },
@@ -436,7 +436,7 @@ export default function AdminPlans() {
                   </div>
                 ))}
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-500" style={{ fontSize: '10px' }}>
                     Benefits / Description
                   </label>
@@ -450,7 +450,7 @@ export default function AdminPlans() {
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-500" style={{ fontSize: '10px' }}>
                     Channels Included
                   </label>
@@ -467,7 +467,7 @@ export default function AdminPlans() {
                   </p>
                 </div>
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-500" style={{ fontSize: '10px' }}>
                     Status
                   </label>
@@ -483,7 +483,7 @@ export default function AdminPlans() {
                 </div>
               </div>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={handleSavePlan}
@@ -506,7 +506,7 @@ export default function AdminPlans() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">Delete Plan</h2>
@@ -526,7 +526,7 @@ export default function AdminPlans() {
                 Delete <span className="font-semibold">{deleteTarget.plan_name}</span>? This removes it from admin plan management and user load selections. If the plan already has transaction history, the backend will ask you to set it inactive instead.
               </p>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={handleDeletePlan}

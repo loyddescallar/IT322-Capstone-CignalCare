@@ -63,10 +63,10 @@ export default function Troubleshoot() {
 
   return (
     <UserLayout>
-      <div className="min-h-screen bg-white">
-        <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-12">
+      <div className="min-h-[100dvh] bg-white">
+        <main className="mx-auto max-w-7xl px-4 py-7 sm:px-8 sm:py-10 lg:px-12">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-[#cc0000]">
+            <h1 className="text-2xl font-bold tracking-tight text-[#cc0000] sm:text-3xl">
               Troubleshoot Your Box
             </h1>
             <p className="mt-2 text-sm text-gray-500">
@@ -100,7 +100,7 @@ export default function Troubleshoot() {
 
           {!loading && !error && (
             <>
-              <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                 {models.map((model, index) => (
                   <button
                     key={model.id}

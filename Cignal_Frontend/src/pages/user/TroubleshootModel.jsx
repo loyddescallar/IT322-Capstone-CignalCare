@@ -133,7 +133,7 @@ export default function TroubleshootModel() {
 
   return (
     <UserLayout>
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-[100dvh] bg-slate-50">
         <section className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-7 lg:px-8">
             <button

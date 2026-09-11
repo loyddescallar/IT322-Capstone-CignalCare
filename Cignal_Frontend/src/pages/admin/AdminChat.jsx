@@ -211,8 +211,8 @@ export default function AdminChat() {
   const status = displayStatus(ticket.status);
 
   return (
-    <div className="flex h-screen flex-col bg-gray-100">
-      <div className="flex flex-shrink-0 items-start gap-3 border-b border-gray-200 bg-white px-4 py-3">
+    <div className="flex h-[100dvh] min-w-0 flex-col bg-gray-100">
+      <div className="flex flex-shrink-0 items-start gap-2 border-b border-gray-200 bg-white px-3 py-3 sm:gap-3 sm:px-4">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -250,7 +250,7 @@ export default function AdminChat() {
         </div>
       </div>
 
-      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-white px-4 py-2">
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 overflow-x-auto border-b border-gray-100 bg-white px-3 py-2 sm:px-4">
         <p className="mr-1 text-xs text-gray-500">Update Status:</p>
         {STATUSES.map((statusOption) => (
           <button
@@ -275,7 +275,7 @@ export default function AdminChat() {
         </div>
       )}
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div className="flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
         {messages.length === 0 ? (
           <p className="mt-10 text-center text-xs text-gray-400">
             No messages yet. Type a reply below.
@@ -302,7 +302,7 @@ export default function AdminChat() {
                 )}
 
                 <div
-                  className={`flex max-w-[75%] flex-col ${
+                  className={`flex max-w-[88%] flex-col sm:max-w-[75%] ${
                     mine ? 'items-end' : 'items-start'
                   }`}
                 >
@@ -374,7 +374,7 @@ export default function AdminChat() {
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex min-w-0 gap-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -403,13 +403,13 @@ export default function AdminChat() {
                   }
                 }}
                 placeholder="Type a reply..."
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-xs outline-none focus:border-[#cc0000]"
+                className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-[#cc0000] sm:px-4"
               />
               <button
                 type="button"
                 onClick={sendMessage}
                 disabled={(!newMsg.trim() && !file) || sending}
-                className="flex-shrink-0 rounded-xl bg-[#cc0000] px-4 py-2.5 text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#cc0000] text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:h-auto sm:w-auto sm:px-4 sm:py-2.5"
                 aria-label="Send message"
               >
                 <Send size={15} />

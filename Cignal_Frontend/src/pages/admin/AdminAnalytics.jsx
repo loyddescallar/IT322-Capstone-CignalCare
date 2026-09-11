@@ -197,18 +197,18 @@ export default function AdminAnalytics() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-950">Business Analytics</h1>
           <p className="mt-1 text-xs text-slate-500">Turn sales and subscriber-support records into management decisions.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <select value={days} onChange={(e) => setDays(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+          <select value={days} onChange={(e) => setDays(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm sm:w-auto">
             <option value="7">Last 7 Days</option>
             <option value="30">Last 30 Days</option>
             <option value="90">Last 90 Days</option>
             <option value="365">Last 12 Months</option>
           </select>
-          <select value={location} onChange={(e) => setLocation(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">
+          <select value={location} onChange={(e) => setLocation(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm sm:w-auto">
             <option value="">All Locations</option>
             {LOCATIONS.filter(Boolean).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <button onClick={exportCsv} className="flex items-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#b90000]">
+          <button onClick={exportCsv} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#b90000] sm:w-auto">
             <Download size={14} /> Export Report
           </button>
         </div>
@@ -343,7 +343,7 @@ export default function AdminAnalytics() {
               <div className="grid gap-3 lg:grid-cols-2">
                 <HorizontalBars items={data?.salesByPlan || []} valueKey="revenue" format={peso} />
                 <div className="overflow-x-auto rounded-xl border border-slate-100">
-                  <table className="min-w-full text-xs">
+                  <table className="min-w-[620px] text-xs">
                     <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2.5">Plan / Product</th><th className="px-3 py-2.5">Transactions</th><th className="px-3 py-2.5">Revenue</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">{(data?.salesByPlan || []).slice(0, 8).map((row) => <tr key={row.label}><td className="px-3 py-3 font-semibold text-slate-700">{row.label}</td><td className="px-3 py-3 text-slate-500">{row.count}</td><td className="px-3 py-3 font-bold text-slate-800">{peso(row.revenue)}</td></tr>)}</tbody>
                   </table>
@@ -374,7 +374,7 @@ export default function AdminAnalytics() {
               subtitle="Compare how the Full Guide, Quick Restart, Factory Reset, and Video Guide perform using recorded subscriber sessions."
             >
               <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
+                <table className="min-w-[620px] text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400">
                       <th className="px-3 py-3">Support Method</th>
@@ -448,7 +448,7 @@ export default function AdminAnalytics() {
               className="xl:col-span-2"
             >
               <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
+                <table className="min-w-[620px] text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400">
                       <th className="px-3 py-3">Receiver</th>

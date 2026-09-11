@@ -216,7 +216,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+    <div className="relative min-h-[100dvh] overflow-hidden bg-slate-950">
       {/* Background video */}
       <video
         autoPlay
@@ -235,7 +235,7 @@ export default function Login() {
       <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
 
       {/* Page content */}
-      <main className="relative z-10 flex min-h-screen items-center px-5 py-8 sm:px-8 lg:px-12 xl:px-20">
+      <main className="relative z-10 flex min-h-[100dvh] items-center px-3 py-6 sm:px-8 sm:py-8 lg:px-12 xl:px-20">
         <div className="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] xl:gap-20">
           {/* Desktop branding and inquiry actions */}
           <section className="hidden text-white lg:block">
@@ -333,7 +333,7 @@ export default function Login() {
                 />
               </div>
 
-              <div className="rounded-[28px] border border-white/25 bg-white/95 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="rounded-[24px] border border-white/25 bg-white/95 p-5 shadow-2xl backdrop-blur-xl sm:rounded-[28px] sm:p-8">
                 <div className="mb-7">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="h-7 w-1.5 rounded-full bg-[#cc0000]" />
@@ -516,14 +516,14 @@ export default function Login() {
       {/* Inquiry modal */}
       {(prepaidModal || ccaModal) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label={
             prepaidModal ? 'Prepaid Account Inquiry' : 'CCA Inquiry'
           }
         >
-          <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[90dvh]">
             <div
               className={`flex flex-shrink-0 items-center justify-between px-5 py-4 text-white ${
                 prepaidModal
@@ -560,7 +560,7 @@ export default function Login() {
                   : 'Enter an account number or CCA number to view subscriber information.'}
               </p>
 
-              <form onSubmit={handleInquiry} className="mb-4 flex gap-2">
+              <form onSubmit={handleInquiry} className="mb-4 flex flex-col gap-2 sm:flex-row">
                 <input
                   type="text"
                   value={inquiryInput}
@@ -577,7 +577,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={inquiryLoading || !inquiryInput.trim()}
-                  className="rounded-xl bg-[#cc0000] px-5 py-3 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-xl bg-[#cc0000] px-5 py-3 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {inquiryLoading ? 'Searching...' : 'Search'}
                 </button>

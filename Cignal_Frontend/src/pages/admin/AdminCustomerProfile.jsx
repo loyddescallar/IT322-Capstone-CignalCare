@@ -642,7 +642,7 @@ export default function AdminCustomerProfile() {
 
                   <div className="flex items-center gap-1">
                     <MapPin size={11} className="text-slate-400" />
-                    <span className="text-xs text-slate-600">
+                    <span className="break-words text-xs text-slate-600">
                       {customer.address || normalizeLocation(customer.location)}
                     </span>
                   </div>
@@ -1189,7 +1189,7 @@ export default function AdminCustomerProfile() {
       </div>
 
       {mode === 'credentials' && issuedCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
             <h2 className="text-sm font-bold text-gray-900">Temporary Login Credentials</h2>
             <p className="mt-2 text-xs leading-5 text-gray-500">Give these directly to the verified subscriber. This password must be changed on the next login.</p>
@@ -1208,7 +1208,7 @@ export default function AdminCustomerProfile() {
 
       {/* Edit Modal */}
       {mode === 'edit' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">
@@ -1224,14 +1224,14 @@ export default function AdminCustomerProfile() {
               </button>
             </div>
 
-            <div className="max-h-[80vh] overflow-y-auto p-5">
+            <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:max-h-[80dvh] sm:p-5">
               {formErr && (
                 <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
                   {formErr}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   {
                     label: 'Subscriber Name *',
@@ -1279,11 +1279,11 @@ export default function AdminCustomerProfile() {
                   </div>
                 ))}
 
-                <div className="col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500">
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500 sm:col-span-2">
                   Account Number and CCA Number are permanent subscriber identifiers. Correct them only through a controlled data migration.
                 </div>
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label
                     className="mb-1 block text-xs font-medium text-gray-500"
                     style={{ fontSize: '10px' }}
@@ -1300,7 +1300,7 @@ export default function AdminCustomerProfile() {
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label
                     className="mb-1 block text-xs font-medium text-gray-500"
                     style={{ fontSize: '10px' }}
@@ -1323,7 +1323,7 @@ export default function AdminCustomerProfile() {
                 </div>
               </div>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={handleUpdateCustomer}
@@ -1349,7 +1349,7 @@ export default function AdminCustomerProfile() {
 
       {/* Archive Modal */}
       {mode === 'archive' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">
@@ -1380,7 +1380,7 @@ export default function AdminCustomerProfile() {
                 records.
               </p>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={handleArchiveCustomer}
@@ -1405,7 +1405,7 @@ export default function AdminCustomerProfile() {
 
       {/* Restore Modal */}
       {mode === 'restore' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">
@@ -1434,7 +1434,7 @@ export default function AdminCustomerProfile() {
                 ({customer.accountNumber}) to the active customer records?
               </p>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={handleRestoreCustomer}

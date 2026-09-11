@@ -218,10 +218,10 @@ export default function UserTechnicianRequest() {
                 {files.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {files.map((file, index) => (
-                      <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2">
+                      <div key={`${file.name}-${index}`} className="flex min-w-0 flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 sm:flex-nowrap sm:gap-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${file.type.startsWith('image') ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{file.type.startsWith('image') ? 'Image' : 'Video'}</span>
                         <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{file.name}</span>
-                        <span className="text-xs text-slate-400">{formatSize(file.size)}</span>
+                        <span className="ml-auto text-xs text-slate-400 sm:ml-0">{formatSize(file.size)}</span>
                         <button type="button" onClick={() => removeFile(index)} className="text-slate-400 hover:text-red-500" aria-label={`Remove ${file.name}`}><X size={14} /></button>
                       </div>
                     ))}
@@ -260,8 +260,8 @@ export default function UserTechnicianRequest() {
       </div>
 
       {success && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 text-center shadow-2xl sm:p-8">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100"><CheckCircle2 size={32} className="text-green-600" /></div>
             <h2 className="mb-2 text-xl font-bold text-slate-800">Request Submitted</h2>
             <p className="mb-6 text-sm leading-6 text-slate-500">Our team will contact <strong>{form.contactPhone}</strong> to confirm the technician schedule.</p>

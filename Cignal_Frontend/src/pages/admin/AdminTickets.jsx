@@ -326,7 +326,7 @@ export default function AdminTickets() {
         {/* Ticket List */}
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="flex max-w-xs flex-1 items-center gap-2 rounded-lg bg-gray-100 px-3 py-2">
+            <div className="flex w-full min-w-0 items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1">
               <Search size={13} className="text-gray-400" />
               <input
                 type="text"
@@ -355,7 +355,7 @@ export default function AdminTickets() {
             <select
               value={catFilter}
               onChange={(event) => setCat(event.target.value)}
-              className="ml-auto rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none"
+              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700 outline-none sm:ml-auto sm:w-auto sm:py-1.5"
             >
               <option value="All">All Categories</option>
               {CATEGORIES.map((category) => <option key={category}>{category}</option>)}
@@ -363,7 +363,7 @@ export default function AdminTickets() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="min-w-[880px] w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   {['ID', 'Account', 'Subject', 'Category', 'Location', 'Status', 'Created', ''].map((heading) => (
@@ -482,7 +482,7 @@ export default function AdminTickets() {
                       key={message.id || `${message.created_at}-${index}`}
                       className={`flex ${mine ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`flex max-w-[80%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                      <div className={`flex max-w-[88%] flex-col sm:max-w-[80%] ${mine ? 'items-end' : 'items-start'}`}>
                         <span className="mb-1 px-1 text-[9px] font-semibold text-gray-400">
                           {senderLabel}
                         </span>
@@ -509,7 +509,7 @@ export default function AdminTickets() {
               </div>
 
               <div className="space-y-2 border-t border-gray-100 p-3">
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   <button type="button" onClick={() => navigate(`/admin/chat/${selectedTicket.id}`)} className="rounded-lg border border-[#cc0000] px-3 py-1.5 text-xs font-medium text-[#cc0000] transition-colors hover:bg-red-50">Open Full Chat</button>
                   {!isArchived(selectedTicket.status) && (
                     <button type="button" onClick={() => setArchiveTarget(selectedTicket)} className="ml-auto rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50">Archive</button>
@@ -528,7 +528,7 @@ export default function AdminTickets() {
                       onChange={(event) => setNewMsg(event.target.value)}
                       onKeyDown={(event) => event.key === 'Enter' && sendMessage()}
                       placeholder="Type a reply..."
-                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000]"
+                      className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000]"
                     />
                     <button type="button" onClick={sendMessage} disabled={!newMsg.trim() || sending} className="rounded-lg bg-[#cc0000] px-3 py-2 text-white transition-colors hover:bg-red-700 disabled:opacity-50"><Send size={13} /></button>
                   </div>
@@ -540,7 +540,7 @@ export default function AdminTickets() {
       </div>
 
       {archiveTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">Archive Ticket</h2>
@@ -550,7 +550,7 @@ export default function AdminTickets() {
               <p className="text-xs leading-relaxed text-gray-600">
                 Archive ticket <span className="font-semibold">#{archiveTarget.id}</span> — "{archiveTarget.subject}"? This will hide it from the active ticket list while keeping it as a record.
               </p>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button type="button" onClick={handleArchiveTicket} disabled={updating === archiveTarget.id} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-60">
                   {updating === archiveTarget.id ? 'Archiving...' : 'Archive'}
                 </button>

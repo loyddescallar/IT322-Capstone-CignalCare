@@ -95,14 +95,14 @@ export default function AdminSecurity() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-red-600"><ShieldCheck size={18} /> Admin Security Center</div>
             <h1 className="mt-2 text-2xl font-bold text-gray-900">Protect administrator access</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">Password, Authenticator verification, recovery codes, session revocation, and security activity are managed here.</p>
           </div>
-          <button onClick={load} className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"><RefreshCw size={16} /> Refresh</button>
+          <button onClick={load} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"><RefreshCw size={16} /> Refresh</button>
         </div>
 
         {error && <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -117,7 +117,7 @@ export default function AdminSecurity() {
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-6">
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><LockKeyhole size={19} className="text-red-600" /> Security Verification</h2>
             <p className="mt-1 text-xs leading-5 text-gray-500">Sensitive changes require both your current password and current Authenticator code.</p>
             <div className="mt-4 space-y-3">
@@ -126,7 +126,7 @@ export default function AdminSecurity() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Mail size={19} className="text-red-600" /> Recovery Contact Email</h2>
             <p className="mt-1 text-xs leading-5 text-gray-500">Stored as a recovery/security contact. Offline recovery codes remain the active provider-free recovery method.</p>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@example.com" className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-red-500" />
@@ -135,7 +135,7 @@ export default function AdminSecurity() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-lg font-bold text-gray-900">Account Protection Actions</h2>
             <div className="mt-5 space-y-4">
               <div className="rounded-xl border border-gray-200 p-4">
@@ -157,20 +157,20 @@ export default function AdminSecurity() {
           </section>
 
           {recoveryCodes.length > 0 && (
-            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-6">
               <h2 className="font-bold text-amber-900">Save these codes now</h2>
               <p className="mt-1 text-xs leading-5 text-amber-800">They are only displayed after generation. Do not commit them to GitHub.</p>
-              <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-white p-4 font-mono text-sm text-gray-900">{recoveryCodes.map((code) => <span key={code}>{code}</span>)}</div>
+              <div className="mt-4 grid grid-cols-1 gap-2 rounded-xl bg-white p-4 font-mono text-sm text-gray-900 sm:grid-cols-2">{recoveryCodes.map((code) => <span key={code}>{code}</span>)}</div>
               <button onClick={copyCodes} className="mt-3 flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-bold text-amber-900"><Copy size={16} /> Copy Codes</button>
             </section>
           )}
         </div>
       </div>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Clock3 size={19} className="text-red-600" /> Recent Security Activity</h2><p className="mt-1 text-xs text-gray-500">Authentication and administrator write actions are recorded for review.</p></div></div>
         <div className="mt-5 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
+          <table className="min-w-[720px] text-left text-sm">
             <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-400"><th className="px-3 py-3">Time</th><th className="px-3 py-3">Action</th><th className="px-3 py-3">IP</th><th className="px-3 py-3">Details</th></tr></thead>
             <tbody>{logs.length ? logs.map((log) => <tr key={log.event_id} className="border-b border-gray-100"><td className="whitespace-nowrap px-3 py-3 text-gray-500">{formatDate(log.created_at)}</td><td className="px-3 py-3 font-semibold text-gray-900">{log.action}</td><td className="px-3 py-3 text-gray-500">{log.ip_address || '—'}</td><td className="max-w-lg px-3 py-3 text-gray-500">{log.details || '—'}</td></tr>) : <tr><td colSpan="4" className="px-3 py-8 text-center text-gray-400">No security activity recorded yet.</td></tr>}</tbody>
           </table>

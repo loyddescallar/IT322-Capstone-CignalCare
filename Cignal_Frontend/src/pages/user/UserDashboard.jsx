@@ -91,13 +91,13 @@ export default function UserDashboard() {
     <UserLayout>
 
       {/* Notification Bell */}
-      <div ref={notifRef} className="fixed top-24 right-4 z-40">
+      <div ref={notifRef} className="fixed right-3 top-24 z-40 sm:right-4">
         <button onClick={()=>setNotifOpen(!notifOpen)} className="relative bg-white shadow-lg border border-gray-200 p-3 rounded-full hover:bg-gray-50 transition-colors">
           <Bell size={20} className="text-gray-600"/>
           {unread>0&&<span className="absolute top-1 right-1 w-4 h-4 bg-cignalRed text-white rounded-full text-[9px] font-bold flex items-center justify-center animate-pulse">{unread}</span>}
         </button>
         {notifOpen&&(
-          <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="fixed left-3 right-3 top-36 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-80">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-semibold text-gray-800">Notifications</p>
               <button onClick={()=>{setNotifs(p=>p.map(n=>({...n,is_read:1})));axiosClient.patch('/notifications/read-all').catch(()=>{});}} className="text-xs text-cignalRed hover:underline font-semibold">Mark all read</button>
@@ -116,12 +116,12 @@ export default function UserDashboard() {
         )}
       </div>
 
-      <div className="min-h-screen bg-white flex flex-col">
-        <main className="mx-auto w-full max-w-[1600px] space-y-16 px-4 py-10 sm:px-6 lg:px-10 xl:px-12">
+      <div className="min-h-[100dvh] bg-white flex flex-col">
+        <main className="mx-auto w-full max-w-[1600px] space-y-10 px-3 py-6 sm:space-y-12 sm:px-6 sm:py-8 lg:space-y-16 lg:px-10 lg:py-10 xl:px-12">
 
           {/* Subscription Status Banner */}
           {(prepaid||user.accountNumber)&&(
-            <div className={`rounded-2xl bg-gradient-to-r ${prepaid?subBannerColor:'from-gray-500 to-gray-400'} text-white p-6 shadow-lg fade-up`}>
+            <div className={`rounded-2xl bg-gradient-to-r ${prepaid?subBannerColor:'from-gray-500 to-gray-400'} p-4 text-white shadow-lg fade-up sm:p-6`}>
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Subscription Status</p>
@@ -129,9 +129,9 @@ export default function UserDashboard() {
                   <p className="text-white/80 text-sm mt-0.5">Account No: {user.accountNumber||'—'}</p>
                   {prepaid?<><p className="mt-2 font-semibold">{subLabel}</p><p className="text-white/70 text-sm">Expires: {prepaid.expiry}</p></> :<p className="mt-2 text-white/70 text-sm">No active subscription found.</p>}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <button onClick={()=>navigate('/user/load-request')} className="bg-white text-cignalRed font-bold px-6 py-3 rounded-xl hover:bg-red-50 transition-colors text-sm flex items-center gap-2"><RefreshCw size={16}/>{prepaid?.status==='expired'?'Load Again':'Reload Now'}</button>
-                  <button onClick={()=>navigate('/user/load-history')} className="border-2 border-white text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-white/10 transition-colors text-sm">Load History</button>
+                <div className="flex w-full flex-col gap-2 sm:w-auto">
+                  <button onClick={()=>navigate('/user/load-request')} className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-cignalRed transition-colors hover:bg-red-50 sm:w-auto"><RefreshCw size={16}/>{prepaid?.status==='expired'?'Load Again':'Reload Now'}</button>
+                  <button onClick={()=>navigate('/user/load-history')} className="w-full rounded-xl border-2 border-white px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 sm:w-auto">Load History</button>
                 </div>
               </div>
             </div>
@@ -139,7 +139,7 @@ export default function UserDashboard() {
 
           {/* HEADER */}
           <section className="fade-up">
-            <h1 className="text-4xl font-bold text-cignalRed">Welcome to Descallar Satellite Services</h1>
+            <h1 className="text-3xl font-bold leading-tight text-cignalRed sm:text-4xl">Welcome to Descallar Satellite Services</h1>
             <p className="text-slate-600 max-w-xl mt-2">Manage your account, view load plans, and access Cignal Customer Care features designed for your convenience — all in one place.</p>
           </section>
 
@@ -209,7 +209,7 @@ export default function UserDashboard() {
           {/* RED BANNER */}
           <section className="relative w-full rounded-2xl overflow-hidden shadow-lg fade-up hover-zoom">
             <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500" style={{backgroundImage:"url('/images/Cignal23.jpg')",filter:"brightness(0.35)"}}/>
-            <div className="relative z-10 text-center text-white py-20 space-y-6">
+            <div className="relative z-10 space-y-6 px-4 py-12 text-center text-white sm:px-6 sm:py-16 lg:py-20">
               <h2 className="text-lg sm:text-2xl font-semibold leading-relaxed max-w-4xl mx-auto fade-up">
                 Cignal transmits 104 SD and 30 HD channels, including free-to-air and a varied mix of 17 audio channels. We also offer on-demand viewing via Pay-Per-View subscription offers, as well as online streaming via our Cignal Play website and app.
                 <br/><br/>
@@ -244,7 +244,7 @@ export default function UserDashboard() {
           </section>
 
           {/* COMMITMENT BAND */}
-          <section className="fade-up rounded-2xl bg-gradient-to-r from-cignalRed via-red-600 to-rose-500 text-white p-8 shadow-lg">
+          <section className="fade-up rounded-2xl bg-gradient-to-r from-cignalRed via-red-600 to-rose-500 p-5 text-white shadow-lg sm:p-8">
             <h2 className="text-xl sm:text-2xl font-semibold text-center sm:text-left fade-up">Our Commitment to Better TV</h2>
             <div className="mt-6 grid gap-4 md:grid-cols-3 stagger">
               {[
@@ -269,17 +269,17 @@ export default function UserDashboard() {
 
       {/* CHANNEL MODAL */}
       {selectedPlan&&(
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[999]">
-          <div className="bg-white w-[94%] max-w-3xl p-6 rounded-2xl shadow-2xl relative max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm sm:p-4">
+          <div className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col rounded-2xl bg-white p-4 shadow-2xl sm:max-h-[90dvh] sm:p-6">
             <button onClick={()=>setSelectedPlan(null)} className="absolute right-4 top-4 text-gray-500 hover:text-black"><X size={20}/></button>
-            <h2 className="text-2xl font-bold text-cignalRed mb-1">{selectedPlan.name} — Included Channels</h2>
+            <h2 className="mb-1 pr-8 text-xl font-bold text-cignalRed sm:text-2xl">{selectedPlan.name} — Included Channels</h2>
             <p className="text-sm text-slate-600 mb-4">Filter by category or explore the full channel lineup.</p>
             <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0">
               {CHANNEL_CATEGORIES.map(cat=>(
                 <button key={cat} onClick={()=>setActiveCategory(cat)} className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${activeCategory===cat?'bg-cignalRed text-white border-cignalRed shadow-sm':'bg-white text-cignalRed border-cignalRed/40 hover:bg-cignalRed/10'}`}>{cat}</button>
               ))}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pr-1 flex-1">
+            <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2 md:grid-cols-3">
               {filteredChannels.map((ch,i)=>(
                 <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 hover:-translate-y-[3px] hover:shadow-lg transition">
                   <p className="text-sm font-bold">{ch.name}</p>

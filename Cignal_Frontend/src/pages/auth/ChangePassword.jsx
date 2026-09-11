@@ -48,8 +48,8 @@ export default function ChangePassword() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
-      <div className="w-full max-w-md rounded-[28px] bg-white p-7 shadow-2xl sm:p-8">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-3 py-6 sm:px-4 sm:py-10">
+      <div className="w-full max-w-md rounded-[24px] bg-white p-5 shadow-2xl sm:rounded-[28px] sm:p-8">
         <div className="mb-6 flex items-start gap-3">
           <div className="rounded-xl bg-red-50 p-3 text-[#cc0000]"><ShieldCheck size={23} /></div>
           <div>

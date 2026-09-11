@@ -36,18 +36,18 @@ export default function AdminTransactions() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between"><div><h1 className="text-lg font-bold text-gray-800">Transactions</h1><p className="text-xs text-gray-500 mt-0.5">Prepaid load transaction history</p></div><button onClick={handleExport} className="flex items-center gap-1.5 border border-gray-200 text-xs px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-50 font-semibold"><Download size={13}/> Export CSV</button></div>
+      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-lg font-bold text-gray-800">Transactions</h1><p className="text-xs text-gray-500 mt-0.5">Prepaid load transaction history</p></div><button onClick={handleExport} className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 sm:w-auto"><Download size={13}/> Export CSV</button></div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[{label:'Total Revenue',value:'₱'+totalRevenue.toLocaleString(),color:'text-green-600'},{label:"Today's Revenue",value:'₱'+todayRevenue.toLocaleString(),color:'text-blue-600'},{label:'Pending',value:pendingCount,color:'text-amber-600'},{label:'Failed/Cancelled',value:failedCount,color:'text-red-600'}].map(s=><div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><p className="text-xs text-gray-500 mb-2">{s.label}</p><p className={`text-2xl font-bold ${s.color}`}>{loading?'...':s.value}</p></div>)}</div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 flex-1 max-w-xs"><Search size={14} className="text-gray-400"/><input type="text" placeholder="Search account, reference, plan..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-transparent text-xs text-gray-600 placeholder-gray-400 outline-none w-full"/></div>
-          <div className="flex items-center gap-2"><Filter size={13} className="text-gray-400"/>
+          <div className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1"><Search size={14} className="text-gray-400"/><input type="text" placeholder="Search account, reference, plan..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-transparent text-xs text-gray-600 placeholder-gray-400 outline-none w-full"/></div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto"><Filter size={13} className="text-gray-400"/>
             <select value={statusF} onChange={e=>setStatusF(e.target.value)} className="text-xs border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-[#cc0000] bg-white text-gray-600"><option value="All">All Status</option>{TX_STATUSES.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select>
             <select value={paymentF} onChange={e=>setPayF(e.target.value)} className="text-xs border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-[#cc0000] bg-white text-gray-600"><option value="All">All Payments</option>{PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}</select>
           </div>
-          <span className="text-xs text-gray-400 ml-auto">{filtered.length} records</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} records</span>
         </div>
-        <div className="overflow-x-auto"><table className="w-full text-xs">
+        <div className="overflow-x-auto"><table className="min-w-[1120px] w-full text-xs">
           <thead><tr className="border-b border-gray-100 bg-gray-50">{['#','Reference No.','Account Name','Account No.','Plan','Amount','Payment','Processed By','Date','Expiry','Status'].map(h=><th key={h} className="text-left py-2.5 px-3 text-gray-500 font-semibold uppercase tracking-wide" style={{fontSize:'10px'}}>{h}</th>)}</tr></thead>
           <tbody>
             {loading?<tr><td colSpan={11} className="py-10 text-center text-gray-400">Loading transactions...</td></tr>

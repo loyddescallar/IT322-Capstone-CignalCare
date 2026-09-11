@@ -161,7 +161,7 @@ export default function AdminLoadRequests() {
 
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="flex max-w-xs flex-1 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2">
+          <div className="flex w-full items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1">
             <Search size={14} className="text-gray-400" />
             <input
               type="text"
@@ -196,7 +196,7 @@ export default function AdminLoadRequests() {
             ))}
           </div>
 
-          <span className="ml-auto text-xs text-gray-400">{filtered.length} requests</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} requests</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -266,7 +266,7 @@ export default function AdminLoadRequests() {
       </div>
 
       {photoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhotoModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4" onClick={() => setPhotoModal(null)}>
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <h2 className="text-sm font-bold text-gray-800">{photoModal.label}</h2>
@@ -278,8 +278,8 @@ export default function AdminLoadRequests() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl sm:max-h-[90dvh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">Review Load Request #{selected.id}</h2>
               <button onClick={() => setSelected(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100"><X size={16} /></button>
@@ -320,7 +320,7 @@ export default function AdminLoadRequests() {
               )}
 
               {(selected.receipt_photo || selected.screen_photo) && (
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   {selected.receipt_photo && (
                     <div>
                       <p className="mb-1 text-xs text-gray-400" style={{ fontSize: '10px' }}>RECEIPT</p>

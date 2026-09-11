@@ -119,7 +119,7 @@ export default function UserRetrieveInfo() {
           {result && !loading && (
             <div className="grid gap-4 lg:grid-cols-2">
               <Section skey="account" label="Account Credentials" icon={<User size={14} className="text-[#cc0000]"/>}>
-                <div className="mt-3 grid grid-cols-2 gap-4">
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {[{label:'Account Name',value:result.accountName},{label:'Account No.',value:result.accountNumber},{label:'CCA No.',value:result.ccaNumber},{label:'Phone',value:result.phone},{label:'Location',value:result.location||'—'},{label:'Address',value:result.address}].map(field=>(
                     <div key={field.label} className="min-w-0">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{field.label}</p>
@@ -155,7 +155,7 @@ export default function UserRetrieveInfo() {
               <Section skey="loadReqs" label="Remote Load Requests" icon={<CreditCard size={14} className="text-blue-500"/>}>
                 {extraData.loadRequests?.length===0?<p className="py-8 text-center text-sm text-slate-400">No load requests found.</p>:(
                   <div className="mt-3 space-y-2">{(extraData.loadRequests||[]).slice(0,6).map((request,index)=>(
-                    <div key={request.id || index} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3">
+                    <div key={request.id || index} className="flex flex-col items-start gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{request.plan_name} — ₱{Number(request.amount||0).toLocaleString()}</p><p className="mt-0.5 truncate text-xs text-slate-400">{request.payment_method} · {request.reference_no || 'No reference'} · {formatDate(request.created_at)}</p></div>
                       <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[request.status]||'bg-slate-100 text-slate-600'}`}>{request.status || 'Received'}</span>
                     </div>
@@ -167,7 +167,7 @@ export default function UserRetrieveInfo() {
                 {extraData.techRequests?.length===0?<p className="py-8 text-center text-sm text-slate-400">No technician requests found.</p>:(
                   <div className="mt-3 space-y-2">{(extraData.techRequests||[]).slice(0,6).map((request,index)=>(
                     <div key={request.id || index} className="rounded-xl bg-slate-50 p-3">
-                      <div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{request.issueDescription}</p><p className="mt-0.5 text-xs leading-5 text-slate-400">Submitted: {formatDate(request.created_at)}{request.preferred_date?` · Preferred: ${request.preferred_date}`:''}{request.technician_name?` · Technician: ${request.technician_name}`:''}</p></div><span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${TECH_BADGE[request.status]||'bg-slate-100 text-slate-600'}`}>{request.status || 'Submitted'}</span></div>
+                      <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between"><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{request.issueDescription}</p><p className="mt-0.5 text-xs leading-5 text-slate-400">Submitted: {formatDate(request.created_at)}{request.preferred_date?` · Preferred: ${request.preferred_date}`:''}{request.technician_name?` · Technician: ${request.technician_name}`:''}</p></div><span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${TECH_BADGE[request.status]||'bg-slate-100 text-slate-600'}`}>{request.status || 'Submitted'}</span></div>
                     </div>
                   ))}</div>
                 )}
@@ -180,7 +180,7 @@ export default function UserRetrieveInfo() {
                       {[{label:'Total Tickets',value:extraData.tickets?.length||0},{label:'Needs Review',value:extraData.tickets?.filter(ticket=>['Submitted','Under Review','Open','In Progress'].includes(ticket.status)).length||0}].map(stat=><div key={stat.label} className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{stat.label}</p><p className="mt-1 text-xl font-bold text-slate-800">{stat.value}</p></div>)}
                     </div>
                     <div className="grid gap-2 md:grid-cols-2">{(extraData.tickets||[]).slice(0,8).map((ticket,index)=>(
-                      <div key={ticket.id || index} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{ticket.subject}</p><p className="mt-0.5 text-xs text-slate-400">#{ticket.id} · {ticket.category} · {timeAgo(ticket.created_at)}</p></div><span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${TICKET_BADGE[displayTicketStatus(ticket.status)]||'bg-slate-100 text-slate-600'}`}>{displayTicketStatus(ticket.status)}</span></div>
+                      <div key={ticket.id || index} className="flex flex-col items-start gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{ticket.subject}</p><p className="mt-0.5 text-xs text-slate-400">#{ticket.id} · {ticket.category} · {timeAgo(ticket.created_at)}</p></div><span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${TICKET_BADGE[displayTicketStatus(ticket.status)]||'bg-slate-100 text-slate-600'}`}>{displayTicketStatus(ticket.status)}</span></div>
                     ))}</div>
                   </>
                 )}

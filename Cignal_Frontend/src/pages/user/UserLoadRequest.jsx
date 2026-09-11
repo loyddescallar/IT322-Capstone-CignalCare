@@ -392,7 +392,7 @@ export default function UserLoadRequest() {
       description="Verify your TV status, select an active prepaid plan, and complete payment securely."
       icon={Signal}
       actions={(
-        <button type="button" onClick={() => navigate('/user/load-history')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+        <button type="button" onClick={() => navigate('/user/load-history')} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto">
           <History size={15} /> Load History
         </button>
       )}
@@ -580,7 +580,7 @@ export default function UserLoadRequest() {
 
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Send payment to</p><p className="mt-1 font-bold text-slate-900">{MANUAL_ACCOUNT.name}</p>
-                      <div className="mt-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{manualMethod} Number</p><p className="mt-1 font-mono text-lg font-bold text-slate-900">{MANUAL_ACCOUNT.number}</p></div><button type="button" onClick={() => copyText(MANUAL_ACCOUNT.number, 'number')} className="inline-flex items-center gap-1 rounded-lg bg-[#cc0000] px-3 py-2 text-xs font-bold text-white">{copied === 'number' ? <Check size={12} /> : <Copy size={12} />}{copied === 'number' ? 'Copied' : 'Copy'}</button></div>
+                      <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{manualMethod} Number</p><p className="mt-1 font-mono text-lg font-bold text-slate-900">{MANUAL_ACCOUNT.number}</p></div><button type="button" onClick={() => copyText(MANUAL_ACCOUNT.number, 'number')} className="inline-flex items-center gap-1 rounded-lg bg-[#cc0000] px-3 py-2 text-xs font-bold text-white">{copied === 'number' ? <Check size={12} /> : <Copy size={12} />}{copied === 'number' ? 'Copied' : 'Copy'}</button></div>
                       <div className="mt-4 border-t border-slate-200 pt-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Exact amount</p><p className="mt-1 text-3xl font-bold text-[#cc0000]">{formatPeso(selectedPlan.amount)}</p></div>
                     </div>
                   </div>
@@ -629,9 +629,9 @@ export default function UserLoadRequest() {
       </div>
 
       {channelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setChannelModal(null)}>
-          <div className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between bg-gradient-to-r from-[#8f0000] to-[#cc0000] px-5 py-4 text-white"><div><h2 className="text-lg font-bold">{channelModal.name} Channel Lineup</h2><p className="text-xs text-white/80">{channelModal.channels || 0} channels • {formatPeso(channelModal.amount)}</p></div><button type="button" onClick={() => setChannelModal(null)} className="rounded-xl p-2 hover:bg-white/15" aria-label="Close channel lineup"><X size={18} /></button></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4" onClick={() => setChannelModal(null)}>
+          <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[86dvh]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 bg-gradient-to-r from-[#8f0000] to-[#cc0000] px-4 py-4 text-white sm:items-center sm:px-5"><div><h2 className="text-lg font-bold">{channelModal.name} Channel Lineup</h2><p className="text-xs text-white/80">{channelModal.channels || 0} channels • {formatPeso(channelModal.amount)}</p></div><button type="button" onClick={() => setChannelModal(null)} className="rounded-xl p-2 hover:bg-white/15" aria-label="Close channel lineup"><X size={18} /></button></div>
             <div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3">{CHANNEL_CATEGORIES.map((category) => <button key={category} type="button" onClick={() => setChannelCat(category)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${channelCat === category ? 'bg-[#cc0000] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{category}</button>)}</div>
             <div className="overflow-y-auto p-5">{filteredChannels.length === 0 ? <div className="py-10 text-center"><Tv size={26} className="mx-auto text-slate-300" /><p className="mt-2 text-sm text-slate-400">No channels in this category.</p></div> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filteredChannels.map((channel, index) => <div key={`${channel.name}-${index}`} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"><p className="text-sm font-bold text-slate-800">{channel.name}</p><p className="mt-0.5 text-xs text-slate-500">{channel.category}</p></div>)}</div>}</div>
             <div className="border-t border-slate-100 p-4"><button type="button" onClick={() => { setSelectedPlan(channelModal); setChannelModal(null); }} className="w-full rounded-xl bg-[#cc0000] py-3 text-sm font-bold text-white hover:bg-red-700">Select {channelModal.name} — {formatPeso(channelModal.amount)}</button></div>
