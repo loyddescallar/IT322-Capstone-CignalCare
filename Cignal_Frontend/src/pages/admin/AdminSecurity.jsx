@@ -3,6 +3,8 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
+  Eye,
+  EyeOff,
   KeyRound,
   LockKeyhole,
   Mail,
@@ -35,6 +37,8 @@ export default function AdminSecurity() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState([]);
 
@@ -117,7 +121,7 @@ export default function AdminSecurity() {
             <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><LockKeyhole size={19} className="text-red-600" /> Security Verification</h2>
             <p className="mt-1 text-xs leading-5 text-gray-500">Sensitive changes require both your current password and current Authenticator code.</p>
             <div className="mt-4 space-y-3">
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current admin password" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-red-500" />
+              <div className="relative"><input type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current admin password" className="w-full rounded-xl border border-gray-200 py-3 pl-4 pr-12 text-sm outline-none focus:border-red-500" /><button type="button" onClick={() => setShowCurrentPassword((visible) => !visible)} aria-label={showCurrentPassword ? 'Hide current admin password' : 'Show current admin password'} aria-pressed={showCurrentPassword} className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200">{showCurrentPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
               <div className="relative"><Smartphone size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" /><input inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))} placeholder="6-digit Authenticator code" className="w-full rounded-xl border border-gray-200 py-3 pl-11 pr-4 text-sm outline-none focus:border-red-500" /></div>
             </div>
           </section>
@@ -136,7 +140,7 @@ export default function AdminSecurity() {
             <div className="mt-5 space-y-4">
               <div className="rounded-xl border border-gray-200 p-4">
                 <div className="flex items-start gap-3"><LockKeyhole size={19} className="mt-0.5 text-red-600" /><div className="flex-1"><p className="font-bold text-gray-900">Change Admin Password</p><p className="text-xs leading-5 text-gray-500">Changing the password automatically invalidates all older admin sessions.</p></div></div>
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password (12+ chars, upper/lower/number/symbol)" className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-red-500" />
+                <div className="relative mt-3"><input type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password (12+ chars, upper/lower/number/symbol)" className="w-full rounded-xl border border-gray-200 py-3 pl-4 pr-12 text-sm outline-none focus:border-red-500" /><button type="button" onClick={() => setShowNewPassword((visible) => !visible)} aria-label={showNewPassword ? 'Hide new admin password' : 'Show new admin password'} aria-pressed={showNewPassword} className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200">{showNewPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
                 <button disabled={busy === 'password'} onClick={() => run('password', async () => { const response = await authApi.adminChangePassword({ ...credentials(), newPassword }); saveUpdatedSession(response.data); setNewPassword(''); setMessage(response.data?.message || 'Password changed.'); })} className="mt-3 rounded-xl bg-[#cc0000] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Change Password</button>
               </div>
 

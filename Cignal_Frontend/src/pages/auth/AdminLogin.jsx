@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   Copy,
+  Eye,
+  EyeOff,
   KeyRound,
   LockKeyhole,
   Mail,
@@ -21,7 +23,10 @@ function saveAdminSession(data) {
   localStorage.setItem('user', JSON.stringify(data.user));
 }
 
-function Field({ label, icon: Icon, ...props }) {
+function Field({ label, icon: Icon, type = 'text', ...props }) {
+  const isPassword = type === 'password';
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div>
       <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-white/55">{label}</label>
@@ -29,8 +34,20 @@ function Field({ label, icon: Icon, ...props }) {
         {Icon && <Icon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35" />}
         <input
           {...props}
-          className={`w-full rounded-xl border border-white/10 bg-black/30 py-3.5 ${Icon ? 'pl-11' : 'pl-4'} pr-4 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-red-500 focus:ring-4 focus:ring-red-500/10`}
+          type={isPassword && showPassword ? 'text' : type}
+          className={`w-full rounded-xl border border-white/10 bg-black/30 py-3.5 ${Icon ? 'pl-11' : 'pl-4'} ${isPassword ? 'pr-12' : 'pr-4'} text-sm text-white outline-none transition placeholder:text-white/30 focus:border-red-500 focus:ring-4 focus:ring-red-500/10`}
         />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-white/45 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-400/50"
+            aria-label={showPassword ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        )}
       </div>
     </div>
   );

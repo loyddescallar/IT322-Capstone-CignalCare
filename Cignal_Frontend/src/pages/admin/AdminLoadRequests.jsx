@@ -23,12 +23,15 @@ const PAYMENT_BADGE = {
   manual_review: 'bg-blue-100 text-blue-700',
 };
 
-function formatDate(date) {
+function formatDateTime(date) {
   if (!date) return '—';
-  return new Date(date).toLocaleDateString('en-PH', {
+  return new Date(date).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
@@ -109,19 +112,17 @@ export default function AdminLoadRequests() {
     setSaveError('');
 
     try {
-      await updateLoadStatus(selected.id, newStatus, adminNote);
-      setRequests((prev) =>
-        prev.map((request) =>
-          request.id === selected.id
-            ? {
-                ...request,
-                status: newStatus,
-                admin_note: adminNote,
-                fulfilled_at: newStatus === 'Completed' ? request.fulfilled_at || new Date().toISOString() : request.fulfilled_at,
-              }
-            : request
-        )
-      );
+      const response = await updateLoadStatus(selected.id, newStatus, adminNote);
+      const updatedRequest = response.data?.request;
+
+      if (updatedRequest) {
+        setRequests((current) => current.map((request) =>
+          request.id === updatedRequest.id ? updatedRequest : request
+        ));
+      } else {
+        await loadRequests();
+      }
+
       setSelected(null);
     } catch (err) {
       setSaveError(err.response?.data?.error || 'Failed to update request.');
@@ -199,10 +200,10 @@ export default function AdminLoadRequests() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="min-w-[1240px] w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {['#', 'Account Name', 'Account No.', 'Plan', 'Amount', 'Method', 'Payment', 'Reference', 'Location', 'Process', 'Date', 'Photos', 'Actions'].map((header) => (
+                {['#', 'Account Name', 'Account No.', 'Plan', 'Amount', 'Method', 'Payment', 'Reference', 'Location', 'Process', 'Transaction Times', 'Photos', 'Actions'].map((header) => (
                   <th key={header} className="px-3 py-2.5 text-left font-semibold uppercase tracking-wide text-gray-500" style={{ fontSize: '10px' }}>
                     {header}
                   </th>
@@ -240,7 +241,13 @@ export default function AdminLoadRequests() {
                         <div className="flex items-center gap-1"><MapPin size={10} className="text-gray-400" /><span className="text-gray-500">{request.location || '—'}</span></div>
                       </td>
                       <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusConfig.badge}`}>{request.status}</span></td>
-                      <td className="px-3 py-2 text-gray-400">{formatDate(request.created_at)}</td>
+                      <td className="min-w-[190px] px-3 py-2">
+                        <div className="space-y-1 text-[10px] leading-4 text-gray-500">
+                          <p><span className="font-semibold text-gray-600">Requested:</span> {formatDateTime(request.created_at)}</p>
+                          {request.payment_completed_at && <p><span className="font-semibold text-gray-600">Payment confirmed:</span> {formatDateTime(request.payment_completed_at)}</p>}
+                          {request.fulfilled_at && <p><span className="font-semibold text-gray-600">Completed:</span> {formatDateTime(request.fulfilled_at)}</p>}
+                        </div>
+                      </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           {request.receipt_photo && <button onClick={() => setPhotoModal({ url: request.receipt_photo, label: 'Receipt Photo' })} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100"><Image size={10} />Receipt</button>}
@@ -272,7 +279,7 @@ export default function AdminLoadRequests() {
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">Review Load Request #{selected.id}</h2>
               <button onClick={() => setSelected(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100"><X size={16} /></button>
@@ -285,7 +292,7 @@ export default function AdminLoadRequests() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   { label: 'Account Name', value: selected.account_name },
                   { label: 'Account No.', value: selected.account_number },
@@ -295,6 +302,9 @@ export default function AdminLoadRequests() {
                   { label: 'Payment Status', value: paymentLabel(selected.payment_status || 'manual_review') },
                   { label: 'Reference No.', value: selected.reference_no },
                   { label: 'Diagnostic', value: selected.diagnostic_result || '—' },
+                  { label: 'Requested', value: formatDateTime(selected.created_at) },
+                  { label: 'Payment Confirmed', value: selected.payment_completed_at ? formatDateTime(selected.payment_completed_at) : '—' },
+                  { label: 'Completed', value: selected.fulfilled_at ? formatDateTime(selected.fulfilled_at) : '—' },
                 ].map((field) => (
                   <div key={field.label} className="rounded-xl bg-gray-50 p-3">
                     <p className="font-semibold text-gray-400" style={{ fontSize: '10px' }}>{field.label}</p>
@@ -338,8 +348,14 @@ export default function AdminLoadRequests() {
                 <textarea value={adminNote} onChange={(event) => setAdminNote(event.target.value)} rows={2} placeholder="Optional note..." className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000]" />
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60">{saving ? 'Saving...' : 'Update Request'}</button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  onClick={handleSave}
+                  disabled={saving || (selected.payment_method === 'PayMongo' && selected.payment_status !== 'paid' && newStatus === 'Completed')}
+                  className="flex-1 rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? 'Saving...' : 'Update Request'}
+                </button>
                 <button onClick={() => setSelected(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-xs text-gray-600 hover:bg-gray-50">Cancel</button>
               </div>
             </div>

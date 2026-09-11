@@ -443,10 +443,17 @@ async function updateLoadStatusController(req, res) {
       });
     }
 
-    if (request.status === status && String(request.admin_note || '') === String(admin_note || '')) {
+    const needsFulfillment = status === 'Completed' && !request.fulfilled_at;
+
+    if (
+      request.status === status &&
+      String(request.admin_note || '') === String(admin_note || '') &&
+      !needsFulfillment
+    ) {
       return res.json({
         message: 'Load request already has this status',
         unchanged: true,
+        request,
       });
     }
 
@@ -483,14 +490,29 @@ async function updateLoadStatusController(req, res) {
       })
     );
 
+    const updatedRequest = await getLoadRequestById(req.params.id);
+
     return res.json({
       message: 'Load request updated',
+      request: updatedRequest,
     });
   } catch (err) {
-    console.error('UPDATE LOAD REQUEST STATUS ERROR', err);
+    console.error('UPDATE LOAD REQUEST STATUS ERROR', {
+      message: err.message,
+      code: err.code,
+      fulfillmentStep: err.fulfillmentStep || null,
+      stack:
+        String(process.env.NODE_ENV || '').toLowerCase() === 'development'
+          ? err.stack
+          : undefined,
+    });
 
     if (err.code === 'PLAN_NOT_FOUND') {
       return res.status(409).json({ error: err.message });
+    }
+
+    if (err.code === 'PAYMENT_NOT_CONFIRMED') {
+      return res.status(400).json({ error: err.message });
     }
 
     return res.status(500).json({

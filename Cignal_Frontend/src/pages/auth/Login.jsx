@@ -12,6 +12,8 @@ import {
   Phone,
   ExternalLink,
   Tv,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import authApi from '../../api/authApi';
 
@@ -92,6 +94,7 @@ export default function Login() {
 
   const [accountNumber, setAccountNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -383,7 +386,7 @@ export default function Login() {
                       <LockKeyhole size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         id="password"
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(event) => {
                           setPassword(event.target.value);
@@ -391,8 +394,17 @@ export default function Login() {
                         }}
                         autoComplete="current-password"
                         placeholder="Enter your password"
-                        className="w-full rounded-xl border border-gray-200 bg-white py-3.5 pl-11 pr-4 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#cc0000] focus:ring-4 focus:ring-red-100"
+                        className="w-full rounded-xl border border-gray-200 bg-white py-3.5 pl-11 pr-12 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-[#cc0000] focus:ring-4 focus:ring-red-100"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
                     </div>
                   </div>
 

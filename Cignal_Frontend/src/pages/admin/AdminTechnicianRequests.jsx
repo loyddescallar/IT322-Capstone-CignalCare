@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Wrench, Calendar, Phone, MapPin, Image } from 'lucide-react';
+import { Search, X, Wrench, Calendar, Phone, MapPin, Image, ExternalLink } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 import customerApi from '../../api/customerApi';
 
@@ -46,7 +46,7 @@ export default function AdminTechnicianRequests() {
           <div className="flex gap-1.5 flex-wrap">{['All',...STATUSES].map(s=><button key={s} onClick={()=>setStatusF(s)} className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${statusF===s?'bg-slate-700 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s}</button>)}</div>
           <span className="text-xs text-gray-400 ml-auto">{filtered.length} requests</span>
         </div>
-        <div className="overflow-x-auto"><table className="w-full text-xs">
+        <div className="overflow-x-auto"><table className="min-w-[1040px] w-full text-xs">
           <thead><tr className="border-b border-gray-100 bg-gray-50">{['#','Issue','Source','Account No.','Contact','Location','Preferred Date','Photo','Technician','Status','Actions'].map(h=><th key={h} className="text-left py-2.5 px-3 text-gray-500 font-semibold uppercase tracking-wide" style={{fontSize:'10px'}}>{h}</th>)}</tr></thead>
           <tbody>
             {loading?<tr><td colSpan={11} className="py-10 text-center text-gray-400">Loading...</td></tr>
@@ -71,13 +71,32 @@ export default function AdminTechnicianRequests() {
       </div>
       {selected&&(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100"><h2 className="text-sm font-bold text-gray-800">Manage Request #{selected.id}</h2><button onClick={()=>setSelected(null)} className="p-1 rounded-xl hover:bg-gray-100 text-gray-400"><X size={16}/></button></div>
             <div className="p-5 space-y-3">
               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                 <div className="flex items-start gap-2"><Wrench size={12} className="text-[#cc0000] mt-0.5 flex-shrink-0"/><p className="text-xs text-gray-700 whitespace-pre-wrap">{selected.issueDescription}</p></div>
                 <div className="flex items-center gap-2"><Phone size={12} className="text-gray-400"/><p className="text-xs text-gray-600">{selected.contactName} · {selected.contactPhone}</p></div>
                 {selected.location&&<div className="flex items-center gap-2"><MapPin size={12} className="text-gray-400"/><p className="text-xs text-gray-600">{selected.location}</p></div>}
+                {(selected.service_address||selected.subscriber_address)&&(
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{selected.service_address?'Service Address':'Account Address · Legacy Request'}</p>
+                    <p className="mt-1 break-words text-xs leading-5 text-gray-700">{selected.service_address||selected.subscriber_address}</p>
+                  </div>
+                )}
+                {selected.latitude!=null&&selected.longitude!=null&&(
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Exact Service Pin</p>
+                        <p className="mt-1 break-all font-mono text-[11px] text-gray-600">{Number(selected.latitude).toFixed(6)}, {Number(selected.longitude).toFixed(6)}</p>
+                      </div>
+                      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selected.latitude},${selected.longitude}`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black">
+                        <ExternalLink size={12}/> Open in Google Maps
+                      </a>
+                    </div>
+                  </div>
+                )}
                 {selected.preferred_date&&<div className="flex items-center gap-2"><Calendar size={12} className="text-gray-400"/><p className="text-xs text-gray-600">{selected.preferred_date} {selected.preferred_time}</p></div>}
                 {(selected.source||selected.screen_issue)&&<div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2"><p className="text-xs font-bold text-red-700">{sourceLabel(selected.source)}</p>{selected.screen_issue&&<p className="mt-1 text-xs text-red-600">TV issue: {selected.screen_issue}</p>}</div>}
                 {selected.screen_photo_url&&<button onClick={()=>setPhotoModal({url:selected.screen_photo_url,label:'TV Screen Photo'})} className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-600 hover:bg-purple-100"><Image size={12}/> View TV screen photo</button>}
@@ -85,7 +104,7 @@ export default function AdminTechnicianRequests() {
               <div><label className="block text-xs text-gray-500 font-medium mb-1" style={{fontSize:'10px'}}>Status</label><select value={newStatus} onChange={e=>setNewStatus(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#cc0000]">{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
               <div><label className="block text-xs text-gray-500 font-medium mb-1" style={{fontSize:'10px'}}>Assign Technician</label><input value={techName} onChange={e=>setTechName(e.target.value)} placeholder="Enter technician name" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#cc0000]"/></div>
               <div><label className="block text-xs text-gray-500 font-medium mb-1" style={{fontSize:'10px'}}>Admin Note</label><textarea value={adminNote} onChange={e=>setAdminNote(e.target.value)} rows={3} placeholder="Optional notes..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#cc0000] resize-none"/></div>
-              <div className="flex gap-2"><button onClick={handleSave} disabled={saving} className="flex-1 bg-[#cc0000] hover:bg-red-700 text-white text-xs py-2.5 rounded-xl font-semibold disabled:opacity-60">{saving?'Saving...':'Save Changes'}</button><button onClick={()=>setSelected(null)} className="flex-1 border border-gray-200 text-xs py-2.5 rounded-xl text-gray-600 hover:bg-gray-50">Cancel</button></div>
+              <div className="flex flex-col gap-2 sm:flex-row"><button onClick={handleSave} disabled={saving} className="flex-1 bg-[#cc0000] hover:bg-red-700 text-white text-xs py-2.5 rounded-xl font-semibold disabled:opacity-60">{saving?'Saving...':'Save Changes'}</button><button onClick={()=>setSelected(null)} className="flex-1 border border-gray-200 text-xs py-2.5 rounded-xl text-gray-600 hover:bg-gray-50">Cancel</button></div>
             </div>
           </div>
         </div>

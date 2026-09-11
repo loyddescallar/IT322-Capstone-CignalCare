@@ -21,12 +21,15 @@ const PAYMENT_BADGE = {
   manual_review: 'bg-blue-100 text-blue-700',
 };
 
-function formatDate(date) {
+function formatDateTime(date) {
   if (!date) return '—';
-  return new Date(date).toLocaleDateString('en-PH', {
+  return new Date(date).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
@@ -112,10 +115,10 @@ export default function UserLoadHistory() {
 
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="min-w-[1040px] w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['Plan', 'Amount', 'Method', 'Payment', 'Reference', 'Submitted', 'Process', 'Photos'].map((header) => (
+                  {['Plan', 'Amount', 'Method', 'Payment', 'Reference', 'Transaction Times', 'Process', 'Photos'].map((header) => (
                     <th key={header} className="px-4 py-2.5 text-left font-semibold uppercase text-gray-500" style={{ fontSize: '10px' }}>
                       {header}
                     </th>
@@ -143,7 +146,13 @@ export default function UserLoadHistory() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-gray-400" style={{ fontSize: '10px' }}>{request.reference_no}</td>
-                      <td className="px-4 py-3 text-gray-400">{formatDate(request.created_at)}</td>
+                      <td className="min-w-[190px] px-4 py-3">
+                        <div className="space-y-1 text-[10px] leading-4 text-gray-500">
+                          <p><span className="font-semibold text-gray-600">Requested:</span> {formatDateTime(request.created_at)}</p>
+                          {request.payment_completed_at && <p><span className="font-semibold text-gray-600">Payment confirmed:</span> {formatDateTime(request.payment_completed_at)}</p>}
+                          {request.fulfilled_at && <p><span className="font-semibold text-gray-600">Completed:</span> {formatDateTime(request.fulfilled_at)}</p>}
+                        </div>
+                      </td>
                       <td className="min-w-[230px] px-4 py-3">
                         <div className="space-y-2">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[request.status] || 'bg-gray-100 text-gray-600'}`}>
@@ -177,7 +186,7 @@ export default function UserLoadHistory() {
 
         {photo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhoto(null)}>
-            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white" onClick={(event) => event.stopPropagation()}>
+            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
                 <h2 className="text-sm font-bold text-gray-800">{photo.label}</h2>
                 <button onClick={() => setPhoto(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100">

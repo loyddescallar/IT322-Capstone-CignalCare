@@ -32,6 +32,27 @@ const EXTRA_COLUMNS = [
       ADD COLUMN IF NOT EXISTS screen_photo_url TEXT
     `,
   },
+  {
+    name: "service_address",
+    sql: `
+      ALTER TABLE technician_requests
+      ADD COLUMN IF NOT EXISTS service_address TEXT
+    `,
+  },
+  {
+    name: "latitude",
+    sql: `
+      ALTER TABLE technician_requests
+      ADD COLUMN IF NOT EXISTS latitude DECIMAL(9,6)
+    `,
+  },
+  {
+    name: "longitude",
+    sql: `
+      ALTER TABLE technician_requests
+      ADD COLUMN IF NOT EXISTS longitude DECIMAL(9,6)
+    `,
+  },
 ];
 
 async function ensureTechnicianColumns() {
@@ -85,9 +106,12 @@ async function createRequest(data) {
       preferred_time,
       source,
       screen_issue,
-      screen_photo_url
+      screen_photo_url,
+      service_address,
+      latitude,
+      longitude
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       data.user_id,
@@ -100,6 +124,9 @@ async function createRequest(data) {
       data.source || null,
       data.screen_issue || null,
       data.screen_photo_url || null,
+      data.service_address,
+      data.latitude ?? null,
+      data.longitude ?? null,
     ]
   );
 
@@ -128,7 +155,8 @@ async function getAllRequests() {
   const [rows] = await pool.query(`
     SELECT
       tr.*,
-      u.location
+      u.location,
+      u.address AS subscriber_address
     FROM technician_requests tr
     LEFT JOIN users u
       ON u.id = tr.user_id
@@ -147,7 +175,8 @@ async function getRequestById(id) {
       tr.*,
       u.accountName,
       u.accountNumber,
-      u.location
+      u.location,
+      u.address AS subscriber_address
     FROM technician_requests tr
     LEFT JOIN users u
       ON u.id = tr.user_id
