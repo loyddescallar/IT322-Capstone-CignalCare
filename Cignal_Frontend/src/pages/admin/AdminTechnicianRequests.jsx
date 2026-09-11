@@ -38,13 +38,13 @@ export default function AdminTechnicianRequests() {
   return (
     <div className="space-y-4">
       <div><h1 className="text-lg font-bold text-gray-800">Technician Requests</h1><p className="text-xs text-gray-500 mt-0.5">Field service and repair requests from subscribers</p></div>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">{kpis.map(s=><div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><div className="flex items-center gap-2 mb-2"><div className={`w-2 h-2 rounded-full ${s.dot}`}/><p className="text-xs text-gray-500">{s.label}</p></div><p className={`text-2xl font-bold ${s.color}`}>{loading?'...':s.value}</p></div>)}</div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{kpis.map(s=><div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><div className="flex items-center gap-2 mb-2"><div className={`w-2 h-2 rounded-full ${s.dot}`}/><p className="text-xs text-gray-500">{s.label}</p></div><p className={`text-2xl font-bold ${s.color}`}>{loading?'...':s.value}</p></div>)}</div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 flex-1 max-w-xs"><Search size={14} className="text-gray-400"/><input type="text" placeholder="Search issue, account, contact..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-transparent text-xs text-gray-600 placeholder-gray-400 outline-none w-full"/></div>
+          <div className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1"><Search size={14} className="text-gray-400"/><input type="text" placeholder="Search issue, account, contact..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-transparent text-xs text-gray-600 placeholder-gray-400 outline-none w-full"/></div>
           <div className="flex gap-1.5 flex-wrap">{['All',...LOCATIONS].map(loc=><button key={loc} onClick={()=>setLocF(loc)} className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${locF===loc?'bg-[#cc0000] text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{loc}</button>)}</div>
           <div className="flex gap-1.5 flex-wrap">{['All',...STATUSES].map(s=><button key={s} onClick={()=>setStatusF(s)} className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${statusF===s?'bg-slate-700 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s}</button>)}</div>
-          <span className="text-xs text-gray-400 ml-auto">{filtered.length} requests</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} requests</span>
         </div>
         <div className="overflow-x-auto"><table className="min-w-[1040px] w-full text-xs">
           <thead><tr className="border-b border-gray-100 bg-gray-50">{['#','Issue','Source','Account No.','Contact','Location','Preferred Date','Photo','Technician','Status','Actions'].map(h=><th key={h} className="text-left py-2.5 px-3 text-gray-500 font-semibold uppercase tracking-wide" style={{fontSize:'10px'}}>{h}</th>)}</tr></thead>
@@ -70,8 +70,8 @@ export default function AdminTechnicianRequests() {
         </table></div>
       </div>
       {selected&&(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl sm:max-h-[90dvh]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100"><h2 className="text-sm font-bold text-gray-800">Manage Request #{selected.id}</h2><button onClick={()=>setSelected(null)} className="p-1 rounded-xl hover:bg-gray-100 text-gray-400"><X size={16}/></button></div>
             <div className="p-5 space-y-3">
               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
@@ -110,8 +110,8 @@ export default function AdminTechnicianRequests() {
         </div>
       )}
       {photoModal&&(
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-3 sm:p-4">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[90dvh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4"><h2 className="text-sm font-bold text-gray-800">{photoModal.label}</h2><button onClick={()=>setPhotoModal(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100"><X size={16}/></button></div>
             <div className="bg-gray-50 p-4"><img src={photoModal.url} alt={photoModal.label} className="mx-auto max-h-[70vh] rounded-xl object-contain"/></div>
           </div>

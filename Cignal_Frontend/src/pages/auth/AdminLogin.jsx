@@ -195,8 +195,8 @@ export default function AdminLogin() {
       </video>
       <div className="fixed inset-0 z-10 bg-black/35" />
 
-      <main className="relative z-20 flex min-h-[100dvh] items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md rounded-[28px] border border-white/20 bg-[#10151f]/95 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+      <main className="relative z-20 flex min-h-[100dvh] items-center justify-center px-3 py-5 sm:px-4 sm:py-8">
+        <div className="w-full max-w-md rounded-[24px] border border-white/20 bg-[#10151f]/95 p-5 shadow-2xl backdrop-blur-xl sm:rounded-[28px] sm:p-8">
           <div className="mb-7 flex items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600/15 text-red-400">
               <ShieldCheck size={23} />
@@ -287,7 +287,7 @@ export default function AdminLogin() {
           {mode === 'codes' && (
             <div className="space-y-5">
               <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-xs leading-5 text-emerald-100"><CheckCircle2 size={18} className="mb-2" />Security setup completed. These recovery codes are shown only now. Store them offline, not in GitHub or the browser.</div>
-              <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-black/25 p-4 font-mono text-sm text-white">
+              <div className="grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-4 font-mono text-sm text-white sm:grid-cols-2">
                 {recoveryCodes.map((code) => <div key={code}>{code}</div>)}
               </div>
               <button type="button" onClick={() => copyText(recoveryCodes.join('\n'))} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white"><Copy size={16} />Copy Recovery Codes</button>

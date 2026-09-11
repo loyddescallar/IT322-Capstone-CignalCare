@@ -446,10 +446,10 @@ export default function AdminWorkspace() {
   };
 
   return (
-    <div className="admin-shell flex h-screen w-screen overflow-hidden bg-[#f6f7f9]">
+    <div className="admin-shell flex h-[100dvh] w-full overflow-hidden bg-[#f6f7f9]">
       {/* SIDEBAR */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-[#101827] transition-transform duration-300 lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[88vw] max-w-60 flex-col bg-[#101827] transition-transform duration-300 sm:w-60 lg:relative lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -573,7 +573,7 @@ export default function AdminWorkspace() {
 
       {/* MAIN */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex min-h-14 flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+        <header className="flex min-h-14 flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
           <button
             className="p-1 text-gray-500 hover:text-gray-700 lg:hidden"
             onClick={() => setSidebarOpen(true)}
@@ -584,7 +584,7 @@ export default function AdminWorkspace() {
           <div className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-600">
             <Clock size={12} className="text-gray-400" />
             <span className="font-medium tabular-nums">{timeStr}</span>
-            <span className="ml-1.5 text-gray-400">{dateStr}</span>
+            <span className="ml-1.5 hidden text-gray-400 md:inline">{dateStr}</span>
           </div>
 
           <div className="flex-1" />
@@ -605,7 +605,7 @@ export default function AdminWorkspace() {
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+              <div className="fixed left-4 right-4 top-16 z-50 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80">
                 <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                   <p className="text-sm font-semibold text-gray-800">
                     Notifications
@@ -687,7 +687,7 @@ export default function AdminWorkspace() {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl">
+              <div className="absolute right-0 top-full z-50 mt-2 w-[min(13rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl">
                 <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
                   <p className="text-xs font-semibold text-gray-800">
                     {adminName}
@@ -715,7 +715,7 @@ export default function AdminWorkspace() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-7">
+        <main className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 xl:p-7">
           {renderContent()}
         </main>
       </div>

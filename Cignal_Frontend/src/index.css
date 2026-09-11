@@ -5,6 +5,9 @@
 * { box-sizing: border-box; }
 
 html {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
   font-family: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -12,10 +15,18 @@ html {
 }
 
 body {
+  width: 100%;
+  min-height: 100%;
   margin: 0;
   font-family: inherit;
   color: #0f172a;
   background: #f6f7f9;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100%;
 }
 
 button, input, select, textarea { font: inherit; }

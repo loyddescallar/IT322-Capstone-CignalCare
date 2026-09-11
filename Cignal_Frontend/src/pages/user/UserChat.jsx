@@ -135,8 +135,8 @@ export default function UserChat() {
 
   return (
     <UserLayout>
-      <div className="flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
-        <div className="flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
+      <div className="flex flex-col" style={{ height: 'calc(100dvh - 80px)' }}>
+        <div className="flex flex-shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-3 sm:gap-3 sm:px-4">
           <button
             type="button"
             onClick={() => navigate('/user/tickets')}
@@ -161,7 +161,7 @@ export default function UserChat() {
           </div>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4">
+        <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3 sm:p-4">
           {messages.length === 0 ? (
             <p className="mt-10 text-center text-xs text-gray-400">
               No messages yet.
@@ -185,7 +185,7 @@ export default function UserChat() {
                   )}
 
                   <div
-                    className={`flex max-w-[75%] flex-col ${
+                    className={`flex max-w-[88%] flex-col sm:max-w-[75%] ${
                       mine ? 'items-end' : 'items-start'
                     }`}
                   >
@@ -228,7 +228,7 @@ export default function UserChat() {
         </div>
 
         {!isFinished(status) && (
-          <div className="flex-shrink-0 border-t border-gray-200 bg-white p-3">
+          <div className="flex-shrink-0 border-t border-gray-200 bg-white p-2.5 sm:p-3">
             {error && (
               <div className="mb-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">
                 {error}
@@ -281,13 +281,13 @@ export default function UserChat() {
                   }
                 }}
                 placeholder="Type a message..."
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-xs outline-none focus:border-[#cc0000]"
+                className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-[#cc0000] sm:px-4"
               />
               <button
                 type="button"
                 onClick={sendMessage}
                 disabled={(!newMsg.trim() && !file) || sending}
-                className="rounded-xl bg-[#cc0000] px-4 py-2.5 text-white hover:bg-red-700 disabled:opacity-50"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#cc0000] text-white hover:bg-red-700 disabled:opacity-50 sm:w-auto sm:px-4"
                 aria-label="Send message"
               >
                 <Send size={15} />

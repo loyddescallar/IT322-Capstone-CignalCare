@@ -318,11 +318,11 @@ export default function CignalBot() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-3 right-3 z-50 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:bottom-5 sm:right-5">
       {open && (
         <div
-          className="flex w-80 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
-          style={{ height: minimized ? 'auto' : '420px' }}
+          className="flex w-[calc(100vw-1.5rem)] max-w-80 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-80"
+          style={{ height: minimized ? 'auto' : 'min(420px, calc(100dvh - 7rem))' }}
         >
           <div className="flex flex-shrink-0 items-center gap-2 bg-gradient-to-r from-[#880000] to-[#cc0000] px-4 py-3 text-white">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/20">
@@ -445,7 +445,7 @@ export default function CignalBot() {
                   onKeyDown={(event) => event.key === 'Enter' && sendMessage(input)}
                   placeholder="Ilagay ang mensahe..."
                   disabled={typing || Boolean(preparingAction)}
-                  className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000] disabled:bg-gray-50"
+                  className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000] disabled:bg-gray-50"
                 />
                 <button
                   onClick={() => sendMessage(input)}

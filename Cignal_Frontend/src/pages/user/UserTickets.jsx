@@ -204,7 +204,7 @@ export default function UserTickets() {
               <div
                 key={ticket.id}
                 onClick={() => handleTicketClick(ticket)}
-                className="group flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
+                className="group flex cursor-pointer flex-col items-stretch justify-between gap-3 rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md sm:flex-row sm:items-center"
               >
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -219,7 +219,7 @@ export default function UserTickets() {
                     <RequestTimeline steps={ACTIVE_STATUSES} current={status === 'Archived' ? 'Resolved' : status} compact />
                   </div>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2">
+                <div className="flex flex-shrink-0 items-center justify-end gap-2 self-end sm:self-auto">
                   <span className="text-xs font-semibold text-[#cc0000] opacity-0 transition-opacity group-hover:opacity-100">View ticket</span>
                   <ChevronRight size={16} className="text-gray-300" />
                 </div>
@@ -230,13 +230,13 @@ export default function UserTickets() {
 
         {/* Technician Requests Section */}
         <div>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
               <Wrench size={18} className="text-gray-600" />
               <h2 className="text-lg font-bold text-gray-800">My Technician Requests</h2>
               {pendingTech > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">{pendingTech} pending</span>}
             </div>
-            <button onClick={() => navigate('/user/technician-request')} className="rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white hover:bg-red-700">+ New Request</button>
+            <button onClick={() => navigate('/user/technician-request')} className="w-full rounded-xl bg-[#cc0000] px-4 py-2.5 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto">+ New Request</button>
           </div>
 
           {pendingTech > 0 && (

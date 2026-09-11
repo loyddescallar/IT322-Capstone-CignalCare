@@ -144,14 +144,14 @@ export default function AdminDashboard() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-950">Dashboard Overview</h1>
           <p className="mt-1 text-xs text-slate-500">Sales, subscriber support, and service operations at a glance.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
             {currentDate}
           </div>
           <select
             value={location}
             onChange={(event) => setLocation(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm outline-none focus:border-red-300"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm outline-none focus:border-red-300 sm:w-auto"
           >
             <option value="">All Locations</option>
             {LOCATIONS.filter(Boolean).map((item) => (
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
           </select>
           <button
             onClick={() => navigate('/admin/analytics')}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-red-200 hover:text-[#cc0000]"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-red-200 hover:text-[#cc0000] sm:w-auto"
           >
             View Analytics
           </button>
@@ -350,7 +350,7 @@ export default function AdminDashboard() {
             <CardTitle title="Recent Tickets" action="View All" onAction={() => navigate('/admin/tickets')} />
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-[11px]">
+            <table className="min-w-[680px] text-left text-[11px]">
               <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 <tr><th className="px-4 py-3">Ticket</th><th className="px-3 py-3">Customer</th><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th></tr>
               </thead>
@@ -375,7 +375,7 @@ export default function AdminDashboard() {
             <CardTitle title="Recent Common Issues / Incidents" action="View All" onAction={() => navigate('/admin/incidents')} />
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-[11px]">
+            <table className="min-w-[680px] text-left text-[11px]">
               <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 <tr><th className="px-4 py-3">Incident</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Reported</th></tr>
               </thead>

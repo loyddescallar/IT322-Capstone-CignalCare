@@ -62,12 +62,12 @@ export default function AccountSecurity() {
 
   return (
     <UserLayout>
-      <main className="mx-auto min-h-[calc(100vh-5rem)] w-full max-w-3xl px-4 py-10 sm:px-6">
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-lg sm:p-8">
+      <main className="mx-auto min-h-[calc(100dvh-5rem)] w-full max-w-3xl px-3 py-6 sm:px-6 sm:py-10">
+        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-lg sm:p-8">
           <div className="flex items-start gap-3">
             <div className="rounded-2xl bg-red-50 p-3 text-[#cc0000]"><ShieldCheck size={24} /></div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Account Security</h1>
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Account Security</h1>
               <p className="mt-1 text-sm text-gray-500">Verify an optional recovery email so you can reset your password without waiting for Admin assistance.</p>
             </div>
           </div>
@@ -75,8 +75,8 @@ export default function AccountSecurity() {
           {error && <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           {message && <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{message}</div>}
 
-          <section className="mt-7 rounded-2xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between gap-4">
+          <section className="mt-7 rounded-2xl border border-gray-200 p-4 sm:p-5">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Recovery Email</p>
                 <p className="mt-1 text-sm text-gray-700">Account Number: {security?.accountNumber || '—'}</p>
@@ -109,7 +109,7 @@ export default function AccountSecurity() {
               type="button"
               onClick={sendCode}
               disabled={loading || !email.trim() || (security?.emailVerified && email === security.email)}
-              className="mt-3 rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              className="mt-3 w-full rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 sm:w-auto"
             >
               {loading ? 'Please wait...' : security?.emailVerified && email === security.email ? 'Email Verified' : 'Send Verification Code'}
             </button>

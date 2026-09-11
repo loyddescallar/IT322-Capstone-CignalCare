@@ -193,8 +193,8 @@ export default function ForgotPassword() {
 
   if (newRecoveryCode) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
-        <div className="w-full max-w-md rounded-[28px] bg-white p-7 shadow-2xl sm:p-8">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-3 py-6 sm:px-4 sm:py-10">
+        <div className="w-full max-w-md rounded-[24px] bg-white p-5 shadow-2xl sm:rounded-[28px] sm:p-8">
           <div className="mb-5 flex items-start gap-3">
             <div className="rounded-xl bg-green-50 p-3 text-green-700"><ShieldCheck size={23} /></div>
             <div>
@@ -222,8 +222,8 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
-      <div className="w-full max-w-md rounded-[28px] bg-white p-7 shadow-2xl sm:p-8">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-3 py-6 sm:px-4 sm:py-10">
+      <div className="w-full max-w-md rounded-[24px] bg-white p-5 shadow-2xl sm:rounded-[28px] sm:p-8">
         <div className="mb-5 flex items-start gap-3">
           <div className="rounded-xl bg-red-50 p-3 text-[#cc0000]"><KeyRound size={23} /></div>
           <div>
@@ -276,7 +276,7 @@ export default function ForgotPassword() {
 
         {optionsChecked && (options.emailAvailable || options.recoveryCodeAvailable) && (
           <>
-            <div className="my-5 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
+            <div className="my-5 grid grid-cols-1 gap-1 rounded-xl bg-gray-100 p-1 sm:grid-cols-2">
               <button
                 type="button"
                 disabled={!options.emailAvailable}
@@ -392,7 +392,7 @@ function PasswordFields({ password, setPassword, confirmPassword, setConfirmPass
             autoComplete="new-password"
             className="w-full rounded-xl border border-gray-200 py-3 pl-11 pr-12 text-sm outline-none focus:border-[#cc0000]"
           />
-          <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide new password' : 'Show new password'} aria-pressed={showPassword} className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+          <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide new password' : 'Show new password'} aria-pressed={showPassword} className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200 sm:right-3">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
         </div>
       </div>
       <div>
@@ -405,7 +405,7 @@ function PasswordFields({ password, setPassword, confirmPassword, setConfirmPass
             autoComplete="new-password"
             className="w-full rounded-xl border border-gray-200 py-3 pl-4 pr-12 text-sm outline-none focus:border-[#cc0000]"
           />
-          <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'} aria-pressed={showConfirmPassword} className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200">{showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+          <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'} aria-pressed={showConfirmPassword} className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200 sm:right-3">{showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
         </div>
       </div>
       <p className="text-xs leading-5 text-gray-500">Minimum 8 characters with uppercase, lowercase, and a number.</p>

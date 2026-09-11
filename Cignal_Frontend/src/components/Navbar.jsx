@@ -111,7 +111,7 @@ export default function Navbar() {
           hidden ? '-translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
         }`}
       >
-        <div className="mx-auto flex h-20 w-full max-w-[1750px] items-center justify-between px-20">
+        <div className="mx-auto flex h-20 w-full max-w-[1750px] items-center justify-between px-4 sm:px-6 lg:px-8 xl:px-12">
           {/* Logo */}
           <button
             onClick={() => navigate('/user-dashboard')}
@@ -121,12 +121,12 @@ export default function Navbar() {
             <img
               src={LOGO_SRC}
               alt="CignalCare+ Logo"
-              className="h-[140px] w-auto max-w-[180px] object-contain"
+              className="h-16 w-auto max-w-[150px] object-contain sm:h-20 sm:max-w-[180px]"
             />
           </button>
 
           {/* Desktop Nav */}
-          <div className="hidden items-center gap-6 lg:flex">
+          <div className="hidden items-center gap-4 xl:flex 2xl:gap-6">
             <div className="flex items-center gap-2 whitespace-nowrap border-r-2 border-white/50 pr-5 text-[15px] font-semibold">
               <span>Welcome,</span>
               <span className="font-bold capitalize">{username}</span>
@@ -160,7 +160,7 @@ export default function Navbar() {
           {/* Mobile toggle */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-white lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-white transition hover:bg-white/10 xl:hidden"
             aria-label="Toggle navigation menu"
           >
             {menuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -169,7 +169,7 @@ export default function Navbar() {
 
         {/* Mobile menu */}
         {menuOpen && (
-          <div className="space-y-3 border-t border-white/20 bg-cignalRed px-6 py-5 shadow-md lg:hidden">
+          <div className="max-h-[calc(100dvh-5rem)] space-y-1 overflow-y-auto border-t border-white/20 bg-cignalRed px-4 py-4 shadow-md sm:px-6 xl:hidden">
             <p className="text-sm font-semibold">
               Welcome, {username}
             </p>
@@ -184,7 +184,7 @@ export default function Navbar() {
                     navigate(link.path);
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 text-left text-sm font-semibold text-white"
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-white transition hover:bg-white/10"
                 >
                   <Icon size={14} />
                   {link.label}
@@ -194,7 +194,7 @@ export default function Navbar() {
 
             <button
               onClick={logout}
-              className="flex items-center gap-2 text-sm font-semibold text-white"
+              className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
             >
               <LogOut size={14} />
               Logout

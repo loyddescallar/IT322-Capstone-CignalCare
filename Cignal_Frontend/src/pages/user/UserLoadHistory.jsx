@@ -84,7 +84,7 @@ export default function UserLoadHistory() {
       description="Track payment confirmation, manual proof review, and load processing progress."
       icon={History}
       actions={(
-        <button onClick={() => navigate('/user/load-request')} className="inline-flex items-center gap-2 rounded-xl bg-[#cc0000] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700"><Plus size={15} /> New Load Request</button>
+        <button onClick={() => navigate('/user/load-request')} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 sm:w-auto"><Plus size={15} /> New Load Request</button>
       )}
       contentClassName="space-y-5"
     >
@@ -185,8 +185,8 @@ export default function UserLoadHistory() {
         </div>
 
         {photo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhoto(null)}>
-            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white" onClick={(event) => event.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4" onClick={() => setPhoto(null)}>
+            <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white sm:max-h-[90dvh]" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
                 <h2 className="text-sm font-bold text-gray-800">{photo.label}</h2>
                 <button onClick={() => setPhoto(null)} className="rounded-xl p-1 text-gray-400 hover:bg-gray-100">

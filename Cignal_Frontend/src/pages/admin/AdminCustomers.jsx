@@ -400,7 +400,7 @@ export default function AdminCustomers() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-lg font-bold text-gray-800">Customers</h1>
           <p className="mt-0.5 text-xs text-gray-500">
@@ -408,18 +408,18 @@ export default function AdminCustomers() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex">
           <button
             type="button"
             onClick={() => { setMode('import'); setImportError(''); setImportPreview(null); setImportCredentials([]); }}
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:px-4"
           >
             <Upload size={14} /> Import Excel
           </button>
           <button
             type="button"
             onClick={() => { setIssuedCredentials(null); openModal('add'); }}
-            className="flex items-center gap-1.5 rounded-xl bg-[#cc0000] px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+            className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#cc0000] px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 sm:px-4"
           >
             <Plus size={14} /> Add Subscriber
           </button>
@@ -478,7 +478,7 @@ export default function AdminCustomers() {
           </div>
         </div>
 
-        <form onSubmit={handleCcaSearch} className="flex max-w-lg gap-2">
+        <form onSubmit={handleCcaSearch} className="flex max-w-lg flex-col gap-2 sm:flex-row">
           <input
             type="text"
             value={ccaQ}
@@ -487,11 +487,11 @@ export default function AdminCustomers() {
               if (!event.target.value) setCcaResult(null);
             }}
             placeholder="Account number or CCA number"
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-[#cc0000]"
+            className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-[#cc0000]"
           />
           <button
             type="submit"
-            className="rounded-xl bg-[#cc0000] px-5 py-2.5 text-xs font-semibold text-white hover:bg-red-700"
+            className="w-full rounded-xl bg-[#cc0000] px-5 py-2.5 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto"
           >
             Search
           </button>
@@ -508,7 +508,7 @@ export default function AdminCustomers() {
           return (
             <div className="mt-2.5 max-w-lg rounded-xl border border-green-100 bg-green-50 px-4 py-3">
               <p className="mb-2 text-xs font-semibold text-green-700">✅ Record Found</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
                 {[
                   { label: 'Account Name', value: ccaResult.accountName || '—' },
                   { label: 'Account No.', value: ccaResult.accountNumber || '—' },
@@ -547,7 +547,7 @@ export default function AdminCustomers() {
 
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="flex max-w-xs flex-1 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2">
+          <div className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1">
             <Search size={14} className="text-gray-400" />
             <input
               type="text"
@@ -558,7 +558,7 @@ export default function AdminCustomers() {
             />
           </div>
 
-          <div className="flex rounded-xl bg-gray-100 p-1">
+          <div className="flex max-w-full overflow-x-auto rounded-xl bg-gray-100 p-1">
             <button
               type="button"
               onClick={() => setRecordStatus('active')}
@@ -579,7 +579,7 @@ export default function AdminCustomers() {
             </button>
           </div>
 
-          <span className="ml-auto text-xs text-gray-400">
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">
             Showing {displayedCustomers.length} of {customers.length}
           </span>
         </div>
@@ -628,7 +628,7 @@ export default function AdminCustomers() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="min-w-[1080px] w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 {[
@@ -773,7 +773,7 @@ export default function AdminCustomers() {
       </div>
 
       {(mode === 'add' || mode === 'edit') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">
@@ -788,14 +788,14 @@ export default function AdminCustomers() {
               </button>
             </div>
 
-            <div className="max-h-[80vh] overflow-y-auto p-5">
+            <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:max-h-[80dvh] sm:p-5">
               {formErr && (
                 <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
                   {formErr}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   { label: 'Subscriber Name *', name: 'accountName' },
                   { label: 'Account Number *', name: 'accountNumber' },
@@ -876,7 +876,7 @@ export default function AdminCustomers() {
                 </div>
               )}
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={mode === 'add' && issuedCredentials ? closeModal : saveCustomer}
@@ -899,7 +899,7 @@ export default function AdminCustomers() {
       )}
 
       {mode === 'credentials' && issuedCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
             <h2 className="text-sm font-bold text-gray-900">Temporary Login Credentials</h2>
             <p className="mt-2 text-xs text-gray-500">Give these directly to the verified subscriber. The password will be changed on first login.</p>
@@ -917,7 +917,7 @@ export default function AdminCustomers() {
       )}
 
       {mode === 'import' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <div>
@@ -926,7 +926,7 @@ export default function AdminCustomers() {
               </div>
               <button type="button" onClick={closeModal}><X size={17} className="text-gray-400" /></button>
             </div>
-            <div className="max-h-[78vh] overflow-y-auto p-5">
+            <div className="max-h-[calc(100dvh-5rem)] overflow-y-auto p-4 sm:max-h-[78dvh] sm:p-5">
               {importError && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{importError}</div>}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -941,7 +941,7 @@ export default function AdminCustomers() {
                 </div>
               </div>
 
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <button type="button" disabled={importBusy || !importFile} onClick={previewSubscriberImport} className="rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
                   {importBusy ? 'Checking...' : 'Preview & Validate'}
                 </button>
@@ -960,7 +960,7 @@ export default function AdminCustomers() {
                     <span className="font-semibold text-red-700">Invalid/Duplicate: {importPreview.summary.invalid}</span>
                   </div>
                   <div className="max-h-64 overflow-auto rounded-xl border">
-                    <table className="w-full text-[11px]">
+                    <table className="min-w-[640px] w-full text-[11px]">
                       <thead className="sticky top-0 bg-gray-50"><tr><th className="p-2 text-left">Row</th><th className="p-2 text-left">Name</th><th className="p-2 text-left">Account</th><th className="p-2 text-left">CCA</th><th className="p-2 text-left">Result</th></tr></thead>
                       <tbody>{importPreview.rows.map((row) => <tr key={row.rowNumber} className="border-t"><td className="p-2">{row.rowNumber}</td><td className="p-2">{row.accountName}</td><td className="p-2 font-mono">{row.accountNumber}</td><td className="p-2 font-mono">{row.ccaNumber}</td><td className={`p-2 ${row.valid ? 'text-green-700' : 'text-red-700'}`}>{row.valid ? 'Valid' : row.errors.join(' ')}</td></tr>)}</tbody>
                     </table>
@@ -970,9 +970,9 @@ export default function AdminCustomers() {
 
               {importCredentials.length > 0 && (
                 <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
                     <div><p className="text-xs font-bold text-green-800">Import complete: {importCredentials.length} credentials generated.</p><p className="text-[11px] text-green-700">Download them now. The system stores only password hashes.</p></div>
-                    <button type="button" onClick={downloadCredentialsCsv} className="flex items-center gap-1 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white"><Download size={13} /> Download Credentials</button>
+                    <button type="button" onClick={downloadCredentialsCsv} className="flex w-full items-center justify-center gap-1 rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white sm:w-auto"><Download size={13} /> Download Credentials</button>
                   </div>
                 </div>
               )}
@@ -982,7 +982,7 @@ export default function AdminCustomers() {
       )}
 
       {mode === 'archive' && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">Archive Customer</h2>
@@ -1019,7 +1019,7 @@ export default function AdminCustomers() {
       )}
 
       {mode === 'restore' && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-800">Restore Customer</h2>
