@@ -381,10 +381,12 @@ async function fulfillLoadRequest(
   await ensureLoadRequestColumns();
 
   const connection = await pool.getConnection();
+  let fulfillmentStep = 'begin_transaction';
 
   try {
     await connection.beginTransaction();
 
+    fulfillmentStep = 'lock_load_request';
     const [requestRows] = await connection.query(
       `
       SELECT *
@@ -399,6 +401,15 @@ async function fulfillLoadRequest(
 
     if (!request) {
       throw new Error("Load request not found");
+    }
+
+    if (
+      request.payment_method === "PayMongo" &&
+      request.payment_status !== "paid"
+    ) {
+      const error = new Error("PayMongo payment is not confirmed yet.");
+      error.code = "PAYMENT_NOT_CONFIRMED";
+      throw error;
     }
 
     if (request.fulfilled_at) {
@@ -422,7 +433,47 @@ async function fulfillLoadRequest(
       };
     }
 
+    fulfillmentStep = 'check_existing_transaction';
+    const [existingTransactionRows] = await connection.query(
+      `
+      SELECT id, transaction_date
+      FROM prepaid_transactions
+      WHERE reference_no = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [request.reference_no]
+    );
+
+    const existingTransaction = existingTransactionRows[0] || null;
+
+    if (existingTransaction) {
+      fulfillmentStep = 'repair_existing_fulfillment_marker';
+      await connection.query(
+        `
+        UPDATE load_requests
+        SET
+          status = 'Completed',
+          admin_note = ?,
+          fulfilled_at = COALESCE(fulfilled_at, ?, NOW()),
+          updated_at = NOW()
+        WHERE id = ?
+        `,
+        [adminNote || null, existingTransaction.transaction_date || null, id]
+      );
+
+      fulfillmentStep = 'commit_existing_fulfillment_repair';
+      await connection.commit();
+
+      return {
+        alreadyFulfilled: true,
+        request,
+        transactionId: existingTransaction.id,
+      };
+    }
+
     let plan = null;
+    fulfillmentStep = 'resolve_prepaid_plan';
 
     if (request.plan_id) {
       const [planRows] = await connection.query(
@@ -474,6 +525,7 @@ async function fulfillLoadRequest(
     let transactionId = null;
 
     if (planId) {
+      fulfillmentStep = 'upsert_prepaid_transaction';
       const [transaction] = await connection.query(
         `
         INSERT INTO prepaid_transactions (
@@ -517,6 +569,7 @@ async function fulfillLoadRequest(
       transactionId = transaction.insertId || null;
     }
 
+    fulfillmentStep = 'insert_load_history';
     await connection.query(
       `
       INSERT INTO load_history (
@@ -537,6 +590,7 @@ async function fulfillLoadRequest(
     );
 
     if (planId) {
+      fulfillmentStep = 'upsert_prepaid_account';
       await connection.query(
         `
         INSERT INTO prepaid_accounts (
@@ -578,6 +632,7 @@ async function fulfillLoadRequest(
       );
     }
 
+    fulfillmentStep = 'mark_load_request_completed';
     await connection.query(
       `
       UPDATE load_requests
@@ -594,6 +649,7 @@ async function fulfillLoadRequest(
       ]
     );
 
+    fulfillmentStep = 'commit_fulfillment';
     await connection.commit();
 
     return {
@@ -602,7 +658,16 @@ async function fulfillLoadRequest(
       transactionId,
     };
   } catch (error) {
-    await connection.rollback();
+    try {
+      await connection.rollback();
+    } catch (rollbackError) {
+      console.error("LOAD REQUEST FULFILLMENT ROLLBACK ERROR", rollbackError);
+    }
+
+    if (!error.fulfillmentStep) {
+      error.fulfillmentStep = fulfillmentStep;
+    }
+
     throw error;
   } finally {
     connection.release();

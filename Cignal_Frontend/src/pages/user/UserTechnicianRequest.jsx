@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarClock, CheckCircle2, Info, MapPin, PhoneCall, ShieldCheck, Upload, Wrench, X } from 'lucide-react';
 import UserPageShell from '../../components/UserPageShell';
 import axiosClient from '../../api/axiosClient';
+import LocationPinPicker from '../../components/LocationPinPicker';
 
 const MAX_ATTACHMENT_MB = 8;
 
@@ -39,6 +40,7 @@ export default function UserTechnicianRequest() {
     issueDescription:prefill.prefillIssueDescription || '',
   });
   const [files,   setFiles]   = useState(initialFiles);
+  const [locationPin, setLocationPin] = useState(null);
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -81,6 +83,9 @@ export default function UserTechnicianRequest() {
         source:           prefill.source || null,
         screen_issue:     prefill.prefillScreenIssue || '',
         screen_photo:     screenPhotoBase64,
+        service_address:  form.address.trim(),
+        latitude:         locationPin?.latitude ?? null,
+        longitude:        locationPin?.longitude ?? null,
       });
       setSuccess(true);
     } catch(e) {
@@ -164,6 +169,9 @@ export default function UserTechnicianRequest() {
                     <label className="mb-2 block text-xs font-semibold text-slate-600">Landmark or Directions <span className="font-normal text-slate-400">(optional)</span></label>
                     <input name="landmark" value={form.landmark} onChange={hc} placeholder="Near the church, beside the blue gate" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#cc0000] focus:ring-4 focus:ring-red-100" />
                   </div>
+                  <div className="md:col-span-2">
+                    <LocationPinPicker value={locationPin} onChange={setLocationPin} />
+                  </div>
                 </div>
               </section>
 
@@ -179,7 +187,7 @@ export default function UserTechnicianRequest() {
                       {SERVICES.map((service) => <option key={service}>{service}</option>)}
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-xs font-semibold text-slate-600">Preferred Date</label>
                       <input type="date" name="preferredDate" value={form.preferredDate} onChange={hc} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none transition focus:border-[#cc0000] focus:ring-4 focus:ring-red-100" />
@@ -237,6 +245,7 @@ export default function UserTechnicianRequest() {
               <div className="flex justify-between gap-4"><dt className="text-slate-500">Account</dt><dd className="text-right font-semibold text-slate-800">{user.accountNumber || 'Not available'}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-slate-500">Service</dt><dd className="text-right font-semibold text-slate-800">{form.serviceType}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-slate-500">Preferred date</dt><dd className="text-right font-semibold text-slate-800">{form.preferredDate || 'To be confirmed'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-slate-500">Exact pin</dt><dd className="text-right font-semibold text-slate-800">{locationPin ? 'Selected' : 'Not selected'}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-slate-500">Attachments</dt><dd className="text-right font-semibold text-slate-800">{files.length}</dd></div>
             </dl>
           </div>
@@ -258,7 +267,7 @@ export default function UserTechnicianRequest() {
             <p className="mb-6 text-sm leading-6 text-slate-500">Our team will contact <strong>{form.contactPhone}</strong> to confirm the technician schedule.</p>
             <div className="flex flex-col gap-2">
               <button onClick={() => navigate('/user/tickets')} className="w-full rounded-xl bg-[#cc0000] py-3 font-semibold text-white hover:bg-red-700">View My Tickets</button>
-              <button onClick={() => { setSuccess(false); setForm({ contactName:user.accountName||'', contactPhone:user.phone||'', altContact:'', address:user.address||'', landmark:'', serviceType:'Signal / Dish Repair', preferredDate:'', preferredTime:'', issueDescription:'' }); setFiles([]); }} className="w-full rounded-xl border border-slate-200 py-3 text-sm text-slate-600 hover:bg-slate-50">Submit Another Request</button>
+              <button onClick={() => { setSuccess(false); setForm({ contactName:user.accountName||'', contactPhone:user.phone||'', altContact:'', address:user.address||'', landmark:'', serviceType:'Signal / Dish Repair', preferredDate:'', preferredTime:'', issueDescription:'' }); setFiles([]); setLocationPin(null); }} className="w-full rounded-xl border border-slate-200 py-3 text-sm text-slate-600 hover:bg-slate-50">Submit Another Request</button>
             </div>
           </div>
         </div>

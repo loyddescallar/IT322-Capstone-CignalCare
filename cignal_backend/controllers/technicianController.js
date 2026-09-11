@@ -26,6 +26,9 @@ async function createTechnicianRequest(req, res) {
       source,
       screen_issue,
       screen_photo,
+      service_address,
+      latitude,
+      longitude,
     } = req.body;
 
     if (!accountNumber || !contactName || !contactPhone || !issueDescription) {
@@ -35,6 +38,40 @@ async function createTechnicianRequest(req, res) {
     const customer = await findByAccountIdOrCca(String(accountNumber).trim());
     if (!customer) return res.status(404).json({ error: 'Customer account not found' });
     if (!isAdmin(req) && !ownsAccount(req, customer.accountNumber)) return res.status(403).json({ error: 'Forbidden' });
+
+    const serviceAddress = String(service_address || customer.address || '').trim();
+    if (!serviceAddress) {
+      return res.status(400).json({ error: 'Service address is required' });
+    }
+
+    const hasLatitude = latitude !== null && latitude !== undefined && latitude !== '';
+    const hasLongitude = longitude !== null && longitude !== undefined && longitude !== '';
+
+    if (hasLatitude !== hasLongitude) {
+      return res.status(400).json({ error: 'Latitude and longitude must be provided together.' });
+    }
+
+    let normalizedLatitude = null;
+    let normalizedLongitude = null;
+
+    if (hasLatitude && hasLongitude) {
+      normalizedLatitude = Number(latitude);
+      normalizedLongitude = Number(longitude);
+
+      if (
+        !Number.isFinite(normalizedLatitude) ||
+        normalizedLatitude < -90 ||
+        normalizedLatitude > 90 ||
+        !Number.isFinite(normalizedLongitude) ||
+        normalizedLongitude < -180 ||
+        normalizedLongitude > 180
+      ) {
+        return res.status(400).json({ error: 'Invalid service location coordinates.' });
+      }
+
+      normalizedLatitude = Number(normalizedLatitude.toFixed(6));
+      normalizedLongitude = Number(normalizedLongitude.toFixed(6));
+    }
 
     const screenPhotoUrl = await uploadImageMaybe(screen_photo, 'cignalcare/technician/screens');
 
@@ -49,6 +86,9 @@ async function createTechnicianRequest(req, res) {
       source: source || null,
       screen_issue: screen_issue || null,
       screen_photo_url: screenPhotoUrl || null,
+      service_address: serviceAddress,
+      latitude: normalizedLatitude,
+      longitude: normalizedLongitude,
     });
 
     const linkedIncident = await linkTechnicianIfActive(id, customer.location, issueDescription.trim());
