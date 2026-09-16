@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   CheckCircle2,
   Copy,
   Eye,
@@ -350,12 +349,6 @@ export default function AdminLogin() {
               <button type="button" onClick={() => copyText(recoveryCodes.join('\n'))} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white"><Copy size={16} />Copy Recovery Codes</button>
               <button type="button" onClick={() => navigate('/admin-dashboard')} className="w-full rounded-xl bg-[#cc0000] py-3.5 text-sm font-bold text-white">I Saved Them — Open Dashboard</button>
             </div>
-          )}
-
-          {mode !== 'codes' && (
-            <button type="button" onClick={() => navigate('/login')} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-bold text-white/55 transition hover:bg-white/10 hover:text-white">
-              <ArrowLeft size={15} /> Back to Customer Login
-            </button>
           )}
 
           <div className="mt-6 flex items-center justify-center gap-2 text-[11px] text-white/35"><Satellite size={13} /> CignalCare+ Admin Security</div>
