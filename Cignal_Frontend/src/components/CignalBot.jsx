@@ -358,7 +358,7 @@ export default function CignalBot() {
                         className={`max-w-[85%] rounded-xl px-3 py-2 text-xs ${
                           message.from === 'user'
                             ? 'rounded-br-sm bg-[#cc0000] text-white'
-                            : 'rounded-bl-sm border border-gray-200 bg-white text-gray-800 shadow-sm'
+                            : 'formal-long-text rounded-bl-sm border border-gray-200 bg-white text-gray-800 shadow-sm'
                         }`}
                       >
                         {renderText(message.text)}

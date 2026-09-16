@@ -69,3 +69,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .floating-icon { animation: float 3s ease-in-out infinite; }
 @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-5px);} }
 
+
+/* Formal narrative copy only. Chat/user-entered content remains left aligned unless explicitly marked. */
+.formal-long-text {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}

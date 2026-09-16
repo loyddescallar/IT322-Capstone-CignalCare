@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getJwtSecret } = require('../utils/authConfig');
+const { getCurrentTermsVersion } = require('../utils/termsConfig');
 const { findSecurityByUserId, writeAudit } = require('../models/adminSecurityModel');
 const { ensureAccountSchema } = require('../models/userModel');
 
@@ -21,7 +22,8 @@ async function authRequired(req, res, next) {
     const payload = jwt.verify(token, getJwtSecret());
     await ensureAccountSchema();
     const [rows] = await pool.query(
-      `SELECT id, accountName, accountNumber, ccaNumber, role, location, status, auth_session_version
+      `SELECT id, accountName, accountNumber, ccaNumber, role, location, status,
+              auth_session_version, terms_version, terms_accepted_at
        FROM users
        WHERE id = ?
        LIMIT 1`,
@@ -46,6 +48,20 @@ async function authRequired(req, res, next) {
       if (Number(payload.sessionVersion || 0) !== Number(user.auth_session_version || 1)) {
         return res.status(401).json({ error: 'Customer session has been revoked. Please log in again.' });
       }
+
+      const currentTermsVersion = getCurrentTermsVersion();
+      const termsAccepted = String(user.terms_version || '') === currentTermsVersion;
+      const path = String(req.originalUrl || req.url || '');
+      const termsRoute =
+        path.startsWith('/api/auth/customer/terms') || path === '/api/auth/me';
+
+      if (!termsAccepted && !termsRoute) {
+        return res.status(428).json({
+          error: 'Terms of Use and Privacy Notice acceptance is required before using customer services.',
+          termsRequired: true,
+          currentVersion: currentTermsVersion,
+        });
+      }
     }
 
     req.user = {
@@ -57,17 +73,18 @@ async function authRequired(req, res, next) {
       role: user.role,
       location: user.location,
       status: user.status,
+      termsVersion: user.terms_version || null,
+      termsAcceptedAt: user.terms_accepted_at || null,
     };
 
     if (user.role === 'admin' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-      const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
       const startedAt = Date.now();
       res.on('finish', () => {
         if (res.statusCode >= 200 && res.statusCode < 400) {
           writeAudit({
             userId: user.id,
             action: 'ADMIN_API_MUTATION',
-            ipAddress: forwarded || req.ip || req.socket?.remoteAddress || null,
+            ipAddress: req.ip || req.socket?.remoteAddress || null,
             userAgent: req.headers['user-agent'] || null,
             details: `${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`,
           });

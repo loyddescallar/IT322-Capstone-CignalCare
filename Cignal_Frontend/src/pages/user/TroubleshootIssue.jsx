@@ -733,7 +733,7 @@ export default function TroubleshootIssue() {
                 <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                   {issueTitle}
                 </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                <p className="formal-long-text mt-2 max-w-3xl text-sm leading-6 text-slate-500">
                   {issue.description}
                 </p>
               </div>
@@ -759,7 +759,7 @@ export default function TroubleshootIssue() {
                 <h2 className="mt-1 text-xl font-bold text-slate-900">
                   Choose the type of help you want
                 </h2>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                <p className="formal-long-text mt-1 max-w-3xl text-sm leading-6 text-slate-500">
                   Use the full guide for the complete recommended process, or choose a focused option when you only want to restart, reset, or watch the available official video.
                 </p>
               </div>
@@ -908,7 +908,7 @@ export default function TroubleshootIssue() {
                   </div>
 
                   {video.purpose && (
-                    <p className="mt-4 text-sm leading-6 text-slate-600">{video.purpose}</p>
+                    <p className="formal-long-text mt-4 text-sm leading-6 text-slate-600">{video.purpose}</p>
                   )}
 
                   {video.note && (
@@ -1049,7 +1049,7 @@ export default function TroubleshootIssue() {
 
                   <div className="p-5 sm:p-7">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
-                      <p className="text-[15px] font-semibold leading-7 text-slate-800 sm:text-base sm:leading-8">
+                      <p className="formal-long-text text-[15px] font-semibold leading-7 text-slate-800 sm:text-base sm:leading-8">
                         {activeStep.instruction}
                       </p>
                     </div>
@@ -1134,7 +1134,7 @@ export default function TroubleshootIssue() {
               <h2 className="mt-5 text-xl font-bold text-slate-900 sm:text-2xl">
                 {selectedMode.resultQuestion}
               </h2>
-              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+              <p className="formal-long-text mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
                 You completed the <strong>{selectedMode.title}</strong> for <strong>{issueTitle}</strong> on the <strong>{model.name}</strong>.
               </p>
               <div className="mt-7 grid gap-3 sm:grid-cols-2">
@@ -1172,7 +1172,7 @@ export default function TroubleshootIssue() {
                 <CheckCircle2 size={34} />
               </div>
               <h2 className="mt-5 text-2xl font-bold text-slate-900">Problem resolved</h2>
-              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+              <p className="formal-long-text mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
                 The troubleshooting outcome has been saved.
               </p>
               <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">

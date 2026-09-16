@@ -32,7 +32,7 @@ export default function LocationPinPicker({ value, onChange }) {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const onChangeRef = useRef(onChange);
-  const [locationState, setLocationState] = useState({ loading: false, error: '' });
+  const [locationState, setLocationState] = useState({ loading: false, error: '', accuracy: null });
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -71,7 +71,7 @@ export default function LocationPinPicker({ value, onChange }) {
           const dragged = marker.getLatLng();
           const next = normalizePoint(dragged.lat, dragged.lng);
           if (next) {
-            setLocationState({ loading: false, error: '' });
+            setLocationState({ loading: false, error: '', accuracy: null });
             onChangeRef.current?.(next);
           }
         });
@@ -82,7 +82,7 @@ export default function LocationPinPicker({ value, onChange }) {
       }
 
       if (shouldNotify) {
-        setLocationState({ loading: false, error: '' });
+        setLocationState({ loading: false, error: '', accuracy: null });
         onChangeRef.current?.(point);
       }
     };
@@ -132,7 +132,7 @@ export default function LocationPinPicker({ value, onChange }) {
         const dragged = marker.getLatLng();
         const next = normalizePoint(dragged.lat, dragged.lng);
         if (next) {
-          setLocationState({ loading: false, error: '' });
+          setLocationState({ loading: false, error: '', accuracy: null });
           onChangeRef.current?.(next);
         }
       });
@@ -143,46 +143,97 @@ export default function LocationPinPicker({ value, onChange }) {
     }
   }, [value?.latitude, value?.longitude]);
 
-  const useCurrentLocation = () => {
+  const useCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      setLocationState({ loading: false, error: 'Current location is not supported by this browser.' });
+      setLocationState({ loading: false, error: 'Location services are not supported by this browser. Place the pin manually instead.', accuracy: null });
       return;
     }
 
-    setLocationState({ loading: true, error: '' });
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (!window.isSecureContext && !isLocalhost) {
+      setLocationState({ loading: false, error: 'Device location requires a secure HTTPS connection. Use the deployed CignalCare+ site or place the pin manually.', accuracy: null });
+      return;
+    }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const point = normalizePoint(position.coords.latitude, position.coords.longitude);
-
-        if (!point) {
-          setLocationState({ loading: false, error: 'The browser returned an invalid location.' });
+    try {
+      if (navigator.permissions?.query) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        if (permission.state === 'denied') {
+          setLocationState({
+            loading: false,
+            error: 'Location access is blocked for this site. Open your browser Site Settings, set Location to Allow, make sure the device Location/GPS service is turned on, then try again.',
+            accuracy: null,
+          });
           return;
         }
-
-        onChange?.(point);
-        mapRef.current?.setView([point.latitude, point.longitude], PIN_ZOOM);
-        setLocationState({ loading: false, error: '' });
-      },
-      (error) => {
-        const message =
-          error.code === error.PERMISSION_DENIED
-            ? 'Location permission was denied. You can still place the pin manually or submit using the written address only.'
-            : 'Your current location could not be detected. You can still place the pin manually or submit using the written address only.';
-
-        setLocationState({ loading: false, error: message });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 30000,
       }
-    );
+    } catch {
+      // Some browsers do not expose geolocation through the Permissions API.
+      // Calling getCurrentPosition below will still trigger their normal prompt.
+    }
+
+    setLocationState({ loading: true, error: '', accuracy: null });
+
+    const locate = (options) => new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+
+    try {
+      let position;
+      try {
+        // First request the device's highest available GPS/location accuracy.
+        // Calling this while handling the user's click triggers the browser's
+        // permission prompt when the permission has not been decided yet.
+        position = await locate({
+          enableHighAccuracy: true,
+          timeout: 18000,
+          maximumAge: 0,
+        });
+      } catch (firstError) {
+        if (firstError?.code === firstError?.PERMISSION_DENIED || firstError?.code === 1) throw firstError;
+        // Desktop devices and indoor phones may not return a GPS fix quickly.
+        // Fall back to the browser's best available position instead of failing
+        // the technician request completely.
+        position = await locate({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 15000,
+        });
+      }
+
+      const point = normalizePoint(position.coords.latitude, position.coords.longitude);
+      if (!point) {
+        setLocationState({ loading: false, error: 'The device returned an invalid location. Place the pin manually instead.', accuracy: null });
+        return;
+      }
+
+      const map = mapRef.current;
+      if (map) {
+        map.invalidateSize();
+        map.flyTo([point.latitude, point.longitude], PIN_ZOOM, { animate: true, duration: 0.6 });
+      }
+      onChangeRef.current?.(point);
+      setLocationState({
+        loading: false,
+        error: '',
+        accuracy: Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null,
+      });
+    } catch (error) {
+      let message = 'Your current location could not be detected. Make sure device Location/GPS is turned on, then try again or place the pin manually.';
+      if (error?.code === error?.PERMISSION_DENIED || error?.code === 1) {
+        message = 'Location permission was denied. Allow Location for this site in your browser settings, make sure device Location/GPS is on, then try again.';
+      } else if (error?.code === error?.TIMEOUT || error?.code === 3) {
+        message = 'Location detection timed out. Move to an area with a clearer GPS/network signal, turn on Location/GPS, then retry or place the pin manually.';
+      } else if (error?.code === error?.POSITION_UNAVAILABLE || error?.code === 2) {
+        message = 'The device location is currently unavailable. Turn on Location/GPS and Wi-Fi/mobile data, then retry or place the pin manually.';
+      }
+      setLocationState({ loading: false, error: message, accuracy: null });
+    }
   };
 
   const clearPin = () => {
     onChange?.(null);
-    setLocationState({ loading: false, error: '' });
+    setLocationState({ loading: false, error: '', accuracy: null });
   };
 
   return (
@@ -193,7 +244,7 @@ export default function LocationPinPicker({ value, onChange }) {
             Exact Map Pin <span className="font-normal text-slate-400">(optional)</span>
           </p>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Tap/click the map or drag the marker. The written service address remains required.
+            Tap/click the map or drag the marker. Use My Current Location will ask for browser location permission when needed. The written service address remains required.
           </p>
         </div>
 
@@ -235,6 +286,7 @@ export default function LocationPinPicker({ value, onChange }) {
           </span>
           <span>Lat: {Number(value.latitude).toFixed(6)}</span>
           <span>Lng: {Number(value.longitude).toFixed(6)}</span>
+          {locationState.accuracy != null && <span>Accuracy: ±{locationState.accuracy} m</span>}
         </div>
       ) : (
         <p className="text-xs leading-5 text-slate-500">

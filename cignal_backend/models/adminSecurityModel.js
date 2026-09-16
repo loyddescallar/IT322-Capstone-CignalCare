@@ -6,6 +6,8 @@ let schemaReady = false;
 async function ensureAdminSecuritySchema() {
   if (schemaReady) return;
 
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_phone VARCHAR(30) NULL, ADD COLUMN IF NOT EXISTS recovery_phone_verified_at TIMESTAMP NULL DEFAULT NULL`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS admin_security (
     user_id INTEGER PRIMARY KEY,
     username VARCHAR(80) NOT NULL UNIQUE,
@@ -48,14 +50,14 @@ async function ensureAdminSecuritySchema() {
 
 async function hasConfiguredAdminSecurity() {
   await ensureAdminSecuritySchema();
-  const [rows] = await pool.query(`SELECT COUNT(*) AS total FROM admin_security WHERE totp_enabled = TRUE`);
+  const [rows] = await pool.query(`SELECT COUNT(*) AS total FROM admin_security`);
   return Number(rows[0]?.total || 0) > 0;
 }
 
 async function findSecurityByUsername(username) {
   await ensureAdminSecuritySchema();
   const [rows] = await pool.query(
-    `SELECT s.*, u.accountName, u.accountNumber, u.ccaNumber, u.address, u.phone, u.email, u.password_hash, u.role, u.location, u.status
+    `SELECT s.*, u.accountName, u.accountNumber, u.ccaNumber, u.address, u.phone, u.recovery_phone, u.recovery_phone_verified_at, u.email, u.email_verified_at, u.password_hash, u.role, u.location, u.status
      FROM admin_security s
      JOIN users u ON u.id = s.user_id
      WHERE s.username = ? AND u.role = 'admin'
@@ -68,7 +70,7 @@ async function findSecurityByUsername(username) {
 async function findSecurityByUserId(userId) {
   await ensureAdminSecuritySchema();
   const [rows] = await pool.query(
-    `SELECT s.*, u.accountName, u.accountNumber, u.ccaNumber, u.address, u.phone, u.email, u.password_hash, u.role, u.location, u.status
+    `SELECT s.*, u.accountName, u.accountNumber, u.ccaNumber, u.address, u.phone, u.recovery_phone, u.recovery_phone_verified_at, u.email, u.email_verified_at, u.password_hash, u.role, u.location, u.status
      FROM admin_security s
      JOIN users u ON u.id = s.user_id
      WHERE s.user_id = ? AND u.role = 'admin'
@@ -96,7 +98,7 @@ async function updateAdminPasswordAndEmail(userId, passwordHash, email) {
 }
 
 async function updateAdminEmail(userId, email) {
-  await pool.query(`UPDATE users SET email = ?, updated_at = NOW() WHERE id = ? AND role = 'admin'`, [email, userId]);
+  await pool.query(`UPDATE users SET email = ?, email_verified_at = NULL, updated_at = NOW() WHERE id = ? AND role = 'admin'`, [email, userId]);
 }
 
 async function updateAdminPassword(userId, passwordHash) {

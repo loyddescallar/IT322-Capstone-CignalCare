@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Mail, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Mail, ShieldCheck, Smartphone } from 'lucide-react';
 import UserLayout from '../../components/UserLayout';
 import authApi from '../../api/authApi';
 
@@ -8,6 +8,9 @@ export default function AccountSecurity() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -17,6 +20,7 @@ export default function AccountSecurity() {
       const response = await authApi.customerSecurityInfo();
       setSecurity(response.data);
       setEmail(response.data.email || '');
+      setPhone(response.data.recoveryPhone || response.data.phone || '');
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to load account security.');
     }
@@ -60,6 +64,41 @@ export default function AccountSecurity() {
     }
   };
 
+
+  const sendPhoneCode = async () => {
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      const response = await authApi.requestPhoneVerification({ phone });
+      setPhoneCodeSent(true);
+      setMessage(response.data.message);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to send SMS verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyPhoneCode = async () => {
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      const response = await authApi.confirmPhoneVerification({ code: phoneCode });
+      const current = JSON.parse(localStorage.getItem('user') || '{}');
+      localStorage.setItem('user', JSON.stringify({ ...current, ...response.data.user }));
+      setPhoneCode('');
+      setPhoneCodeSent(false);
+      setMessage(response.data.message);
+      await loadSecurity();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to verify mobile number.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <UserLayout>
       <main className="mx-auto min-h-[calc(100dvh-5rem)] w-full max-w-3xl px-3 py-6 sm:px-6 sm:py-10">
@@ -68,7 +107,7 @@ export default function AccountSecurity() {
             <div className="rounded-2xl bg-red-50 p-3 text-[#cc0000]"><ShieldCheck size={24} /></div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Account Security</h1>
-              <p className="mt-1 text-sm text-gray-500">Verify an optional recovery email so you can reset your password without waiting for Admin assistance.</p>
+              <p className="mt-1 text-sm text-gray-500">Verify recovery email and mobile contacts so you can use Email or SMS OTP when recovering your account.</p>
             </div>
           </div>
 
@@ -140,6 +179,44 @@ export default function AccountSecurity() {
             <p className="mt-4 text-xs leading-5 text-gray-500">
               Verification codes expire after 10 minutes. Changing your email removes its verified status and requires a new verification code.
             </p>
+          </section>
+
+          <section className="mt-5 rounded-2xl border border-gray-200 p-4 sm:p-5">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Recovery Mobile Number</p>
+                <p className="mt-1 text-sm text-gray-700">Separate from the service/contact number. Used only for security and SMS recovery codes.</p>
+              </div>
+              {security?.phoneVerified ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700"><CheckCircle2 size={14} /> Verified</span>
+              ) : (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">Unverified</span>
+              )}
+            </div>
+
+            <label className="mt-5 block text-xs font-bold uppercase tracking-wide text-gray-600">Philippine Mobile Number</label>
+            <div className="relative mt-2">
+              <Smartphone size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value); setPhoneCodeSent(false); }}
+                className="w-full rounded-xl border border-gray-200 py-3 pl-11 pr-4 text-sm outline-none focus:border-[#cc0000]"
+                placeholder="09XXXXXXXXX"
+              />
+            </div>
+            <button type="button" onClick={sendPhoneCode} disabled={loading || !phone.trim() || (security?.phoneVerified && phone === security.recoveryPhone)} className="mt-3 w-full rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 sm:w-auto">
+              {loading ? 'Please wait...' : security?.phoneVerified && phone === security.recoveryPhone ? 'Mobile Number Verified' : 'Send SMS Verification Code'}
+            </button>
+
+            {phoneCodeSent && (
+              <div className="mt-5 rounded-2xl bg-gray-50 p-4">
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-600">6-digit SMS Code</label>
+                <input type="text" inputMode="numeric" maxLength={6} value={phoneCode} onChange={(e) => setPhoneCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-bold tracking-[0.35em] outline-none focus:border-[#cc0000]" placeholder="000000" />
+                <button type="button" onClick={verifyPhoneCode} disabled={loading || phoneCode.length !== 6} className="mt-3 w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50">Verify Mobile Number</button>
+              </div>
+            )}
+            <p className="mt-4 text-xs leading-5 text-gray-500">SMS verification requires UniSMS to be configured. Changing your mobile number requires verification again.</p>
           </section>
 
           <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-5 text-blue-800">

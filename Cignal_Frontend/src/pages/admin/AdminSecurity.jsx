@@ -40,6 +40,10 @@ export default function AdminSecurity() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [contactChannel, setContactChannel] = useState('');
+  const [contactCode, setContactCode] = useState('');
+  const [contactCodeSent, setContactCodeSent] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
 
   async function load() {
@@ -52,6 +56,7 @@ export default function AdminSecurity() {
       ]);
       setSecurity(securityResponse.data?.security || null);
       setEmail(securityResponse.data?.security?.recoveryEmail || '');
+      setPhone(securityResponse.data?.security?.recoveryPhone || '');
       setLogs(logsResponse.data?.logs || []);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Unable to load security settings.');
@@ -84,6 +89,56 @@ export default function AdminSecurity() {
     }
   };
 
+
+  const startContactVerification = async (channel) => {
+    if (!currentPassword || !/^\d{6}$/.test(totpCode)) {
+      setError('Enter your current admin password and 6-digit Authenticator code first.');
+      return;
+    }
+    const value = channel === 'email' ? email : phone;
+    if (!String(value || '').trim()) {
+      setError(channel === 'email' ? 'Enter an email address.' : 'Enter a Philippine mobile number.');
+      return;
+    }
+    setBusy(`contact-${channel}`);
+    setError('');
+    setMessage('');
+    try {
+      const response = await authApi.adminContactVerificationStart({ ...credentials(), channel, value });
+      setContactChannel(channel);
+      setContactCode('');
+      setContactCodeSent(true);
+      setMessage(response.data?.message || 'Verification code sent.');
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Unable to send verification code.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const confirmContactVerification = async () => {
+    if (!contactChannel || !/^\d{6}$/.test(contactCode)) {
+      setError('Enter the 6-digit verification code.');
+      return;
+    }
+    setBusy('contact-confirm');
+    setError('');
+    setMessage('');
+    try {
+      const response = await authApi.adminContactVerificationConfirm({ channel: contactChannel, code: contactCode });
+      setContactCode('');
+      setContactCodeSent(false);
+      setCurrentPassword('');
+      setTotpCode('');
+      setMessage(response.data?.message || 'Security contact verified.');
+      await load();
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Unable to verify security contact.');
+    } finally {
+      setBusy('');
+    }
+  };
+
   const copyCodes = async () => {
     await navigator.clipboard.writeText(recoveryCodes.join('\n'));
     setMessage('Recovery codes copied. Store them somewhere offline and secure.');
@@ -100,7 +155,7 @@ export default function AdminSecurity() {
           <div>
             <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-red-600"><ShieldCheck size={18} /> Admin Security Center</div>
             <h1 className="mt-2 text-2xl font-bold text-gray-900">Protect administrator access</h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">Password, Authenticator verification, recovery codes, session revocation, and security activity are managed here.</p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">Password, Email/SMS OTP, Authenticator fallback, recovery codes, session revocation, and security activity are managed here.</p>
           </div>
           <button onClick={load} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"><RefreshCw size={16} /> Refresh</button>
         </div>
@@ -110,7 +165,7 @@ export default function AdminSecurity() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-gray-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">Secure Username</p><p className="mt-2 font-bold text-gray-900">{security?.username || '—'}</p></div>
-          <div className="rounded-xl border border-gray-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">Two-Factor Authentication</p><p className="mt-2 flex items-center gap-2 font-bold text-emerald-700"><CheckCircle2 size={17} /> {security?.twoFactorEnabled ? 'Enabled' : 'Not enabled'}</p></div>
+          <div className="rounded-xl border border-gray-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">Two-Factor Authentication</p><p className="mt-2 flex items-center gap-2 font-bold text-emerald-700"><CheckCircle2 size={17} /> {security?.emailOtpAvailable || security?.smsOtpAvailable ? 'Email/SMS Ready' : security?.twoFactorEnabled ? 'Authenticator Ready' : 'Needs setup'}</p></div>
           <div className="rounded-xl border border-gray-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">Last Secure Login</p><p className="mt-2 text-sm font-semibold text-gray-900">{formatDate(security?.lastLoginAt)}</p></div>
         </div>
       </div>
@@ -127,10 +182,28 @@ export default function AdminSecurity() {
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Mail size={19} className="text-red-600" /> Recovery Contact Email</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-500">Stored as a recovery/security contact. Offline recovery codes remain the active provider-free recovery method.</p>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@example.com" className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-red-500" />
-            <button disabled={busy === 'email'} onClick={() => run('email', async () => { const response = await authApi.adminUpdateRecoveryEmail({ ...credentials(), email }); setMessage(response.data?.message || 'Recovery email updated.'); })} className="mt-3 w-full rounded-xl bg-gray-900 py-3 text-sm font-bold text-white disabled:opacity-50">Update Recovery Email</button>
+            <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Mail size={19} className="text-red-600" /> OTP Login Contacts</h2>
+            <p className="mt-1 text-xs leading-5 text-gray-500">Verify an email and/or mobile number once. After verification, either can be selected instead of opening an Authenticator app during Admin login.</p>
+
+            <div className="mt-4 rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-gray-900">Email OTP</p>{security?.emailVerified ? <span className="text-xs font-bold text-emerald-700">Verified</span> : <span className="text-xs font-bold text-amber-700">Unverified</span>}</div>
+              <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setContactCodeSent(false); }} placeholder="admin@example.com" className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-red-500" />
+              <button disabled={busy === 'contact-email'} onClick={() => startContactVerification('email')} className="mt-3 w-full rounded-xl bg-gray-900 py-3 text-sm font-bold text-white disabled:opacity-50">{security?.emailVerified && email === security?.recoveryEmail ? 'Re-verify / Change Email' : 'Send Email Verification Code'}</button>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-gray-900">SMS OTP</p>{security?.phoneVerified ? <span className="text-xs font-bold text-emerald-700">Verified</span> : <span className="text-xs font-bold text-amber-700">Unverified</span>}</div>
+              <div className="relative mt-3"><Smartphone size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" /><input type="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setContactCodeSent(false); }} placeholder="09XXXXXXXXX" className="w-full rounded-xl border border-gray-200 py-3 pl-11 pr-4 text-sm outline-none focus:border-red-500" /></div>
+              <button disabled={busy === 'contact-sms'} onClick={() => startContactVerification('sms')} className="mt-3 w-full rounded-xl bg-[#cc0000] py-3 text-sm font-bold text-white disabled:opacity-50">{security?.phoneVerified && phone === security?.recoveryPhone ? 'Re-verify / Change Mobile' : 'Send SMS Verification Code'}</button>
+            </div>
+
+            {contactCodeSent && (
+              <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{contactChannel === 'email' ? 'Email' : 'SMS'} verification code</p>
+                <input inputMode="numeric" maxLength={6} value={contactCode} onChange={(e) => setContactCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-bold tracking-[0.35em] outline-none focus:border-red-500" />
+                <button disabled={busy === 'contact-confirm' || contactCode.length !== 6} onClick={confirmContactVerification} className="mt-3 w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white disabled:opacity-50">Verify Contact</button>
+              </div>
+            )}
           </section>
         </div>
 

@@ -25,6 +25,11 @@ const PORT = process.env.PORT || 5000;
 const isProduction =
   String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 
+app.disable('x-powered-by');
+// Render terminates HTTPS in front of the Node service. Trust exactly one
+// reverse-proxy hop in production so req.ip is derived safely.
+app.set('trust proxy', isProduction ? 1 : false);
+
 const configuredOrigins = Array.from(
   new Set(
     [process.env.CORS_ORIGIN, process.env.FRONTEND_URL]
@@ -58,6 +63,21 @@ app.use(
   })
 );
 app.use(morgan(isProduction ? 'combined' : 'dev'));
+
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  if (isProduction) {
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains'
+    );
+  }
+
+  next();
+});
 
 if (isProduction && configuredOrigins.length === 0) {
   console.warn(

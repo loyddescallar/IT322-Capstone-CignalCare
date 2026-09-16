@@ -13,6 +13,8 @@ async function ensureAccountSchema() {
     ADD COLUMN IF NOT EXISTS recovery_code_issued_at TIMESTAMP NULL DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS auth_session_version INTEGER NOT NULL DEFAULT 1,
     ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS recovery_phone VARCHAR(30) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS recovery_phone_verified_at TIMESTAMP NULL DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS email_verification_code_hash VARCHAR(64) DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMP NULL DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS email_verification_attempts INTEGER NOT NULL DEFAULT 0,
@@ -20,7 +22,9 @@ async function ensureAccountSchema() {
     ADD COLUMN IF NOT EXISTS password_reset_code_hash VARCHAR(64) DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMP NULL DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS password_reset_attempts INTEGER NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS password_reset_last_sent_at TIMESTAMP NULL DEFAULT NULL`);
+    ADD COLUMN IF NOT EXISTS password_reset_last_sent_at TIMESTAMP NULL DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS terms_version VARCHAR(40) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP NULL DEFAULT NULL`);
 
   // Existing temporary credentials created before this migration receive a
   // fresh seven-day window instead of being invalidated without warning.
@@ -76,6 +80,55 @@ async function findByAccountNumber(accountNumber) {
     [accountNumber]
   );
   return rows[0] || null;
+}
+
+async function findByCcaNumber(ccaNumber) {
+  await ensureAccountSchema();
+  const [rows] = await pool.query(
+    `SELECT * FROM users
+     WHERE ccaNumber = ?
+       AND role = 'user'
+       AND COALESCE(status, 'active') <> 'archived'
+     LIMIT 1`,
+    [ccaNumber]
+  );
+  return rows[0] || null;
+}
+
+async function getPublicPrepaidAccount(accountNumber) {
+  await ensureAccountSchema();
+  const [rows] = await pool.query(
+    `SELECT
+       u.id,
+       u.accountNumber,
+       u.status AS subscriber_status,
+       pa.last_load_amount,
+       pa.last_load_date,
+       pa.expiry_date,
+       pa.status AS prepaid_status,
+       pp.plan_name,
+       pp.validity_days
+     FROM users u
+     LEFT JOIN prepaid_accounts pa ON pa.account_number = u.accountNumber
+     LEFT JOIN prepaid_plans pp ON pp.id = pa.current_plan_id
+     WHERE u.accountNumber = ?
+       AND u.role = 'user'
+       AND COALESCE(u.status, 'active') <> 'archived'
+     LIMIT 1`,
+    [accountNumber]
+  );
+  return rows[0] || null;
+}
+
+async function acceptTerms(id, version) {
+  await ensureAccountSchema();
+  await pool.query(
+    `UPDATE users
+     SET terms_version=?, terms_accepted_at=NOW(), updated_at=NOW()
+     WHERE id=? AND role='user'`,
+    [version, id]
+  );
+  return findById(id);
 }
 
 async function findById(id) {
@@ -208,6 +261,7 @@ async function updateUser(id, data) {
   await ensureAccountSchema();
   const existing = await findById(id);
   const nextEmail = data.email || null;
+  const nextPhone = data.phone || '';
   const emailChanged = String(existing?.email || '').trim().toLowerCase() !== String(nextEmail || '').trim().toLowerCase();
 
   await pool.query(
@@ -232,7 +286,7 @@ async function updateUser(id, data) {
     [
       data.accountName,
       data.address || '',
-      data.phone || '',
+      nextPhone,
       nextEmail,
       normalizeLocation(data.location),
       data.role || 'user',
@@ -443,6 +497,29 @@ async function incrementPasswordResetAttempts(id) {
   );
 }
 
+
+async function updateVerifiedPhone(id, phone, role = 'user') {
+  await ensureAccountSchema();
+  const [result] = await pool.query(
+    `UPDATE users
+     SET recovery_phone=?, recovery_phone_verified_at=NOW(), updated_at=NOW()
+     WHERE id=? AND role=?`,
+    [phone, id, role]
+  );
+  return Number(result.affectedRows || 0);
+}
+
+async function updateVerifiedEmail(id, email, role = 'admin') {
+  await ensureAccountSchema();
+  const [result] = await pool.query(
+    `UPDATE users
+     SET email=?, email_verified_at=NOW(), updated_at=NOW()
+     WHERE id=? AND role=?`,
+    [email, id, role]
+  );
+  return Number(result.affectedRows || 0);
+}
+
 async function archiveUser(id) {
   const [result] = await pool.query(
     `UPDATE users
@@ -484,6 +561,9 @@ module.exports = {
   normalizeLocation,
   findForAdminLogin,
   findByAccountNumber,
+  findByCcaNumber,
+  getPublicPrepaidAccount,
+  acceptTerms,
   findById,
   findByAccountIdOrCca,
   getAllUsers,
@@ -501,6 +581,8 @@ module.exports = {
   setCustomerPasswordResetChallenge,
   rollbackCustomerPasswordResetChallenge,
   incrementPasswordResetAttempts,
+  updateVerifiedPhone,
+  updateVerifiedEmail,
   archiveUser,
   restoreUser,
   checkDuplicate,

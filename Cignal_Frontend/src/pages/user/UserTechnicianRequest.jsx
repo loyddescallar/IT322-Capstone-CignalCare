@@ -48,8 +48,10 @@ export default function UserTechnicianRequest() {
   const hc = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
   const addFiles = e => {
-    const newFiles = Array.from(e.target.files || []).filter(file => file.size <= MAX_ATTACHMENT_MB * 1024 * 1024);
-    setFiles(prev => [...prev, ...newFiles]);
+    const selected = Array.from(e.target.files || []).find(
+      file => file.type?.startsWith('image/') && file.size <= MAX_ATTACHMENT_MB * 1024 * 1024
+    );
+    setFiles(selected ? [selected] : []);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
   const removeFile = i => setFiles(prev => prev.filter((_, idx) => idx !== i));
@@ -210,16 +212,16 @@ export default function UserTechnicianRequest() {
                   <Upload size={16} className="text-[#cc0000]" />
                   <h2 className="text-sm font-bold uppercase tracking-wide text-slate-700">Attachments <span className="font-normal normal-case text-slate-400">(optional)</span></h2>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={addFiles} />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={addFiles} />
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-4 py-5 text-sm font-medium text-slate-500 transition hover:border-[#cc0000] hover:bg-red-50 hover:text-[#cc0000]">
-                  <Upload size={17} /> Attach photos or videos of the issue
+                  <Upload size={17} /> Attach a photo of the issue
                 </button>
                 {prefill.prefillScreenPhotoFile && <p className="mt-2 text-xs font-semibold text-green-700">✓ TV screen photo from Load Request was attached automatically.</p>}
                 {files.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {files.map((file, index) => (
                       <div key={`${file.name}-${index}`} className="flex min-w-0 flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 sm:flex-nowrap sm:gap-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${file.type.startsWith('image') ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{file.type.startsWith('image') ? 'Image' : 'Video'}</span>
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Image</span>
                         <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{file.name}</span>
                         <span className="ml-auto text-xs text-slate-400 sm:ml-0">{formatSize(file.size)}</span>
                         <button type="button" onClick={() => removeFile(index)} className="text-slate-400 hover:text-red-500" aria-label={`Remove ${file.name}`}><X size={14} /></button>

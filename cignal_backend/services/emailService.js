@@ -144,22 +144,49 @@ function escapeHtml(value) {
 
 function buildOtpMessage({ code, purpose }) {
   const isVerification = purpose === 'verify_email';
+  const isAccountNumberRecovery = purpose === 'account_number_recovery';
+  const isAdminLogin = purpose === 'admin_login';
+  const isAdminContact = purpose === 'admin_contact_verification';
 
   const title = isVerification
     ? 'Verify your recovery email'
-    : 'Password recovery code';
+    : isAccountNumberRecovery
+      ? 'Account Number recovery code'
+      : isAdminLogin
+        ? 'Admin login verification code'
+        : isAdminContact
+          ? 'Verify your Admin security contact'
+          : 'Password recovery code';
 
   const subject = isVerification
     ? 'CignalCare+ | Verify your recovery email'
-    : 'CignalCare+ | Password recovery code';
+    : isAccountNumberRecovery
+      ? 'CignalCare+ | Account Number recovery code'
+      : isAdminLogin
+        ? 'CignalCare+ | Admin login verification'
+        : isAdminContact
+          ? 'CignalCare+ | Verify Admin security contact'
+          : 'CignalCare+ | Password recovery code';
 
   const instruction = isVerification
     ? 'Use the verification code below to confirm this email address for CignalCare+ account recovery.'
-    : 'Use the security code below to continue resetting your CignalCare+ password.';
+    : isAccountNumberRecovery
+      ? 'Use the security code below to confirm your identity before CignalCare+ reveals your Account Number.'
+      : isAdminLogin
+        ? 'Use the security code below to complete your CignalCare+ administrator login.'
+        : isAdminContact
+          ? 'Use the verification code below to confirm this contact for administrator security and OTP login.'
+          : 'Use the security code below to continue resetting your CignalCare+ password.';
 
   const actionLabel = isVerification
     ? 'Email verification code'
-    : 'Password recovery code';
+    : isAccountNumberRecovery
+      ? 'Account recovery code'
+      : isAdminLogin
+        ? 'Admin login code'
+        : isAdminContact
+          ? 'Admin contact verification code'
+          : 'Password recovery code';
 
   const safeCode = escapeHtml(code);
   const year = new Date().getFullYear();
