@@ -18,47 +18,79 @@ import {
   shouldUseLiveSystemData,
 } from '../data/chatbotRules';
 
+function renderInline(text) {
+  return String(text || '')
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((part, index) =>
+      part.startsWith('**') && part.endsWith('**')
+        ? <strong key={index}>{part.slice(2, -2)}</strong>
+        : part
+    );
+}
+
 function renderText(text) {
   return String(text || '')
     .split('\n')
-    .map((line, i) => {
-      if (!line.trim()) return <div key={i} className="h-1.5" />;
-
-      const parts = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-        part.startsWith('**') ? <strong key={j}>{part.slice(2, -2)}</strong> : part
-      );
+    .map((rawLine, index) => {
+      const line = rawLine.trim();
+      if (!line) return <div key={index} className="h-1.5" />;
 
       if (line.startsWith('|')) {
-        const cells = line.split('|').filter(Boolean);
-        if (cells.every((cell) => cell.trim() === '---' || cell.trim() === '')) return null;
+        const cells = line.split('|').filter(Boolean).map((cell) => cell.trim());
+        if (cells.every((cell) => /^:?-{3,}:?$/.test(cell) || !cell)) return null;
         return (
-          <div key={i} className="flex gap-3 text-xs">
-            <span className="w-24 flex-shrink-0 font-semibold">{cells[0]?.trim()}</span>
-            <span className="text-gray-400">{cells[1]?.trim()}</span>
-            <span>{cells[2]?.trim()}</span>
+          <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-left text-[13px] leading-5">
+            <span className="min-w-0 font-semibold">{renderInline(cells[0] || '')}</span>
+            <span className="text-right text-gray-500">{renderInline(cells.slice(1).join(' · '))}</span>
           </div>
         );
       }
 
-      if (line.startsWith('→')) {
+      const arrowMatch = line.match(/^→\s*(.+)$/);
+      if (arrowMatch) {
         return (
-          <div key={i} className="flex items-start gap-1.5 text-xs">
-            <span className="mt-0.5 flex-shrink-0 text-[#cc0000]">→</span>
-            <span>{parts.slice(1)}</span>
+          <div key={index} className="flex items-start gap-2 text-left text-[13px] leading-5">
+            <span className="mt-[1px] shrink-0 font-bold text-[#cc0000]">→</span>
+            <span className="min-w-0 break-words">{renderInline(arrowMatch[1])}</span>
           </div>
         );
       }
 
-      if (line.startsWith('•')) {
+      const bulletMatch = line.match(/^(?:•|-|\*)\s+(.+)$/);
+      if (bulletMatch) {
         return (
-          <div key={i} className="flex items-start gap-1.5 text-xs">
-            <span className="flex-shrink-0 text-[#cc0000]">•</span>
-            <span>{parts.slice(1)}</span>
+          <div key={index} className="flex items-start gap-2 text-left text-[13px] leading-5">
+            <span className="mt-[1px] shrink-0 font-bold text-[#cc0000]">•</span>
+            <span className="min-w-0 break-words">{renderInline(bulletMatch[1])}</span>
           </div>
         );
       }
 
-      return <p key={i} className="text-xs leading-relaxed">{parts}</p>;
+      const numberMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
+      if (numberMatch) {
+        return (
+          <div key={index} className="flex items-start gap-2 text-left text-[13px] leading-5">
+            <span className="w-4 shrink-0 font-bold text-[#cc0000]">{numberMatch[1]}.</span>
+            <span className="min-w-0 break-words">{renderInline(numberMatch[2])}</span>
+          </div>
+        );
+      }
+
+      const headingMatch = line.match(/^#{1,3}\s+(.+)$/);
+      if (headingMatch) {
+        return (
+          <p key={index} className="text-left text-[13px] font-bold leading-5 text-gray-900">
+            {renderInline(headingMatch[1])}
+          </p>
+        );
+      }
+
+      return (
+        <p key={index} className="break-words text-left text-[13px] leading-5 text-gray-800 sm:text-sm sm:leading-[1.55]">
+          {renderInline(line)}
+        </p>
+      );
     })
     .filter(Boolean);
 }
@@ -321,7 +353,7 @@ export default function CignalBot() {
     <div className="fixed bottom-3 right-3 z-50 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:bottom-5 sm:right-5">
       {open && (
         <div
-          className="flex w-[calc(100vw-1.5rem)] max-w-80 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-80"
+          className="flex w-[calc(100vw-1.5rem)] max-w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-[360px]"
           style={{ height: minimized ? 'auto' : 'min(420px, calc(100dvh - 7rem))' }}
         >
           <div className="flex flex-shrink-0 items-center gap-2 bg-gradient-to-r from-[#880000] to-[#cc0000] px-4 py-3 text-white">
@@ -355,10 +387,10 @@ export default function CignalBot() {
                         </div>
                       )}
                       <div
-                        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs ${
+                        className={`max-w-[88%] rounded-xl px-3 py-2 text-left text-[13px] leading-5 sm:text-sm ${
                           message.from === 'user'
                             ? 'rounded-br-sm bg-[#cc0000] text-white'
-                            : 'formal-long-text rounded-bl-sm border border-gray-200 bg-white text-gray-800 shadow-sm'
+                            : 'rounded-bl-sm border border-gray-200 bg-white text-gray-800 shadow-sm'
                         }`}
                       >
                         {renderText(message.text)}

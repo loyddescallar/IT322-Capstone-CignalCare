@@ -143,92 +143,111 @@ export default function LocationPinPicker({ value, onChange }) {
     }
   }, [value?.latitude, value?.longitude]);
 
-  const useCurrentLocation = async () => {
+  const useCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setLocationState({ loading: false, error: 'Location services are not supported by this browser. Place the pin manually instead.', accuracy: null });
+      setLocationState({
+        loading: false,
+        error: 'Location services are not supported by this browser. Place the pin manually instead.',
+        accuracy: null,
+      });
       return;
     }
 
     const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
     if (!window.isSecureContext && !isLocalhost) {
-      setLocationState({ loading: false, error: 'Device location requires a secure HTTPS connection. Use the deployed CignalCare+ site or place the pin manually.', accuracy: null });
+      setLocationState({
+        loading: false,
+        error: 'Device location requires a secure HTTPS connection. Use the deployed CignalCare+ site or place the pin manually.',
+        accuracy: null,
+      });
       return;
     }
 
-    try {
-      if (navigator.permissions?.query) {
-        const permission = await navigator.permissions.query({ name: 'geolocation' });
-        if (permission.state === 'denied') {
-          setLocationState({
-            loading: false,
-            error: 'Location access is blocked for this site. Open your browser Site Settings, set Location to Allow, make sure the device Location/GPS service is turned on, then try again.',
-            accuracy: null,
-          });
-          return;
-        }
-      }
-    } catch {
-      // Some browsers do not expose geolocation through the Permissions API.
-      // Calling getCurrentPosition below will still trigger their normal prompt.
-    }
-
+    // Important for mobile browsers: request geolocation immediately from the
+    // button tap. Awaiting another API first can cause some browsers to lose the
+    // user-activation context and skip the permission prompt.
     setLocationState({ loading: true, error: '', accuracy: null });
 
-    const locate = (options) => new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
+    const applyPosition = (position) => {
+      const point = normalizePoint(position?.coords?.latitude, position?.coords?.longitude);
 
-    try {
-      let position;
-      try {
-        // First request the device's highest available GPS/location accuracy.
-        // Calling this while handling the user's click triggers the browser's
-        // permission prompt when the permission has not been decided yet.
-        position = await locate({
-          enableHighAccuracy: true,
-          timeout: 18000,
-          maximumAge: 0,
-        });
-      } catch (firstError) {
-        if (firstError?.code === firstError?.PERMISSION_DENIED || firstError?.code === 1) throw firstError;
-        // Desktop devices and indoor phones may not return a GPS fix quickly.
-        // Fall back to the browser's best available position instead of failing
-        // the technician request completely.
-        position = await locate({
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 15000,
-        });
-      }
-
-      const point = normalizePoint(position.coords.latitude, position.coords.longitude);
       if (!point) {
-        setLocationState({ loading: false, error: 'The device returned an invalid location. Place the pin manually instead.', accuracy: null });
+        setLocationState({
+          loading: false,
+          error: 'The device returned an invalid location. Place the pin manually instead.',
+          accuracy: null,
+        });
         return;
       }
 
       const map = mapRef.current;
       if (map) {
         map.invalidateSize();
-        map.flyTo([point.latitude, point.longitude], PIN_ZOOM, { animate: true, duration: 0.6 });
+        map.flyTo([point.latitude, point.longitude], PIN_ZOOM, {
+          animate: true,
+          duration: 0.6,
+        });
       }
+
       onChangeRef.current?.(point);
       setLocationState({
         loading: false,
         error: '',
-        accuracy: Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null,
+        accuracy: Number.isFinite(position.coords.accuracy)
+          ? Math.round(position.coords.accuracy)
+          : null,
       });
-    } catch (error) {
-      let message = 'Your current location could not be detected. Make sure device Location/GPS is turned on, then try again or place the pin manually.';
-      if (error?.code === error?.PERMISSION_DENIED || error?.code === 1) {
-        message = 'Location permission was denied. Allow Location for this site in your browser settings, make sure device Location/GPS is on, then try again.';
-      } else if (error?.code === error?.TIMEOUT || error?.code === 3) {
-        message = 'Location detection timed out. Move to an area with a clearer GPS/network signal, turn on Location/GPS, then retry or place the pin manually.';
-      } else if (error?.code === error?.POSITION_UNAVAILABLE || error?.code === 2) {
-        message = 'The device location is currently unavailable. Turn on Location/GPS and Wi-Fi/mobile data, then retry or place the pin manually.';
+    };
+
+    const locationErrorMessage = (error) => {
+      if (error?.code === 1) {
+        return 'Location permission was denied or blocked. On your phone, open this site’s permissions and set Location to Allow, make sure device Location/GPS is turned on, then tap Use My Current Location again. You can still place the pin manually.';
       }
-      setLocationState({ loading: false, error: message, accuracy: null });
-    }
+      if (error?.code === 3) {
+        return 'Location detection timed out. Make sure Location/GPS and Wi-Fi or mobile data are on, then try again or place the pin manually.';
+      }
+      if (error?.code === 2) {
+        return 'Your device location is currently unavailable. Turn on Location/GPS and Wi-Fi or mobile data, then try again or place the pin manually.';
+      }
+      return 'Your current location could not be detected. Try again or place the pin manually.';
+    };
+
+    const tryFallbackLocation = (primaryError) => {
+      if (primaryError?.code === 1) {
+        setLocationState({
+          loading: false,
+          error: locationErrorMessage(primaryError),
+          accuracy: null,
+        });
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        applyPosition,
+        (fallbackError) => {
+          setLocationState({
+            loading: false,
+            error: locationErrorMessage(fallbackError),
+            accuracy: null,
+          });
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 15000,
+        }
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      applyPosition,
+      tryFallbackLocation,
+      {
+        enableHighAccuracy: true,
+        timeout: 18000,
+        maximumAge: 0,
+      }
+    );
   };
 
   const clearPin = () => {
@@ -244,7 +263,7 @@ export default function LocationPinPicker({ value, onChange }) {
             Exact Map Pin <span className="font-normal text-slate-400">(optional)</span>
           </p>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Tap/click the map or drag the marker. Use My Current Location will ask for browser location permission when needed. The written service address remains required.
+            Tap/click the map or drag the marker. On phones, tap Use My Current Location to let the browser request Location permission. If no prompt appears, Location may already be blocked in the browser/site settings. The written service address remains required.
           </p>
         </div>
 
@@ -253,7 +272,7 @@ export default function LocationPinPicker({ value, onChange }) {
             type="button"
             onClick={useCurrentLocation}
             disabled={locationState.loading}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-[#cc0000] hover:text-[#cc0000] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#cc0000] bg-[#cc0000] px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-10 sm:bg-white sm:px-3 sm:py-2 sm:text-slate-700 sm:hover:border-[#cc0000] sm:hover:bg-white sm:hover:text-[#cc0000]"
           >
             <LocateFixed size={15} />
             {locationState.loading ? 'Locating...' : 'Use My Current Location'}

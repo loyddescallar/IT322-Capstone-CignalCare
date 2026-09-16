@@ -26,13 +26,13 @@ function getGeminiApiKey() {
 }
 
 function getGeminiModel() {
-  return String(process.env.GEMINI_MODEL || 'gemini-3.5-flash').trim();
+  return String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim();
 }
 
 function getGeminiTimeoutMs() {
-  const configured = Number(process.env.GEMINI_TIMEOUT_MS || 15000);
+  const configured = Number(process.env.GEMINI_TIMEOUT_MS || 30000);
 
-  if (!Number.isFinite(configured)) return 15000;
+  if (!Number.isFinite(configured)) return 30000;
 
   return Math.min(Math.max(Math.round(configured), 3000), 30000);
 }
