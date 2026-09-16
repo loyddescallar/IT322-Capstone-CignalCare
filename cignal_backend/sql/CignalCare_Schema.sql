@@ -1,3 +1,9 @@
+-- CignalCare+ CURRENT LOCAL MYSQL SCHEMA
+-- Updated: Sep 14, 2026 (v2: corrected FK creation order)
+-- Schema aligned with the latest CignalCare+ backend source provided on Sep 13, 2026.
+-- Existing INSERT data below is retained from the Jul 15, 2026 backup only.
+-- This file cannot recover local records that were created after that backup and later deleted.
+--
 -- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
@@ -324,6 +330,10 @@ CREATE TABLE `technician_requests` (
   `source` varchar(80) DEFAULT NULL,
   `screen_issue` varchar(120) DEFAULT NULL,
   `screen_photo_url` text DEFAULT NULL,
+  `service_address` text DEFAULT NULL,
+  `latitude` decimal(9,6) DEFAULT NULL,
+  `longitude` decimal(9,6) DEFAULT NULL,
+  `incident_id` varchar(36) DEFAULT NULL,
   `technician_name` varchar(100) DEFAULT NULL,
   `admin_note` text DEFAULT NULL,
   `status` enum('Submitted','Under Review','Scheduled','Completed','Cancelled') NOT NULL DEFAULT 'Submitted',
@@ -351,6 +361,7 @@ CREATE TABLE `tickets` (
   `subject` text NOT NULL,
   `priority` enum('Low','Normal','High','Urgent') NOT NULL DEFAULT 'Normal',
   `status` enum('Submitted','Under Review','Job Order Assigned','Resolved','Archived') NOT NULL DEFAULT 'Submitted',
+  `incident_id` varchar(36) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -495,6 +506,20 @@ CREATE TABLE `users` (
   `location` enum('Balayan','Calaca','Lian','Calatagan','Nasugbu','Lemery') NOT NULL DEFAULT 'Balayan',
   `email` varchar(150) DEFAULT NULL,
   `password_hash` varchar(255) DEFAULT NULL,
+  `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
+  `temporary_password_expires_at` timestamp NULL DEFAULT NULL,
+  `recovery_code_hash` varchar(64) DEFAULT NULL,
+  `recovery_code_issued_at` timestamp NULL DEFAULT NULL,
+  `auth_session_version` int(11) NOT NULL DEFAULT 1,
+  `email_verified_at` timestamp NULL DEFAULT NULL,
+  `email_verification_code_hash` varchar(64) DEFAULT NULL,
+  `email_verification_expires_at` timestamp NULL DEFAULT NULL,
+  `email_verification_attempts` int(11) NOT NULL DEFAULT 0,
+  `email_verification_last_sent_at` timestamp NULL DEFAULT NULL,
+  `password_reset_code_hash` varchar(64) DEFAULT NULL,
+  `password_reset_expires_at` timestamp NULL DEFAULT NULL,
+  `password_reset_attempts` int(11) NOT NULL DEFAULT 0,
+  `password_reset_last_sent_at` timestamp NULL DEFAULT NULL,
   `role` enum('user','admin') NOT NULL DEFAULT 'user',
   `status` enum('active','inactive','archived') NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -510,6 +535,109 @@ INSERT INTO `users` (`id`, `accountName`, `accountNumber`, `ccaNumber`, `address
 (2, 'loyd descallar', '88773322', '88773322', 'Balayan, Batangas', '09755718056', 'Balayan', NULL, NULL, 'user', 'active', '2026-07-03 22:15:50', NULL),
 (8, 'Analie Descallar', '34343232', '34343232', 'near barangay hall, Brgy. Balibago, Calatagan, Batangas', '09660026266', 'Balayan', NULL, NULL, 'user', 'active', '2026-07-10 09:13:42', NULL),
 (9, 'Angel Locsin', '22232422', '22232422', 'near RSA, Brgy. Caloocan, Balayan, Batangas', '09660026266', 'Balayan', NULL, NULL, 'user', 'active', '2026-07-10 10:08:51', NULL);
+
+
+-- --------------------------------------------------------
+
+--
+-- Current admin security tables
+--
+
+CREATE TABLE `admin_security` (
+  `user_id` int(11) NOT NULL,
+  `username` varchar(80) NOT NULL,
+  `totp_secret_enc` text DEFAULT NULL,
+  `totp_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `session_version` int(11) NOT NULL DEFAULT 1,
+  `failed_attempts` int(11) NOT NULL DEFAULT 0,
+  `locked_until` timestamp NULL DEFAULT NULL,
+  `last_login_at` timestamp NULL DEFAULT NULL,
+  `last_password_change_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `uq_admin_security_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `admin_recovery_codes` (
+  `code_id` varchar(36) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `code_hash` varchar(64) NOT NULL,
+  `used_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`code_id`),
+  KEY `idx_admin_recovery_user_used` (`user_id`,`used_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `admin_audit_logs` (
+  `event_id` varchar(36) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `action` varchar(100) NOT NULL,
+  `ip_address` varchar(80) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `details` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`event_id`),
+  KEY `idx_admin_audit_user_created` (`user_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Current troubleshooting outcome analytics table
+--
+
+CREATE TABLE `troubleshoot_outcomes` (
+  `id` varchar(36) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `account_number` varchar(50) DEFAULT NULL,
+  `location` varchar(100) DEFAULT NULL,
+  `model_id` varchar(100) NOT NULL,
+  `model_name` varchar(160) DEFAULT NULL,
+  `issue_id` varchar(100) NOT NULL,
+  `issue_label` varchar(180) NOT NULL,
+  `outcome` varchar(30) NOT NULL,
+  `session_id` varchar(80) DEFAULT NULL,
+  `support_mode` varchar(30) NOT NULL DEFAULT 'full',
+  `is_final` int(11) NOT NULL DEFAULT 1,
+  `video_watched` int(11) NOT NULL DEFAULT 0,
+  `steps_completed` int(11) NOT NULL DEFAULT 0,
+  `total_steps` int(11) NOT NULL DEFAULT 0,
+  `last_step_id` varchar(180) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_troubleshoot_outcomes_created` (`created_at`),
+  KEY `idx_troubleshoot_outcomes_issue` (`issue_id`,`outcome`),
+  KEY `idx_troubleshoot_outcomes_session` (`session_id`,`support_mode`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Current common-issue / incident table
+--
+
+CREATE TABLE `support_incidents` (
+  `id` varchar(36) NOT NULL,
+  `issue_key` varchar(100) NOT NULL,
+  `issue_label` varchar(160) NOT NULL,
+  `location` varchar(100) NOT NULL,
+  `status` varchar(30) NOT NULL DEFAULT 'candidate',
+  `report_count` int(11) NOT NULL DEFAULT 0,
+  `distinct_subscribers` int(11) NOT NULL DEFAULT 0,
+  `first_reported_at` timestamp NULL DEFAULT NULL,
+  `last_reported_at` timestamp NULL DEFAULT NULL,
+  `confirmed_at` timestamp NULL DEFAULT NULL,
+  `resolved_at` timestamp NULL DEFAULT NULL,
+  `dismissed_at` timestamp NULL DEFAULT NULL,
+  `confirmed_by` int(11) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_support_incidents_status_location` (`status`,`location`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 --
 -- Indexes for dumped tables
@@ -592,7 +720,8 @@ ALTER TABLE `technician_requests`
   ADD KEY `idx_technician_requests_user_created` (`user_id`,`created_at`),
   ADD KEY `idx_technician_requests_account` (`accountNumber`),
   ADD KEY `idx_technician_requests_status_created` (`status`,`created_at`),
-  ADD KEY `idx_technician_requests_schedule` (`preferred_date`,`preferred_time`);
+  ADD KEY `idx_technician_requests_schedule` (`preferred_date`,`preferred_time`),
+  ADD KEY `idx_technician_incident` (`incident_id`);
 
 --
 -- Indexes for table `tickets`
@@ -600,7 +729,8 @@ ALTER TABLE `technician_requests`
 ALTER TABLE `tickets`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_tickets_user_created` (`user_id`,`created_at`),
-  ADD KEY `idx_tickets_status_created` (`status`,`created_at`);
+  ADD KEY `idx_tickets_status_created` (`status`,`created_at`),
+  ADD KEY `idx_tickets_incident` (`incident_id`);
 
 --
 -- Indexes for table `ticket_messages`
@@ -726,6 +856,18 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for current admin security tables
+--
+ALTER TABLE `admin_security`
+  ADD CONSTRAINT `fk_admin_security_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `admin_recovery_codes`
+  ADD CONSTRAINT `fk_admin_recovery_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `admin_audit_logs`
+  ADD CONSTRAINT `fk_admin_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `load_history`

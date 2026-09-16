@@ -168,7 +168,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard icon={Banknote} label="Sales Today" value={loading ? '...' : peso(k.salesToday)} helper="In-store POS revenue" tone="red" />
+        <KpiCard icon={Banknote} label="Sales Today" value={loading ? '...' : peso(k.salesToday)} helper="POS + online prepaid revenue" tone="red" />
         <KpiCard icon={Headset} label="Support Requests Today" value={loading ? '...' : k.supportToday || 0} helper="New subscriber tickets" tone="blue" />
         <KpiCard icon={CheckCircle2} label="Resolved Today" value={loading ? '...' : k.resolvedToday || 0} helper="Tickets resolved today" tone="green" />
         <KpiCard icon={Wrench} label="Technician Escalations" value={loading ? '...' : k.technicianEscalations || 0} helper="From verified troubleshooting" tone="amber" />

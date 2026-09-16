@@ -60,8 +60,31 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    const currentPath = window.location.pathname || '';
+
+    if (error.response?.status === 428 && error.response?.data?.termsRequired) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('user') || 'null');
+        if (stored?.role === 'user') {
+          localStorage.setItem(
+            'user',
+            JSON.stringify({
+              ...stored,
+              termsAccepted: false,
+              termsVersion: error.response?.data?.currentVersion || stored.termsVersion || null,
+            })
+          );
+        }
+      } catch {
+        // Ignore malformed stale localStorage and continue to the terms screen.
+      }
+
+      if (currentPath !== '/user/terms') {
+        window.location.href = '/user/terms';
+      }
+    }
+
     if (error.response?.status === 401) {
-      const currentPath = window.location.pathname || '';
       const isAuthPage = ['/login', '/admin-login', '/change-password', '/forgot-password'].includes(currentPath);
       const isAdminPath = currentPath.startsWith('/admin') || currentPath === '/admin-dashboard';
 

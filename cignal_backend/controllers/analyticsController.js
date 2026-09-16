@@ -58,6 +58,14 @@ function supportMode(row) {
   return SUPPORT_MODE_ORDER.includes(mode) ? mode : 'full';
 }
 
+function salesChannel(row) {
+  const reference = String(row.reference_no || '').trim().toUpperCase();
+  const method = String(row.payment_method || '').trim();
+  if (reference.startsWith('POS-')) return 'POS';
+  if (method.toLowerCase() === 'paymongo') return 'Online PayMongo';
+  return method || 'Other';
+}
+
 function sessionKey(row) {
   const explicit = String(row.session_id || '').trim();
   return explicit || `legacy:${row.id}`;
@@ -204,7 +212,7 @@ async function getAdminAnalytics(req, res) {
         `SELECT tr.*,u.location FROM technician_requests tr LEFT JOIN users u ON u.id=tr.user_id ORDER BY tr.created_at DESC`
       ),
       pool.query(
-        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed' AND pt.reference_no LIKE 'POS-%' ORDER BY pt.transaction_date DESC`
+        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed' ORDER BY pt.transaction_date DESC`
       ),
     ]);
 
@@ -353,6 +361,16 @@ async function getAdminAnalytics(req, res) {
       salesByLocation[key].count += 1;
     });
 
+    const salesByChannel = {};
+    sales.forEach((sale) => {
+      const key = salesChannel(sale);
+      if (!salesByChannel[key]) salesByChannel[key] = { channel: key, revenue: 0, count: 0 };
+      salesByChannel[key].revenue += Number(sale.amount || 0);
+      salesByChannel[key].count += 1;
+    });
+    const posTransactions = sales.filter((sale) => salesChannel(sale) === 'POS').length;
+    const onlineTransactions = sales.filter((sale) => salesChannel(sale) === 'Online PayMongo').length;
+
     const activeIncidents = incidentRows.filter((incident) => incident.status === 'confirmed');
     const recentTickets = tickets.slice(0, 8).map((ticket) => ({
       ...ticket,
@@ -407,7 +425,9 @@ async function getAdminAnalytics(req, res) {
         totalRevenue: Number(
           sales.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)
         ),
-        posTransactions: sales.length,
+        totalTransactions: sales.length,
+        posTransactions,
+        onlineTransactions,
         activeSubscribers: activeCustomers.length,
         totalTickets: tickets.length,
         resolvedTickets: resolved.length,
@@ -434,6 +454,7 @@ async function getAdminAnalytics(req, res) {
       salesByLocation: Object.values(salesByLocation).sort(
         (a, b) => b.revenue - a.revenue
       ),
+      salesByChannel: Object.values(salesByChannel).sort((a, b) => b.revenue - a.revenue),
       technician: {
         total: tech.length,
         completed: tech.filter((request) => request.status === 'Completed').length,

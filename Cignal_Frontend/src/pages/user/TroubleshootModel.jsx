@@ -175,7 +175,7 @@ export default function TroubleshootModel() {
                   <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                     {model.name}
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  <p className="formal-long-text mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                     {model.description ||
                       'Choose the symptom or error shown on your television.'}
                   </p>
@@ -205,7 +205,7 @@ export default function TroubleshootModel() {
             <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">
               What problem are you experiencing?
             </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+            <p className="formal-long-text mt-1 max-w-3xl text-sm leading-6 text-slate-500">
               Open an issue to use the recommended receiver-specific guide. Quick restart,
               factory reset, and official video help only appear when they are configured for that issue.
             </p>
@@ -237,7 +237,7 @@ export default function TroubleshootModel() {
                             </span>
                           )}
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                        <p className="formal-long-text mt-2 text-sm leading-6 text-slate-500">
                           {issue.description ||
                             'Open this guide to view the configured troubleshooting steps.'}
                         </p>

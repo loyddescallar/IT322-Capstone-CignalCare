@@ -24,6 +24,7 @@ import Troubleshoot from './pages/user/Troubleshoot';
 import TroubleshootModel from './pages/user/TroubleshootModel';
 import TroubleshootIssue from './pages/user/TroubleshootIssue';
 import AccountSecurity from './pages/user/AccountSecurity';
+import TermsAcceptance from './pages/user/TermsAcceptance';
 
 function readStoredUser() {
   try {
@@ -54,7 +55,27 @@ function RoleRoute({ role, children }) {
     );
   }
 
+  if (role === 'user' && user.termsAccepted !== true) {
+    return <Navigate to="/user/terms" replace />;
+  }
+
   return children;
+}
+
+function UserTermsRoute({ children }) {
+  const token = localStorage.getItem('token');
+  const user = readStoredUser();
+  if (!token || !user) return <Navigate to="/login" replace />;
+  if (user.role !== 'user') return <Navigate to="/admin-dashboard" replace />;
+  return children;
+}
+
+function AdminLoginRoute() {
+  const token = localStorage.getItem('token');
+  const user = readStoredUser();
+  if (token && user?.role === 'user') return <Navigate to="/user-dashboard" replace />;
+  if (token && user?.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+  return <AdminLogin />;
 }
 
 const adminRoute = (element) => <RoleRoute role="admin">{element}</RoleRoute>;
@@ -68,7 +89,7 @@ export default function App() {
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/admin-login" element={<AdminLogin />} />
+      <Route path="/admin-login" element={<AdminLoginRoute />} />
 
       {/* Admin */}
       <Route path="/admin-dashboard" element={adminRoute(<AdminWorkspace />)} />
@@ -96,6 +117,7 @@ export default function App() {
       <Route path="/user/load-request" element={userRoute(<UserLoadRequest />)} />
       <Route path="/user/load-history" element={userRoute(<UserLoadHistory />)} />
       <Route path="/user/account-security" element={userRoute(<AccountSecurity />)} />
+      <Route path="/user/terms" element={<UserTermsRoute><TermsAcceptance /></UserTermsRoute>} />
 
       {/* Troubleshooting */}
       <Route path="/troubleshoot" element={userRoute(<Troubleshoot />)} />

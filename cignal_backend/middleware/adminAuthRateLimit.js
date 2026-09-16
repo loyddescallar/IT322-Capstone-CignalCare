@@ -2,10 +2,17 @@ const buckets = new Map();
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_REQUESTS = 20;
 
+function cleanupExpired(now) {
+  if (buckets.size < 500) return;
+  for (const [key, value] of buckets.entries()) {
+    if (!value || value.resetAt <= now) buckets.delete(key);
+  }
+}
+
 function adminAuthRateLimit(req, res, next) {
-  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  const key = forwarded || req.ip || req.socket?.remoteAddress || 'unknown';
+  const key = req.ip || req.socket?.remoteAddress || 'unknown';
   const now = Date.now();
+  cleanupExpired(now);
   const current = buckets.get(key);
 
   if (!current || current.resetAt <= now) {

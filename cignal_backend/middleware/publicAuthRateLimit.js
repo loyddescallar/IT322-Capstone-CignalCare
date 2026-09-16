@@ -1,8 +1,7 @@
 const buckets = new Map();
 
 function clientKey(req, scope) {
-  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  const ip = forwarded || req.ip || req.socket?.remoteAddress || 'unknown';
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   return `${scope}:${ip}`;
 }
 
@@ -73,10 +72,18 @@ const customerEmailRateLimit = createRateLimiter({
   message: 'Too many email verification or recovery attempts. Please wait a few minutes and try again.',
 });
 
+const customerSmsRecoveryRateLimit = createRateLimiter({
+  scope: 'customer-sms-recovery',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 6,
+  message: 'Too many SMS recovery attempts. Please wait a few minutes and try again.',
+});
+
 module.exports = {
   customerLoginRateLimit,
   passwordChangeRateLimit,
   accountInquiryRateLimit,
   customerRecoveryRateLimit,
   customerEmailRateLimit,
+  customerSmsRecoveryRateLimit,
 };

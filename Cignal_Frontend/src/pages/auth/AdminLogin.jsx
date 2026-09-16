@@ -63,6 +63,9 @@ export default function AdminLogin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [challengeToken, setChallengeToken] = useState('');
+  const [twoFactorMethods, setTwoFactorMethods] = useState([]);
+  const [twoFactorMethod, setTwoFactorMethod] = useState('totp');
+  const [otpSent, setOtpSent] = useState(false);
   const [totpCode, setTotpCode] = useState('');
 
   const [legacyUsername, setLegacyUsername] = useState('admin');
@@ -101,16 +104,31 @@ export default function AdminLogin() {
     run(async () => {
       const response = await authApi.adminLogin({ username: username.trim(), password });
       if (!response.data?.requiresTwoFactor) throw new Error('Two-factor verification was not started.');
+      const methods = Array.isArray(response.data?.methods) ? response.data.methods : [{ id: 'totp', label: 'Authenticator App' }];
+      const preferred = methods.find((item) => item.id === 'email') || methods.find((item) => item.id === 'sms') || methods[0];
       setChallengeToken(response.data.challengeToken);
+      setTwoFactorMethods(methods);
+      setTwoFactorMethod(preferred?.id || 'totp');
+      setOtpSent(false);
       setTotpCode('');
       setMode('twoFactor');
+    });
+  };
+
+  const sendTwoFactorCode = () => {
+    if (!['email', 'sms'].includes(twoFactorMethod)) return;
+    run(async () => {
+      const response = await authApi.adminSendTwoFactor({ challengeToken, method: twoFactorMethod });
+      setOtpSent(true);
+      setTotpCode('');
+      setNotice(response.data?.message || 'Verification code sent.');
     });
   };
 
   const handleTwoFactor = (event) => {
     event.preventDefault();
     run(async () => {
-      const response = await authApi.adminVerifyTwoFactor({ challengeToken, code: totpCode });
+      const response = await authApi.adminVerifyTwoFactor({ challengeToken, method: twoFactorMethod, code: totpCode });
       saveAdminSession(response.data);
       navigate('/admin-dashboard');
     });
@@ -224,9 +242,48 @@ export default function AdminLogin() {
 
           {mode === 'twoFactor' && (
             <form onSubmit={handleTwoFactor} className="space-y-5">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-white/65">Open your authenticator app and enter the current 6-digit CignalCare+ code.</div>
-              <Field label="Authenticator Code" icon={Smartphone} inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))} placeholder="000000" required />
-              <button disabled={loading} className="w-full rounded-xl bg-[#cc0000] py-3.5 text-sm font-bold text-white disabled:opacity-60">{loading ? 'Verifying…' : 'Verify & Open Dashboard'}</button>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-white/65">
+                Choose the verification method you want to use for this Admin login.
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3">
+                {twoFactorMethods.map((item) => {
+                  const Icon = item.id === 'email' ? Mail : item.id === 'sms' ? Smartphone : ShieldCheck;
+                  const active = twoFactorMethod === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { setTwoFactorMethod(item.id); setTotpCode(''); setOtpSent(false); setNotice(''); setError(''); }}
+                      className={`rounded-xl border p-3 text-left transition ${active ? 'border-red-500 bg-red-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                    >
+                      <Icon size={18} className={active ? 'text-red-300' : 'text-white/45'} />
+                      <p className="mt-2 text-xs font-bold text-white">{item.label}</p>
+                      {item.destination && <p className="mt-1 break-all text-[10px] text-white/45">{item.destination}</p>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {twoFactorMethod === 'totp' ? (
+                <>
+                  <p className="text-xs leading-5 text-white/50">Open your authenticator app and enter the current 6-digit CignalCare+ code.</p>
+                  <Field label="Authenticator Code" icon={Smartphone} inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))} placeholder="000000" required />
+                </>
+              ) : !otpSent ? (
+                <button type="button" disabled={loading} onClick={sendTwoFactorCode} className="w-full rounded-xl bg-[#cc0000] py-3.5 text-sm font-bold text-white disabled:opacity-60">
+                  {loading ? 'Sending…' : `Send ${twoFactorMethod === 'email' ? 'Email' : 'SMS'} Code`}
+                </button>
+              ) : (
+                <>
+                  <Field label={`${twoFactorMethod === 'email' ? 'Email' : 'SMS'} Verification Code`} icon={twoFactorMethod === 'email' ? Mail : Smartphone} inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))} placeholder="000000" required />
+                  <button type="button" disabled={loading} onClick={sendTwoFactorCode} className="w-full text-xs font-semibold text-red-300 hover:text-red-200">Resend verification code</button>
+                </>
+              )}
+
+              {(twoFactorMethod === 'totp' || otpSent) && (
+                <button disabled={loading || totpCode.length !== 6} className="w-full rounded-xl bg-[#cc0000] py-3.5 text-sm font-bold text-white disabled:opacity-60">{loading ? 'Verifying…' : 'Verify & Open Dashboard'}</button>
+              )}
               <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-semibold text-white/55">Back to password login</button>
             </form>
           )}

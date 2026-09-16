@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, Smartphone } from 'lucide-react';
 import authApi from '../../api/authApi';
 
 export default function ForgotPassword() {
@@ -11,13 +11,19 @@ export default function ForgotPassword() {
     emailVerified: false,
     emailAvailable: false,
     maskedEmail: null,
+    phoneVerified: false,
+    smsAvailable: false,
+    maskedPhone: null,
     recoveryCodeAvailable: false,
     emailDeliveryConfigured: true,
+    smsDeliveryConfigured: true,
   });
   const [method, setMethod] = useState('code');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [emailCode, setEmailCode] = useState('');
   const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [smsCode, setSmsCode] = useState('');
+  const [smsCodeSent, setSmsCodeSent] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newRecoveryCode, setNewRecoveryCode] = useState('');
@@ -43,13 +49,19 @@ export default function ForgotPassword() {
       emailVerified: false,
       emailAvailable: false,
       maskedEmail: null,
+      phoneVerified: false,
+      smsAvailable: false,
+      maskedPhone: null,
       recoveryCodeAvailable: false,
       emailDeliveryConfigured: true,
+      smsDeliveryConfigured: true,
     });
     setMethod('code');
     setRecoveryCode('');
     setEmailCode('');
     setEmailCodeSent(false);
+    setSmsCode('');
+    setSmsCodeSent(false);
     setPassword('');
     setConfirmPassword('');
     resetMessages();
@@ -82,16 +94,25 @@ export default function ForgotPassword() {
         emailVerified: Boolean(next.emailVerified),
         emailAvailable: Boolean(next.emailAvailable),
         maskedEmail: next.maskedEmail || null,
+        phoneVerified: Boolean(next.phoneVerified),
+        smsAvailable: Boolean(next.smsAvailable),
+        maskedPhone: next.maskedPhone || null,
         recoveryCodeAvailable: Boolean(next.recoveryCodeAvailable),
         emailDeliveryConfigured: next.emailDeliveryConfigured !== false,
+        smsDeliveryConfigured: next.smsDeliveryConfigured !== false,
       });
       setOptionsChecked(true);
       setEmailCodeSent(false);
       setEmailCode('');
+      setSmsCodeSent(false);
+      setSmsCode('');
 
       if (next.emailAvailable) {
         setMethod('email');
         setMessage(`Verified email recovery is available${next.maskedEmail ? ` at ${next.maskedEmail}` : ''}.`);
+      } else if (next.smsAvailable) {
+        setMethod('sms');
+        setMessage(`Verified SMS recovery is available${next.maskedPhone ? ` at ${next.maskedPhone}` : ''}.`);
       } else if (next.recoveryCodeAvailable) {
         setMethod('code');
         if (next.emailVerified && next.emailDeliveryConfigured === false) {
@@ -150,6 +171,44 @@ export default function ForgotPassword() {
         code: emailCode,
         password,
       });
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      setNewRecoveryCode(response.data.recoveryCode || '');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to recover your account.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const startSmsRecovery = async () => {
+    resetMessages();
+    if (!options.smsAvailable) {
+      setError('Verified SMS recovery is not available for this account.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await authApi.startSmsRecovery({ accountNumber: accountNumber.trim() });
+      setSmsCodeSent(true);
+      setMessage(response.data.message);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to start SMS recovery.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitSmsRecovery = async (event) => {
+    event.preventDefault();
+    resetMessages();
+    if (!options.smsAvailable) return setError('Verified SMS recovery is not available for this account.');
+    if (!/^\d{6}$/.test(smsCode)) return setError('Enter the 6-digit reset code sent to your verified mobile number.');
+    if (!validatePassword()) return;
+    setLoading(true);
+    try {
+      const response = await authApi.completeSmsRecovery({ accountNumber: accountNumber.trim(), code: smsCode, password });
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       setNewRecoveryCode(response.data.recoveryCode || '');
@@ -274,9 +333,9 @@ export default function ForgotPassword() {
           )}
         </div>
 
-        {optionsChecked && (options.emailAvailable || options.recoveryCodeAvailable) && (
+        {optionsChecked && (options.emailAvailable || options.smsAvailable || options.recoveryCodeAvailable) && (
           <>
-            <div className="my-5 grid grid-cols-1 gap-1 rounded-xl bg-gray-100 p-1 sm:grid-cols-2">
+            <div className="my-5 grid grid-cols-1 gap-1 rounded-xl bg-gray-100 p-1 sm:grid-cols-3">
               <button
                 type="button"
                 disabled={!options.emailAvailable}
@@ -284,6 +343,14 @@ export default function ForgotPassword() {
                 className={`rounded-lg px-3 py-2 text-xs font-bold ${method === 'email' ? 'bg-white text-[#cc0000] shadow-sm' : 'text-gray-500'} disabled:cursor-not-allowed disabled:opacity-40`}
               >
                 Verified Email
+              </button>
+              <button
+                type="button"
+                disabled={!options.smsAvailable}
+                onClick={() => { setMethod('sms'); resetMessages(); }}
+                className={`rounded-lg px-3 py-2 text-xs font-bold ${method === 'sms' ? 'bg-white text-[#cc0000] shadow-sm' : 'text-gray-500'} disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                Verified SMS
               </button>
               <button
                 type="button"
@@ -332,6 +399,24 @@ export default function ForgotPassword() {
                     <button type="button" onClick={startEmailRecovery} disabled={loading} className="w-full text-xs font-bold text-blue-600 hover:underline">
                       Resend Code
                     </button>
+                  </>
+                )}
+              </form>
+            ) : method === 'sms' && options.smsAvailable ? (
+              <form onSubmit={submitSmsRecovery} className="space-y-4">
+                {!smsCodeSent ? (
+                  <button type="button" onClick={startSmsRecovery} disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#cc0000] py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                    <Smartphone size={16} /> {loading ? 'Sending...' : `Send Code${options.maskedPhone ? ` to ${options.maskedPhone}` : ''}`}
+                  </button>
+                ) : (
+                  <>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-600">6-digit SMS Code</label>
+                      <input type="text" inputMode="numeric" maxLength={6} value={smsCode} onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-center font-mono text-xl font-bold tracking-[0.35em] outline-none focus:border-[#cc0000]" placeholder="000000" />
+                    </div>
+                    <PasswordFields password={password} setPassword={setPassword} confirmPassword={confirmPassword} setConfirmPassword={setConfirmPassword} />
+                    <button disabled={loading} className="w-full rounded-xl bg-[#cc0000] py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">{loading ? 'Resetting...' : 'Reset Password'}</button>
+                    <button type="button" onClick={startSmsRecovery} disabled={loading} className="w-full text-xs font-bold text-blue-600 hover:underline">Resend Code</button>
                   </>
                 )}
               </form>
