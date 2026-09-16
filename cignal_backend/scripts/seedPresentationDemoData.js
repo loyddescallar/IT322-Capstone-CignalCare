@@ -215,7 +215,7 @@ async function seed() {
          (accountName,accountNumber,ccaNumber,address,phone,location,email,password_hash,must_change_password,
           recovery_code_hash,recovery_code_issued_at,auth_session_version,terms_version,terms_accepted_at,
           role,status,created_at)
-         VALUES (?,?,?,?,?,?,NULL,?,0,?,?,1,?,?,'user','active',?)`,
+         VALUES (?,?,?,?,?,?,NULL,?,FALSE,?,?,1,?,?,'user','active',?)`,
         [names[i], accountNumber, ccaNumber, addressPool[i % addressPool.length], phoneFor(i), location,
          passwordHash, hashRecoveryCode(recoveryCode), createdAt, TERMS_VERSION, createdAt, createdAt]
       );
