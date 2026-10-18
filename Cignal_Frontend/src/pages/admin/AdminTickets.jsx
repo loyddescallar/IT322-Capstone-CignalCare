@@ -274,7 +274,7 @@ export default function AdminTickets() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-800">Support Tickets</h1>
-          <p className="mt-0.5 text-xs text-gray-500">Review customer concerns, assign job orders, and resolve support tickets</p>
+          <p className="mt-0.5 text-xs text-gray-500">Review subscriber concerns, assign job orders, and resolve support tickets</p>
         </div>
       </div>
 
@@ -475,7 +475,7 @@ export default function AdminTickets() {
                   const mine = isOwnMessage(message, currentAdmin);
                   const senderLabel = mine
                     ? 'You (Admin)'
-                    : message.sender_name || message.accountName || 'Customer';
+                    : message.sender_name || message.accountName || 'Subscriber';
 
                   return (
                     <div

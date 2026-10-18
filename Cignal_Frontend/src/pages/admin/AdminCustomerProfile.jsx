@@ -171,7 +171,7 @@ function computeSmartRisk(lastLoadDate, activeTickets, openTechReqs, archived) {
       risk: 0,
       level: 'ARCHIVED',
       reason:
-        'This customer is archived. History remains available, but the account is not part of active operations.',
+        'This subscriber is archived. History remains available, but the account is not part of active operations.',
     };
   }
 
@@ -471,7 +471,7 @@ export default function AdminCustomerProfile() {
       closeModal();
       await loadProfile();
     } catch (error) {
-      setFormErr(error.response?.data?.error || 'Failed to update customer.');
+      setFormErr(error.response?.data?.error || 'Failed to update subscriber.');
     } finally {
       setSaving(false);
     }
@@ -895,7 +895,7 @@ export default function AdminCustomerProfile() {
             {activeTab === 'tickets' &&
               (tickets.length === 0 ? (
                 <div className="py-10 text-center text-xs text-slate-400">
-                  No support tickets recorded for this customer yet.
+                  No support tickets recorded for this subscriber yet.
                 </div>
               ) : (
                 <div className="divide-y divide-slate-50">

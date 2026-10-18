@@ -883,7 +883,7 @@ export default function AdminCustomers() {
                   disabled={saving}
                   className="flex-1 rounded-xl bg-[#cc0000] py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                 >
-                  {saving ? 'Saving...' : mode === 'add' && issuedCredentials ? 'Done' : mode === 'add' ? 'Create Subscriber' : 'Update Customer'}
+                  {saving ? 'Saving...' : mode === 'add' && issuedCredentials ? 'Done' : mode === 'add' ? 'Create Subscriber' : 'Update Subscriber'}
                 </button>
                 <button
                   type="button"

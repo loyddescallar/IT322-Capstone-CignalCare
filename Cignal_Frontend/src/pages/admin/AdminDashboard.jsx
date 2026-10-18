@@ -352,7 +352,7 @@ export default function AdminDashboard() {
           <div className="overflow-x-auto">
             <table className="min-w-[680px] text-left text-[11px]">
               <thead className="border-y border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                <tr><th className="px-4 py-3">Ticket</th><th className="px-3 py-3">Customer</th><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th></tr>
+                <tr><th className="px-4 py-3">Ticket</th><th className="px-3 py-3">Subscriber</th><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Location</th><th className="px-3 py-3">Status</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(data?.recentTickets || []).slice(0, 5).map((ticket) => (
