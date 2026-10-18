@@ -36,8 +36,10 @@ export default function UserDashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [selectedPlan,  setSelectedPlan]  = useState(null);
-  const [planList, setPlanList]          = useState(FALLBACK_LOAD_PLANS);
+  const [planList, setPlanList]          = useState(import.meta.env.DEV ? FALLBACK_LOAD_PLANS : []);
+  const [planLoadError, setPlanLoadError] = useState(false);
   const [activeCategory,setActiveCategory]= useState('All');
+  const [planNotice, setPlanNotice] = useState('');
   const [prepaid,       setPrepaid]       = useState(null);
   const [notifications, setNotifs]        = useState([]);
   const [notifOpen,     setNotifOpen]     = useState(false);
@@ -54,7 +56,11 @@ export default function UserDashboard() {
         icon:PLAN_ICONS[i%PLAN_ICONS.length],
       }));
       setPlanList(loaded);
-    }).catch(()=>setPlanList(FALLBACK_LOAD_PLANS));
+      setPlanLoadError(false);
+    }).catch(()=>{
+      setPlanList(import.meta.env.DEV ? FALLBACK_LOAD_PLANS : []);
+      setPlanLoadError(true);
+    });
 
     if(user.accountNumber){
       axiosClient.get('/customers/'+user.accountNumber).then(r=>{
@@ -164,12 +170,18 @@ export default function UserDashboard() {
           <section className="fade-up">
             <h2 className="text-sm font-semibold tracking-[0.25em] text-cignalRed uppercase fade-up">Our Best Value Prepaid Load</h2>
             <p className="text-slate-600 mt-1 max-w-2xl fade-up">Click a load to see the channels included.</p>
+            {planNotice && (
+              <div className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+                <span>{planNotice}</span>
+                <button type="button" onClick={() => setPlanNotice('')} className="shrink-0 rounded-lg p-1 hover:bg-amber-100" aria-label="Dismiss plan notice"><X size={14} /></button>
+              </div>
+            )}
             <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 stagger">
               {planList.map((plan,i)=>{
                 const Icon=plan.icon || CreditCardIcon; const planData=plan;
                 return(
                   <div key={plan.id || plan.plan_code || `${plan.amount}-${i}`} className="fade-up show" style={{animationDelay:`${i*0.12}s`}}
-                    onClick={()=>{if(planData?.channelData?.length){setSelectedPlan(planData);setActiveCategory('All');}else{alert(`${plan.label} channel lineup not added yet.`);}}}>
+                    onClick={()=>{if(planData?.channelData?.length){setPlanNotice('');setSelectedPlan(planData);setActiveCategory('All');}else{setPlanNotice(`${plan.label} channel lineup is not available yet.`);}}}>
                     <div className="rounded-2xl bg-gradient-to-br from-orange-500 via-rose-400 to-pink-500 p-[1px] shadow hover:shadow-lg hover:-translate-y-1 transition cursor-pointer">
                       <div className="rounded-[1.1rem] bg-white px-4 py-4 relative h-full flex flex-col justify-between">
                         <Icon className="absolute right-3 top-3 h-6 w-6 text-cignalRed floating-icon"/>
@@ -181,7 +193,7 @@ export default function UserDashboard() {
                   </div>
                 );
               })}
-              {planList.length===0&&(<div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center"><p className="text-sm font-semibold text-slate-700">No active prepaid plans are available.</p><p className="mt-1 text-xs text-slate-500">Please check again later or contact Descallar Satellite Services.</p></div>)}
+              {planList.length===0&&(<div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center"><p className="text-sm font-semibold text-slate-700">{planLoadError ? 'Prepaid plans are temporarily unavailable.' : 'No active prepaid plans are available.'}</p><p className="mt-1 text-xs text-slate-500">{planLoadError ? 'The live plan list could not be loaded. Please try again later instead of relying on outdated plan information.' : 'Please check again later or contact Descallar Satellite Services.'}</p></div>)}
             </div>
           </section>
 
@@ -191,14 +203,14 @@ export default function UserDashboard() {
           <section className="w-full mt-10 space-y-10">
             <h2 className="text-center text-3xl font-bold text-cignalRed mb-4 fade-up">ABOUT US</h2>
             <div className="relative w-full max-w-5xl mx-auto rounded-xl overflow-hidden shadow-xl slide-in-left">
-              <img src="/images/Cignal-Web-About_Us-Banner.jpg" className="w-full h-auto object-cover"
-                onError={e=>{e.target.style.display='none';}} alt="About Us"/>
+              <img src="/images/Cignal-Web-About_Us-Banner.jpg" alt="About Us" className="w-full h-auto object-cover"
+                onError={e=>{e.target.style.display='none';}}/>
               <div className="w-full bg-cignalRed py-3"><h3 className="text-center text-white font-bold text-lg">ABOUT US</h3></div>
             </div>
             <div className="mt-10 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[auto,1fr] gap-10 items-center">
               <div className="slide-in-left flex justify-center lg:justify-end">
-                <img src="/images/CignalLogo1.png" className="h-32 sm:h-40 w-auto hover-tilt"
-                  onError={e=>{e.target.style.display='none';}} alt="Cignal Logo"/>
+                <img src="/images/CignalLogo1.png" alt="Cignal Logo" className="h-32 sm:h-40 w-auto hover-tilt"
+                  onError={e=>{e.target.style.display='none';}}/>
               </div>
               <p className="text-slate-700 text-base sm:text-lg leading-relaxed slide-in-right">Launched in 2009, Cignal is the Philippines' premier DTH satellite provider using Broadcast Satellite Technology. We broadcast premium TV content nationwide.</p>
             </div>

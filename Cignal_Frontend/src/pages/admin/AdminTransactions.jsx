@@ -6,7 +6,9 @@ import { useNavigate } from 'react-router-dom';
 
 const TX_STATUSES=['completed','pending','failed','cancelled'];
 const PAYMENT_METHODS=['GCash','Maya','Cash','Bank Transfer'];
-function formatDate(d) { if(!d)return '—'; return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}); }
+const MANILA_TIME_ZONE = 'Asia/Manila';
+function formatDate(d) { if(!d)return '—'; return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:MANILA_TIME_ZONE}); }
+function manilaDayKey(value) { if(!value)return ''; const date=new Date(value); return Number.isNaN(date.getTime())?'':date.toLocaleDateString('en-CA',{timeZone:MANILA_TIME_ZONE}); }
 
 export default function AdminTransactions() {
   const navigate=useNavigate();
@@ -20,8 +22,8 @@ export default function AdminTransactions() {
   const filtered=useMemo(()=>{ const q=search.toLowerCase(); return transactions.filter(t=>statusF==='All'||t.status===statusF).filter(t=>paymentF==='All'||t.payment_method===paymentF).filter(t=>(t.account_number||t.accountNumber||'').toLowerCase().includes(q)||(t.account_name||t.accountName||'').toLowerCase().includes(q)||(t.reference_no||'').toLowerCase().includes(q)||(t.plan_name||t.description||'').toLowerCase().includes(q)); },[transactions,search,statusF,paymentF]);
 
   const totalRevenue=transactions.reduce((s,t)=>s+Number(t.amount||t.loadAmount||0),0);
-  const today=new Date().toISOString().split('T')[0];
-  const todayRevenue=transactions.filter(t=>{const d=t.transaction_date||t.created_at||'';return d.startsWith(today)||d.includes(today);}).reduce((s,t)=>s+Number(t.amount||t.loadAmount||0),0);
+  const today=manilaDayKey(new Date());
+  const todayRevenue=transactions.filter(t=>manilaDayKey(t.transaction_date||t.created_at)===today).reduce((s,t)=>s+Number(t.amount||t.loadAmount||0),0);
   const pendingCount=transactions.filter(t=>t.status==='pending').length;
   const failedCount=transactions.filter(t=>['failed','cancelled'].includes(t.status)).length;
 
@@ -30,8 +32,15 @@ export default function AdminTransactions() {
   const handleExport=()=>{
     const rows=[['ID','Reference No.','Account Name','Account No.','Plan','Amount','Payment Method','Processed By','Date','Expiry','Status']];
     filtered.forEach(t=>rows.push([t.id,t.reference_no||'',t.account_name||t.accountName||'',t.account_number||t.accountNumber||'',t.plan_name||t.description||'',t.amount||t.loadAmount||0,t.payment_method||'',t.processed_by||'Admin',formatDate(t.transaction_date||t.created_at),t.expiry_date?formatDate(t.expiry_date):'',t.status||'completed']));
-    const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
-    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='transactions_'+today+'.csv'; a.click();
+    const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('\"','\"\"')}"`).join(',')).join('\n');
+    const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='transactions_'+today+'.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (

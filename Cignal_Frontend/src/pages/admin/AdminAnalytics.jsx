@@ -309,7 +309,7 @@ export default function AdminAnalytics() {
                 {!(data?.insights || []).length && <p className="py-6 text-center text-xs text-slate-400">No management insight available yet.</p>}
               </div>
             </Section>
-            <Section title="Incident Status" subtitle="Only Admin-confirmed incidents become customer advisories.">
+            <Section title="Incident Status" subtitle="Only Admin-confirmed incidents become subscriber advisories.">
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-amber-50 p-4"><p className="text-[10px] font-bold uppercase text-amber-600">Needs Review</p><p className="mt-1 text-3xl font-bold text-amber-800">{k.incidentCandidates || 0}</p></div>
                 <div className="rounded-xl bg-red-50 p-4"><p className="text-[10px] font-bold uppercase text-red-600">Active</p><p className="mt-1 text-3xl font-bold text-red-800">{k.activeIncidents || 0}</p></div>
@@ -329,7 +329,7 @@ export default function AdminAnalytics() {
             <Metric icon={Store} label="Average Sale" value={peso((k.totalRevenue || 0) / Math.max(1, k.totalTransactions || 0))} sub="Revenue per completed transaction" tone="amber" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
-            <Section title="Prepaid Revenue Trend" subtitle="Completed transactions from both Admin POS and customer PayMongo load requests.">
+            <Section title="Prepaid Revenue Trend" subtitle="Completed transactions from both Admin POS and subscriber PayMongo load requests.">
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data?.trend || []} margin={{ top: 5, right: 12, left: -10, bottom: 0 }}>
@@ -519,8 +519,8 @@ export default function AdminAnalytics() {
             </Section>
             <Section title="Service Decision Context" subtitle="Operational signals that connect subscriber support and technician work.">
               <div className="space-y-3">
-                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Technician escalation after troubleshooting</p><p className="mt-1 text-2xl font-bold text-slate-900">{k.technicianSelfServiceEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Customers who escalated from verified troubleshooting to a technician request.</p></div>
-                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Ticket escalation after troubleshooting</p><p className="mt-1 text-2xl font-bold text-slate-900">{k.ticketEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Customers who escalated from troubleshooting to a support ticket.</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Technician escalation after troubleshooting</p><p className="mt-1 text-2xl font-bold text-slate-900">{k.technicianSelfServiceEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Subscribers who escalated from verified troubleshooting to a technician request.</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Ticket escalation after troubleshooting</p><p className="mt-1 text-2xl font-bold text-slate-900">{k.ticketEscalations || 0}</p><p className="mt-1 text-[11px] text-slate-500">Subscribers who escalated from troubleshooting to a support ticket.</p></div>
                 <div className="rounded-xl border border-red-100 bg-red-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-red-500">Active service incidents</p><p className="mt-1 text-2xl font-bold text-red-800">{k.activeIncidents || 0}</p><p className="mt-1 text-[11px] text-red-600">Confirmed incidents should be reviewed before unnecessary individual dispatches.</p></div>
               </div>
             </Section>

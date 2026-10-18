@@ -57,7 +57,7 @@ const navGroups = [
     items: [
       {
         icon: Users,
-        label: 'Customers',
+        label: 'Subscribers',
         path: '/admin/customers',
         key: 'customers',
       },
@@ -220,7 +220,7 @@ function notificationTitle(type = '') {
     admin_technician: 'Technician Request',
     admin_load_request: 'Load Request',
     admin_payment: 'Payment Update',
-    admin_customer: 'Customer Update',
+    admin_customer: 'Subscriber Update',
     admin_message: 'Ticket Reply',
     admin_incident: 'Possible Common Issue',
     load_request: 'Load Request',
@@ -410,7 +410,9 @@ export default function AdminWorkspace() {
   });
 
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('adminUser');
     navigate('/admin-login');
   };
 

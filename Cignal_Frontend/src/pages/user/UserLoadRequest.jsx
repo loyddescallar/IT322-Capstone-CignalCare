@@ -140,6 +140,24 @@ function formatPeso(amount) {
   return `₱${Number(amount || 0).toLocaleString('en-PH')}`;
 }
 
+function useObjectUrl(file) {
+  const [url, setUrl] = useState('');
+
+  useEffect(() => {
+    if (!file) {
+      setUrl('');
+      return undefined;
+    }
+
+    const nextUrl = URL.createObjectURL(file);
+    setUrl(nextUrl);
+
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [file]);
+
+  return url;
+}
+
 function readPendingPlan() {
   try {
     return JSON.parse(sessionStorage.getItem('cignal_pending_load_plan') || 'null');
@@ -153,7 +171,8 @@ export default function UserLoadRequest() {
   const [searchParams] = useSearchParams();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const [plans, setPlans] = useState(FALLBACK_PLANS);
+  const [plans, setPlans] = useState(import.meta.env.DEV ? FALLBACK_PLANS : []);
+  const [plansLoadError, setPlansLoadError] = useState(false);
   const [step, setStep] = useState(1);
   const [channelOneWorking, setChannelOneWorking] = useState(null);
   const [screenFile, setScreenFile] = useState(null);
@@ -163,6 +182,8 @@ export default function UserLoadRequest() {
   const [channelCat, setChannelCat] = useState('All');
   const [manualMethod, setManualMethod] = useState('GCash');
   const [receiptFile, setReceiptFile] = useState(null);
+  const screenPreviewUrl = useObjectUrl(screenFile);
+  const receiptPreviewUrl = useObjectUrl(receiptFile);
   const [referenceNo, setReferenceNo] = useState('');
   const [copied, setCopied] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -201,9 +222,12 @@ export default function UserLoadRequest() {
         if (!active) return;
         const loadedPlans = (response.data?.plans || []).map(normalizePlan).filter((plan) => plan.status === 'active');
         setPlans(loadedPlans);
+        setPlansLoadError(false);
       })
       .catch(() => {
-        if (active) setPlans(FALLBACK_PLANS);
+        if (!active) return;
+        setPlans(import.meta.env.DEV ? FALLBACK_PLANS : []);
+        setPlansLoadError(true);
       });
 
     return () => {
@@ -254,11 +278,11 @@ export default function UserLoadRequest() {
         `Channel 1 picture: No picture / error shown.`,
         `Selected TV issue: ${option?.label || 'Not specified'}.`,
         `Description: ${option?.desc || 'No description provided'}.`,
-        hasPhoto ? `TV screen photo: uploaded by customer and attached for review.` : `TV screen photo: not uploaded.`,
+        hasPhoto ? `TV screen photo: uploaded by the subscriber and attached for review.` : `TV screen photo: not uploaded.`,
         `System recommendation: ${recommendation.title}.`,
         `Recommended action: ${recommendation.body}`,
         '',
-        'Customer note: Customer attempted to request prepaid loading, but the system blocked payment because this issue may not be solved by loading.',
+        'Subscriber note: Subscriber attempted to request prepaid loading, but the system blocked payment because this issue may not be solved by loading.',
       ].join('\n'),
       prefillScreenIssue: option?.label || '',
       prefillScreenPhotoFile: screenFile || null,
@@ -450,7 +474,7 @@ export default function UserLoadRequest() {
                       <div className="mt-4">
                         {screenFile ? (
                           <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <img src={URL.createObjectURL(screenFile)} alt="TV screen" className="mx-auto h-48 w-full rounded-xl object-contain" />
+                            <img src={screenPreviewUrl} alt="TV screen" className="mx-auto h-48 w-full rounded-xl object-contain" />
                             <button type="button" onClick={() => setScreenFile(null)} className="absolute right-3 top-3 rounded-full bg-red-600 p-1.5 text-white" aria-label="Remove TV screen photo"><X size={14} /></button>
                           </div>
                         ) : (
@@ -514,7 +538,7 @@ export default function UserLoadRequest() {
               </div>
 
               {plans.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center"><Tv size={28} className="mx-auto text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">No active prepaid plans are available.</p><p className="mt-1 text-xs text-slate-500">Please contact Descallar Satellite Services or check again later.</p></div>
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center"><Tv size={28} className="mx-auto text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">{plansLoadError ? 'Prepaid plans are temporarily unavailable.' : 'No active prepaid plans are available.'}</p><p className="mt-1 text-xs text-slate-500">{plansLoadError ? 'The live plan list could not be loaded. Please try again later; the system will not show stale fallback prices in production.' : 'Please contact Descallar Satellite Services or check again later.'}</p></div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   {plans.map((plan, index) => {
@@ -589,7 +613,7 @@ export default function UserLoadRequest() {
                     <div>
                       <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Receipt Photo *</label>
                       {receiptFile ? (
-                        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3"><img src={URL.createObjectURL(receiptFile)} alt="Payment receipt" className="mx-auto h-52 w-full rounded-xl object-contain" /><button type="button" onClick={() => setReceiptFile(null)} className="absolute right-3 top-3 rounded-full bg-red-600 p-1.5 text-white" aria-label="Remove receipt"><X size={14} /></button></div>
+                        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3"><img src={receiptPreviewUrl} alt="Payment receipt" className="mx-auto h-52 w-full rounded-xl object-contain" /><button type="button" onClick={() => setReceiptFile(null)} className="absolute right-3 top-3 rounded-full bg-red-600 p-1.5 text-white" aria-label="Remove receipt"><X size={14} /></button></div>
                       ) : (
                         <label className="flex h-52 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 text-center transition hover:border-[#cc0000] hover:bg-red-50"><ReceiptText size={28} className="mb-2 text-slate-400" /><p className="text-xs font-semibold text-slate-600">Upload a readable receipt</p><p className="mt-1 text-[10px] text-slate-400">Max {MAX_IMAGE_MB}MB</p><input type="file" accept="image/*" className="hidden" onChange={(event) => setReceiptFile(event.target.files?.[0] || null)} /></label>
                       )}
