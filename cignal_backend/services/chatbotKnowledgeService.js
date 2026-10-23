@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { FIXED_LOAD_VALIDITY_DAYS } = require('../utils/loadValidity');
 const { boxModels } = require('../data/troubleshootData');
 const { getTicketsByUser, getTicketById } = require('../models/ticketModel');
 const { getRequestsByUser, getRequestById } = require('../models/technicianModel');
@@ -115,7 +116,7 @@ async function getActiveLoadPlans() {
       code: plan.plan_code,
       name: plan.plan_name,
       amount: Number(plan.amount || 0),
-      validityDays: Number(plan.validity_days || 0),
+      validityDays: FIXED_LOAD_VALIDITY_DAYS,
       hdChannels: Number(plan.hd_channels || 0),
       sdChannels: Number(plan.sd_channels || 0),
       benefits: String(plan.benefits_text || '').trim(),

@@ -1,4 +1,7 @@
 const pool = require("../config/db");
+const { FIXED_LOAD_VALIDITY_DAYS } = require("../utils/loadValidity");
+const { posReferenceFromKey } = require("../utils/posIdempotency");
+const { getPublicPrepaidAccount } = require("../models/userModel");
 
 const {
   processPosLoad,
@@ -34,13 +37,6 @@ const PLAN_STATUSES = [
 ];
 
 const POS_PAYMENT_METHODS = new Set(["Cash", "GCash"]);
-
-function makePosReference() {
-  return `POS-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)
-    .toUpperCase()}`;
-}
 
 let planColumnsReady = false;
 
@@ -92,6 +88,7 @@ function decoratePlan(plan) {
 
   return {
     ...plan,
+    validity_days: FIXED_LOAD_VALIDITY_DAYS,
     channels,
     channel_count: channels.length,
   };
@@ -125,11 +122,7 @@ function cleanPlanPayload(body) {
 
   const amount = Number(body.amount || 0);
 
-  const validityDays = Number(
-    body.validity_days ||
-      body.validityDays ||
-      30
-  );
+  const validityDays = FIXED_LOAD_VALIDITY_DAYS;
 
   const hdChannels = Number(
     body.hd_channels ??
@@ -195,13 +188,6 @@ function validatePlanPayload(plan) {
     return "Amount must be greater than zero";
   }
 
-  if (
-    !plan.validityDays ||
-    Number(plan.validityDays) <= 0
-  ) {
-    return "Validity days must be greater than zero";
-  }
-
   return "";
 }
 
@@ -239,6 +225,13 @@ async function addLoad(req, res) {
       });
     }
 
+    // Required for all POS writes: client-generated UUID must stay fixed on retry.
+    // Using the unique prepaid_transactions.reference_no column avoids a migration.
+    const referenceNo = posReferenceFromKey(req.headers['idempotency-key']);
+    if (!referenceNo) {
+      return res.status(400).json({ error: 'A valid Idempotency-Key UUID header is required for POS transactions.' });
+    }
+
     const customer =
       await findByAccountIdOrCca(
         String(accountNumber).trim()
@@ -266,14 +259,14 @@ async function addLoad(req, res) {
         req.user?.accountName ||
         "Admin",
       reference_no:
-        makePosReference(),
+        referenceNo,
       description:
         String(
           description || ""
         ).trim() || null,
     });
 
-    await notifySafely(
+    if (!result.replayed) await notifySafely(
       "POS LOAD",
       () =>
         createNotification({
@@ -290,9 +283,10 @@ async function addLoad(req, res) {
         })
     );
 
-    return res.status(201).json({
+    return res.status(result.replayed ? 200 : 201).json({
+      replayed: Boolean(result.replayed),
       message:
-        "Load transaction recorded",
+        result.replayed ? "Previously completed load confirmed" : "Load transaction recorded",
       historyId: result.historyId,
       transactionId:
         result.transactionId,
@@ -314,6 +308,10 @@ async function addLoad(req, res) {
       });
     }
 
+    if (err.code === 'POS_IDEMPOTENCY_CONFLICT') {
+      return res.status(409).json({ error: err.message });
+    }
+
     if (
       err.code === "ER_DUP_ENTRY"
     ) {
@@ -326,6 +324,24 @@ async function addLoad(req, res) {
     return res.status(500).json({
       error: "Server error",
     });
+  }
+}
+
+async function getMyPrepaidStatus(req, res) {
+  try {
+    const account = await getPublicPrepaidAccount(req.user.accountNumber);
+    if (!account || Number(account.id) !== Number(req.user.id)) {
+      return res.status(404).json({ error: 'Prepaid account not found.' });
+    }
+    return res.json({
+      success: true,
+      expiryDate: account.expiry_date || null,
+      lastLoadDate: account.last_load_date || null,
+      prepaidStatus: account.prepaid_status || 'inactive',
+    });
+  } catch (error) {
+    console.error('GET MY PREPAID STATUS ERROR', error);
+    return res.status(500).json({ error: 'Unable to retrieve prepaid status.' });
   }
 }
 
@@ -705,6 +721,7 @@ async function updateLoadStatusController(
 
 module.exports = {
   addLoad,
+  getMyPrepaidStatus,
   getMyLoadHistory,
   getAllLoadHistoryController,
   getPrepaidTransactionsController,

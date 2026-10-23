@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { FIXED_LOAD_VALIDITY_DAYS } = require("../utils/loadValidity");
 
 let columnsReady = false;
 
@@ -519,7 +520,7 @@ async function fulfillLoadRequest(
       throw error;
     }
 
-    const validityDays = Number(plan.validity_days || 30);
+    const validityDays = FIXED_LOAD_VALIDITY_DAYS;
     const planId = plan.id;
 
     let transactionId = null;

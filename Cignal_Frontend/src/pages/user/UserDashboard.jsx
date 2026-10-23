@@ -63,14 +63,16 @@ export default function UserDashboard() {
     });
 
     if(user.accountNumber){
-      axiosClient.get('/customers/'+user.accountNumber).then(r=>{
-        const c=r.data?.user;
-        if(c?.lastLoadDate){
-          const exp=new Date(c.lastLoadDate); exp.setDate(exp.getDate()+30);
-          const daysLeft=Math.ceil((exp.getTime()-Date.now())/86400000);
-          setPrepaid({ daysLeft, expiry:exp.toLocaleDateString('en-PH'), status:daysLeft>7?'active':daysLeft>0?'expiring':'expired' });
-        }
-      }).catch(()=>{});
+      // The persisted account expiry is authoritative. No reconstruction from
+      // load-history timestamps (which can differ from fulfillment time).
+      axiosClient.get('/load/my-prepaid-status').then(r=>{
+        const value=r.data?.expiryDate;
+        if(!value){ setPrepaid(null); return; }
+        const exp=new Date(value);
+        if(Number.isNaN(exp.getTime())) { setPrepaid(null); return; }
+        const daysLeft=Math.max(0,Math.ceil((exp.getTime()-Date.now())/86400000));
+        setPrepaid({daysLeft,expiry:exp.toLocaleDateString('en-PH',{timeZone:'Asia/Manila'}),status:daysLeft>7?'active':daysLeft>0?'expiring':'expired'});
+      }).catch(()=>setPrepaid(null));
     }
     axiosClient.get('/notifications').then(r=>setNotifs(r.data?.notifications||[])).catch(()=>{
       setNotifs([{id:1,type:'info',message:'Welcome to CignalCare+. Your account is active.',is_read:0,created_at:new Date().toISOString()}]);

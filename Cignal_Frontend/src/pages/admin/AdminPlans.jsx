@@ -95,7 +95,6 @@ export default function AdminPlans() {
       plan_code: plan.plan_code || '',
       plan_name: plan.plan_name || '',
       amount: plan.amount || '',
-      validity_days: plan.validity_days || 30,
       hd_channels: plan.hd_channels || 0,
       sd_channels: plan.sd_channels || 0,
       benefits_text: plan.benefits_text || '',
@@ -120,7 +119,6 @@ export default function AdminPlans() {
     if (!form.plan_name.trim()) return 'Plan name is required.';
     if (!form.plan_code.trim()) return 'Plan code is required.';
     if (!Number(form.amount) || Number(form.amount) <= 0) return 'Amount must be greater than zero.';
-    if (!Number(form.validity_days) || Number(form.validity_days) <= 0) return 'Validity days must be greater than zero.';
     return '';
   }
 
@@ -129,7 +127,7 @@ export default function AdminPlans() {
       plan_code: form.plan_code.trim(),
       plan_name: form.plan_name.trim(),
       amount: Number(form.amount),
-      validity_days: Number(form.validity_days),
+      validity_days: 30,
       hd_channels: Number(form.hd_channels || 0),
       sd_channels: Number(form.sd_channels || 0),
       benefits_text: form.benefits_text.trim(),
@@ -417,7 +415,6 @@ export default function AdminPlans() {
                   { label: 'Plan Code *', name: 'plan_code', placeholder: 'REG300' },
                   { label: 'Plan Name *', name: 'plan_name', placeholder: 'Load 300' },
                   { label: 'Amount *', name: 'amount', type: 'number', placeholder: '300' },
-                  { label: 'Validity Days *', name: 'validity_days', type: 'number', placeholder: '30' },
                   { label: 'HD Channels', name: 'hd_channels', type: 'number', placeholder: '10' },
                   { label: 'SD Channels', name: 'sd_channels', type: 'number', placeholder: '70' },
                 ].map((field) => (
@@ -435,6 +432,10 @@ export default function AdminPlans() {
                     />
                   </div>
                 ))}
+
+                <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  Subscription validity: <strong>30 days (fixed for all prepaid loads)</strong>
+                </div>
 
                 <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-500" style={{ fontSize: '10px' }}>

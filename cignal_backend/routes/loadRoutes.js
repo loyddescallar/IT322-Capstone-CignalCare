@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   addLoad,
+  getMyPrepaidStatus,
   getMyLoadHistory,
   getAllLoadHistoryController,
   getPrepaidTransactionsController,
@@ -20,6 +21,7 @@ router.delete('/plans/:id', authRequired, requireRole('admin'), deletePlanContro
 
 router.get('/prepaid-transactions', authRequired, requireRole('admin'), getPrepaidTransactionsController);
 router.post('/', authRequired, requireRole('admin'), addLoad);
+router.get('/my-prepaid-status', authRequired, requireRole('user'), getMyPrepaidStatus);
 router.get('/my', authRequired, getMyLoadHistory);
 router.get('/admin', authRequired, requireRole('admin'), getAllLoadHistoryController);
 router.patch('/admin/:id', authRequired, requireRole('admin'), updateLoadStatusController);

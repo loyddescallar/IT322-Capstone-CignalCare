@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CheckCircle2, Copy, X } from 'lucide-react';
 import customerApi from '../../api/customerApi';
 import axiosClient from '../../api/axiosClient';
@@ -30,6 +30,10 @@ export default function AdminPOS() {
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
+  // Persist only the operation key and a fingerprint of form inputs in this tab.
+  // An uncertain network result must NEVER trigger a new transaction identity.
+  const pendingPosAttempt = useRef(null);
+  const PENDING_POS_KEY = 'cignalcare_pos_pending_v1';
 
   useEffect(() => {
     let active = true;
@@ -119,6 +123,21 @@ export default function AdminPOS() {
       return;
     }
 
+    const signature = JSON.stringify([
+      found.accountNumber, String(plan.id), String(plan.amount),
+      payMethod, paymentReference.trim(), String(cashTendered),
+    ]);
+    let previous = pendingPosAttempt.current;
+    try { previous ||= JSON.parse(sessionStorage.getItem(PENDING_POS_KEY) || 'null'); }
+    catch { previous = null; }
+    if (previous && previous.signature !== signature) {
+      setError('A previous POS request has an uncertain result. Verify it in Transactions and clear it before processing different details.');
+      return;
+    }
+    const attempt = previous || { signature, key: window.crypto.randomUUID() };
+    pendingPosAttempt.current = attempt;
+    sessionStorage.setItem(PENDING_POS_KEY, JSON.stringify(attempt));
+
     setProcessing(true);
     setError('');
     setSuccess(null);
@@ -134,8 +153,10 @@ export default function AdminPOS() {
         loadAmount: plan.amount,
         paymentMethod: payMethod,
         description: `POS Load — ${plan.plan_name} via ${payMethod}${referenceNote}`,
-      });
+      }, { headers: { 'Idempotency-Key': attempt.key } });
 
+      sessionStorage.removeItem(PENDING_POS_KEY);
+      pendingPosAttempt.current = null;
       setSuccess({
         subscriber: found.accountName,
         plan: plan.plan_name,
@@ -148,11 +169,25 @@ export default function AdminPOS() {
       setCash('');
       setPaymentReference('');
 
-      const historyResponse = await axiosClient.get('/load/prepaid-transactions', { params: { source: 'pos' } });
-      setHistory(historyResponse.data?.transactions || []);
+      // Refresh failure does not turn a successfully committed load into an error.
+      try {
+        const historyResponse = await axiosClient.get('/load/prepaid-transactions', { params: { source: 'pos' } });
+        setHistory(historyResponse.data?.transactions || []);
+      } catch (refreshError) {
+        console.warn('POS history refresh failed after confirmed completion', refreshError);
+      }
     } catch (requestError) {
       console.error('PROCESS POS LOAD ERROR:', requestError);
-      setError(requestError.response?.data?.error || 'Unable to process this load transaction.');
+      const code = requestError.response?.status;
+      if ([400, 404, 409, 422].includes(code)) {
+        // These responses definitively reject the operation; a corrected sale
+        // must use a new request identity.
+        sessionStorage.removeItem(PENDING_POS_KEY);
+        pendingPosAttempt.current = null;
+      }
+      setError(!code || code >= 500
+        ? 'Transaction result not confirmed. Check the history and retry ONLY the same details with the same request ID.'
+        : (requestError.response?.data?.error || 'Unable to process this load transaction.'));
     } finally {
       setProcessing(false);
     }
@@ -193,7 +228,17 @@ export default function AdminPOS() {
           {error && (
             <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
               <X size={14} className="mt-0.5 shrink-0 text-red-600" />
-              <p className="text-xs font-semibold leading-5 text-red-700">{error}</p>
+              <div>
+                <p className="text-xs font-semibold leading-5 text-red-700">{error}</p>
+                <button type="button" className="mt-2 text-xs font-semibold text-red-800 underline"
+                  onClick={() => {
+                    if (window.confirm('Only clear the pending request after verifying the transaction did NOT already complete. Continue?')) {
+                      sessionStorage.removeItem(PENDING_POS_KEY);
+                      pendingPosAttempt.current = null;
+                      setError('');
+                    }
+                  }}>Clear pending request after verification</button>
+              </div>
             </div>
           )}
 
@@ -260,7 +305,7 @@ export default function AdminPOS() {
                   >
                     <p className="text-xs font-bold text-gray-800">{item.plan_name}</p>
                     <p className="text-xs font-semibold text-[#cc0000]">₱{Number(item.amount).toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">{item.validity_days} days · {item.hd_channels}HD/{item.sd_channels}SD</p>
+                    <p className="text-xs text-gray-400">30 days · {item.hd_channels}HD/{item.sd_channels}SD</p>
                   </button>
                 ))}
               </div>

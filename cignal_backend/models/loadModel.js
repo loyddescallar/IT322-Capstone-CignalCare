@@ -1,10 +1,35 @@
 const pool = require("../config/db");
+const { FIXED_LOAD_VALIDITY_DAYS } = require("../utils/loadValidity");
+const { isSamePosTransaction, replayConflict } = require("../utils/posIdempotency");
 
 async function processPosLoad(entry) {
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    const referenceNo = String(entry.reference_no || "").trim();
+    // Replays return the ORIGINAL completed sale. They must not refresh expiry,
+    // add load history, or create another subscriber notification.
+    const [existingRows] = await connection.query(
+      'SELECT * FROM prepaid_transactions WHERE reference_no = ? LIMIT 1 FOR UPDATE',
+      [referenceNo]
+    );
+    if (existingRows[0]) {
+      if (!isSamePosTransaction(existingRows[0], entry)) throw replayConflict();
+      const [plans] = await connection.query(
+        'SELECT * FROM prepaid_plans WHERE id = ? LIMIT 1',
+        [existingRows[0].plan_id]
+      );
+      await connection.commit();
+      return {
+        historyId: null,
+        transactionId: existingRows[0].id,
+        referenceNo,
+        plan: plans[0] || { plan_name: 'Prepaid load', amount: existingRows[0].amount },
+        replayed: true,
+      };
+    }
 
     let plan = null;
     const parsedPlanId = Number(entry.plan_id);
@@ -50,8 +75,7 @@ async function processPosLoad(entry) {
       throw error;
     }
 
-    const validityDays = Number(plan.validity_days || 30);
-    const referenceNo = String(entry.reference_no || "").trim();
+    const validityDays = FIXED_LOAD_VALIDITY_DAYS;
 
     const description =
       entry.description ||
@@ -160,6 +184,28 @@ async function processPosLoad(entry) {
     };
   } catch (error) {
     await connection.rollback();
+    // Concurrent POSTs may both see no sale. The unique reference constraint
+    // makes only one insert succeed; return that committed result on retry.
+    if (error.code === 'ER_DUP_ENTRY') {
+      const referenceNo = String(entry.reference_no || '').trim();
+      const [rows] = await pool.query(
+        'SELECT * FROM prepaid_transactions WHERE reference_no = ? LIMIT 1',
+        [referenceNo]
+      );
+      if (rows[0]) {
+        if (!isSamePosTransaction(rows[0], entry)) throw replayConflict();
+        const [plans] = await pool.query(
+          'SELECT * FROM prepaid_plans WHERE id = ? LIMIT 1', [rows[0].plan_id]
+        );
+        return {
+          historyId: null,
+          transactionId: rows[0].id,
+          referenceNo,
+          plan: plans[0] || { plan_name: 'Prepaid load', amount: rows[0].amount },
+          replayed: true,
+        };
+      }
+    }
     throw error;
   } finally {
     connection.release();
