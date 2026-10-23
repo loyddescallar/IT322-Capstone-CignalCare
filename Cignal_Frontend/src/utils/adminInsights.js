@@ -1,3 +1,4 @@
+import { subscriberLifecycle } from './adminBusinessRules';
 function displayTicketStatus(status) {
   const legacy = { Open: 'Submitted', 'In Progress': 'Under Review', Closed: 'Archived' };
   return legacy[status] || status || 'Submitted';
@@ -42,7 +43,7 @@ export function buildDashboardInsights({tickets,customers,loads}) {
   const resolved = tickets.filter(t=>['Resolved','Archived'].includes(displayTicketStatus(t.status))).length;
   const resolutionRate = tickets.length ? Math.round((resolved/tickets.length)*100) : 0;
   const operationsSummary = 'You currently have '+customers.length+' customers, '+tickets.length+' tickets, and PHP '+totalRevenue.toFixed(2)+' total load value logged.';
-  const atRisk = customers.filter(c=>{ if(!c.lastLoadDate)return false; const d=(Date.now()-new Date(c.lastLoadDate).getTime())/86400000; return d>30&&d<=60; }).length;
+  const atRisk = customers.filter(customer => subscriberLifecycle(customer.lastLoadDate) === 'At Risk').length;
   const recommendation = atRisk>0 ? atRisk+' subscriber'+(atRisk>1?'s are':' is')+' at risk of lapsing. Send a reload reminder.' : 'Keep customer records updated so CCA inquiry and prepaid support stay accurate.';
   return { topIssue, repeatedConcern, resolutionRate, operationsSummary, recommendation };
 }

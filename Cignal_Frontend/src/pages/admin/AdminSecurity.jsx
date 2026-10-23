@@ -16,7 +16,35 @@ import authApi from '../../api/authApi';
 
 function formatDate(value) {
   if (!value) return 'Not recorded yet';
-  return new Date(value).toLocaleString('en-PH');
+  return new Date(value).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' });
+}
+
+const FRIENDLY_EVENTS = {
+  ADMIN_SECURITY_SETUP_STARTED: 'Administrator security setup was started.',
+  ADMIN_SECURITY_SETUP_COMPLETED: 'Administrator security setup was completed.',
+  ADMIN_LOGIN_FAILED: 'An administrator login attempt was unsuccessful.',
+  ADMIN_LOGIN_BLOCKED_LOCKED: 'An administrator sign-in was blocked because the account is temporarily locked.',
+  ADMIN_OTP_SENT: 'An administrator sign-in verification code was sent.',
+  ADMIN_2FA_FAILED: 'An administrator identity verification attempt failed.',
+  ADMIN_LOGIN_SUCCESS: 'Administrator signed in successfully.',
+  ADMIN_RECOVERY_FAILED: 'An account recovery attempt was unsuccessful.',
+  ADMIN_RECOVERY_STARTED: 'Administrator account recovery was started.',
+  ADMIN_RECOVERY_COMPLETED: 'Administrator account recovery completed; security credentials were renewed.',
+  ADMIN_PASSWORD_CHANGED: 'Administrator password was changed successfully.',
+  ADMIN_RECOVERY_CODES_ROTATED: 'New recovery codes were generated. The previous codes can no longer be used.',
+  ADMIN_SESSIONS_REVOKED: 'Previous administrator sign-in sessions were signed out.',
+  ADMIN_RECOVERY_EMAIL_UPDATED: 'Administrator recovery email was updated.',
+  ADMIN_2FA_CONTACT_VERIFIED: 'An administrator recovery contact was verified.',
+};
+function activityDescription(code) {
+  return FRIENDLY_EVENTS[code] || String(code || 'Administrative action').replace(/^(ADMIN|SECURITY)_/, '').replace(/_/g, ' ').toLowerCase().replace(/^./, char => char.toUpperCase()) + (FRIENDLY_EVENTS[code] ? '' : '.');
+}
+function activityDetails(details) {
+  const content = String(details || '').trim();
+  if (!content) return 'No additional details recorded.';
+  if (/^Method:\s*(email|sms|totp)$/i.test(content)) return `Verification method: ${content.split(':')[1].trim().toUpperCase() === 'TOTP' ? 'Authenticator app' : content.split(':')[1].trim().toUpperCase() === 'SMS' ? 'Text message' : 'Email'}.`;
+  if (/^Verified (email|sms) contact\.$/i.test(content)) return `Verified ${/sms/i.test(content) ? 'mobile number' : 'email address'}.`;
+  return content; // Server-generated audit remarks; never include secret values here.
 }
 
 function saveUpdatedSession(data) {
@@ -244,8 +272,8 @@ export default function AdminSecurity() {
         <div className="flex items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Clock3 size={19} className="text-red-600" /> Recent Security Activity</h2><p className="mt-1 text-xs text-gray-500">Authentication and administrator write actions are recorded for review.</p></div></div>
         <div className="mt-5 overflow-x-auto">
           <table className="min-w-[720px] text-left text-sm">
-            <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-400"><th className="px-3 py-3">Time</th><th className="px-3 py-3">Action</th><th className="px-3 py-3">IP</th><th className="px-3 py-3">Details</th></tr></thead>
-            <tbody>{logs.length ? logs.map((log) => <tr key={log.event_id} className="border-b border-gray-100"><td className="whitespace-nowrap px-3 py-3 text-gray-500">{formatDate(log.created_at)}</td><td className="px-3 py-3 font-semibold text-gray-900">{log.action}</td><td className="px-3 py-3 text-gray-500">{log.ip_address || '—'}</td><td className="max-w-lg px-3 py-3 text-gray-500">{log.details || '—'}</td></tr>) : <tr><td colSpan="4" className="px-3 py-8 text-center text-gray-400">No security activity recorded yet.</td></tr>}</tbody>
+            <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-400"><th className="px-3 py-3">Time</th><th className="px-3 py-3">Action</th><th className="px-3 py-3">IP Address</th><th className="px-3 py-3">Details</th></tr></thead>
+            <tbody>{logs.length ? logs.map((log) => <tr key={log.event_id} className="border-b border-gray-100"><td className="whitespace-nowrap px-3 py-3 text-gray-500">{formatDate(log.created_at)}</td><td className="px-3 py-3 font-semibold text-gray-900">{activityDescription(log.action)}</td><td className="px-3 py-3 text-gray-500">{log.ip_address || '—'}</td><td className="max-w-lg px-3 py-3 text-gray-500">{activityDetails(log.details)}</td></tr>) : <tr><td colSpan="4" className="px-3 py-8 text-center text-gray-400">No security activity recorded yet.</td></tr>}</tbody>
           </table>
         </div>
       </section>

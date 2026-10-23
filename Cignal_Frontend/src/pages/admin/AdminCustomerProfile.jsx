@@ -30,6 +30,7 @@ import {
 import customerApi from '../../api/customerApi';
 import ticketApi from '../../api/ticketApi';
 import axiosClient from '../../api/axiosClient';
+import { subscriberLifecycle } from '../../utils/adminBusinessRules';
 
 const LOCATIONS = [
   'Balayan',
@@ -102,18 +103,7 @@ function formatDate(dateValue) {
 }
 
 function getActivityStatus(lastLoadDate) {
-  if (!lastLoadDate) return 'Inactive';
-
-  const date = new Date(lastLoadDate);
-
-  if (Number.isNaN(date.getTime())) return 'Inactive';
-
-  const days = (Date.now() - date.getTime()) / 86400000;
-
-  if (days <= 30) return 'Active';
-  if (days <= 60) return 'At Risk';
-
-  return 'Inactive';
+  return subscriberLifecycle(lastLoadDate);
 }
 
 function isTicketOpen(ticket) {
@@ -179,12 +169,18 @@ function computeSmartRisk(lastLoadDate, activeTickets, openTechReqs, archived) {
   const reasons = [];
   const status = getActivityStatus(lastLoadDate);
 
-  if (status === 'Inactive') {
+  if (status === 'Archive Eligible') {
+    risk += 45;
+    reasons.push('120+ days since last completed reload; eligible for manual archival');
+  } else if (status === 'No Load Yet') {
+    risk += 25;
+    reasons.push('no completed reload on record');
+  } else if (status === 'Inactive') {
     risk += 40;
-    reasons.push('no reload in 60+ days');
+    reasons.push('90–119 days since last completed reload');
   } else if (status === 'At Risk') {
     risk += 25;
-    reasons.push('31–60 days without reload');
+    reasons.push('60–89 days since last completed reload');
   }
 
   if (activeTickets > 0) {
@@ -252,6 +248,8 @@ const activityStyles = {
     badge: 'bg-slate-100 text-slate-600 border-slate-200',
     dot: 'bg-slate-400',
   },
+  'Archive Eligible': { badge: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+  'No Load Yet': { badge: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
 };
 
 export default function AdminCustomerProfile() {

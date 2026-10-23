@@ -220,19 +220,26 @@ async function getAllLoadHistory() {
   return rows;
 }
 
-async function getAllPrepaidTransactions() {
+async function getAllPrepaidTransactions(filters = {}) {
+  const conditions = ["pt.status = 'completed'"];
+  const params = [];
+  if (filters.source === 'pos') conditions.push("pt.reference_no LIKE 'POS-%'");
+  if (filters.accountNumber) {
+    conditions.push('pt.account_number LIKE ?');
+    // Account-number search is intentional; escape SQL wildcard characters.
+    params.push(`%${String(filters.accountNumber).replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  if (filters.paymentMethod && filters.paymentMethod !== 'All') {
+    conditions.push('pt.payment_method = ?');
+    params.push(filters.paymentMethod);
+  }
   const [rows] = await pool.query(
-    `
-    SELECT
-      pt.*,
-      pp.plan_name
-    FROM prepaid_transactions pt
-    LEFT JOIN prepaid_plans pp
-      ON pp.id = pt.plan_id
-    ORDER BY pt.transaction_date DESC
-    `
+    `SELECT pt.*, pp.plan_name
+       FROM prepaid_transactions pt
+       LEFT JOIN prepaid_plans pp ON pp.id = pt.plan_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY pt.created_at DESC`, params
   );
-
   return rows;
 }
 

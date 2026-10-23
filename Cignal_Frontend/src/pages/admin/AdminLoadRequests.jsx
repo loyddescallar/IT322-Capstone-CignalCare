@@ -172,30 +172,16 @@ export default function AdminLoadRequests() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {['All', ...LOCATIONS].map((location) => (
-              <button
-                key={location}
-                onClick={() => setLocationFilter(location)}
-                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${locationFilter === location ? 'bg-[#cc0000] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                {location}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {['All', ...STATUSES].map((status) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${statusFilter === status ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
-
+          <label className="flex w-full flex-col gap-1 text-xs text-gray-600 sm:w-auto">Coverage Location
+            <select aria-label="Filter requests by location" value={locationFilter} onChange={event => setLocationFilter(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-red-600">
+              {['All', ...LOCATIONS].map(location => <option key={location}>{location}</option>)}
+            </select>
+          </label>
+          <label className="flex w-full flex-col gap-1 text-xs text-gray-600 sm:w-auto">Request Status
+            <select aria-label="Filter requests by status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-red-600">
+              {['All', ...STATUSES].map(status => <option key={status}>{status}</option>)}
+            </select>
+          </label>
           <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} requests</span>
         </div>
 

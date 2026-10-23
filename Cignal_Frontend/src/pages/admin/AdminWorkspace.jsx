@@ -8,7 +8,6 @@ import {
   Headset,
   Wrench,
   Bell,
-  ChevronDown,
   AlignJustify,
   X,
   Satellite,
@@ -288,16 +287,13 @@ export default function AdminWorkspace() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [newLoadCount, setNewLoadCount] = useState(0);
   const [notifList, setNotifList] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
 
   const notifRef = useRef(null);
-  const profileRef = useRef(null);
 
   useOutsideClick(notifRef, () => setNotifOpen(false));
-  useOutsideClick(profileRef, () => setProfileOpen(false));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -597,7 +593,7 @@ export default function AdminWorkspace() {
               onClick={() => setNotifOpen(!notifOpen)}
               className="relative rounded-lg p-2 transition-colors hover:bg-gray-100"
             >
-              <Bell size={18} className="text-gray-600" />
+              <Bell size={18} className={unread > 0 && !notifOpen ? "text-gray-600 admin-notification-attention" : "text-gray-600"} />
 
               {unread > 0 && (
                 <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#cc0000] text-[9px] font-bold text-white">
@@ -676,45 +672,6 @@ export default function AdminWorkspace() {
             )}
           </div>
 
-          {/* Profile */}
-          <div ref={profileRef} className="relative">
-            <button
-              onClick={() => setProfileOpen(!profileOpen)}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-gray-100"
-            >
-              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#cc0000] text-xs font-bold text-white">
-                {adminInitials}
-              </div>
-              <ChevronDown size={13} className="text-gray-400" />
-            </button>
-
-            {profileOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-[min(13rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-xl">
-                <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
-                  <p className="text-xs font-semibold text-gray-800">
-                    {adminName}
-                  </p>
-
-                  <div className="mt-0.5 flex items-center gap-1">
-                    <ShieldCheck size={10} className="text-[#cc0000]" />
-                    <span className="text-xs font-medium text-[#cc0000]">
-                      Super Administrator
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={logout}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-red-50"
-                >
-                  <LogOut size={14} className="text-red-500" />
-                  <span className="text-xs font-medium text-red-500">
-                    Logout
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
         </header>
 
         <main className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 xl:p-7">
