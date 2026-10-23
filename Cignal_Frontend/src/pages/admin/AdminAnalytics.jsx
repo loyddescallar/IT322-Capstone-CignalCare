@@ -134,7 +134,8 @@ export default function AdminAnalytics() {
       [],
       ['SUMMARY'],
       ['Metric', 'Value'],
-      ['Total Prepaid Revenue', k.totalRevenue || 0],
+      ['Total Prepaid Sales (PHP)', k.totalRevenue || 0],
+      ['Gross Profit (PHP)', k.grossProfit || 0],
       ['Total Prepaid Transactions', k.totalTransactions || 0],
       ['POS Transactions', k.posTransactions || 0],
       ['Online PayMongo Transactions', k.onlineTransactions || 0],
@@ -145,7 +146,7 @@ export default function AdminAnalytics() {
       ['Repeat Contact Rate', `${k.repeatContactRate || 0}%`],
       [],
       ['SALES CHANNELS'],
-      ['Channel', 'Transactions', 'Revenue'],
+      ['Channel', 'Transactions', 'Sales (PHP)'],
       ...(data?.salesByChannel || []).map((item) => [item.channel, item.count, item.revenue]),
       [],
       ['TOP ISSUES'],
@@ -187,13 +188,15 @@ export default function AdminAnalytics() {
 
     const csv = rows
       .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv' }));
+      .join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `cignalcare-business-analytics-${Date.now()}.csv`;
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -237,7 +240,7 @@ export default function AdminAnalytics() {
       {!loading && tab === 'overview' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Metric icon={Store} label="Prepaid Revenue" value={peso(k.totalRevenue)} sub={`${k.totalTransactions || 0} completed transactions`} tone="red" />
+            <Metric icon={Store} label="Prepaid Sales" value={peso(k.totalRevenue)} sub={`${k.totalTransactions || 0} completed transactions`} tone="red" />
             <Metric icon={Users} label="Active Subscribers" value={k.activeSubscribers || 0} sub={location || 'Across all locations'} tone="blue" />
             <Metric icon={Headset} label="Support Tickets" value={k.totalTickets || 0} sub={`${k.resolutionRate || 0}% resolved`} tone="amber" />
             <Metric icon={CheckCircle2} label="Self-Service Success" value={`${k.selfServiceResolutionRate || 0}%`} sub={`${k.selfServiceAssessments || 0} completed assessments`} tone="green" />
@@ -257,9 +260,9 @@ export default function AdminAnalytics() {
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(value, name) => name === 'Prepaid Revenue' ? peso(value) : value} />
+                    <Tooltip formatter={(value, name) => name === 'Prepaid Sales' ? peso(value) : value} />
                     <Area yAxisId="left" type="monotone" dataKey="support" name="Support Requests" stroke="#dc2626" fill="url(#supportGradient)" strokeWidth={2.4} />
-                    <Area yAxisId="right" type="monotone" dataKey="sales" name="Prepaid Revenue" stroke="#2563eb" fill="url(#salesGradient)" strokeWidth={2.2} />
+                    <Area yAxisId="right" type="monotone" dataKey="sales" name="Prepaid Sales" stroke="#2563eb" fill="url(#salesGradient)" strokeWidth={2.2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -323,13 +326,13 @@ export default function AdminAnalytics() {
       {!loading && tab === 'sales' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric icon={Store} label="Prepaid Revenue" value={peso(k.totalRevenue)} sub="POS + completed PayMongo loads" tone="red" />
+            <Metric icon={Store} label="Prepaid Sales" value={peso(k.totalRevenue)} sub="POS + completed PayMongo loads" tone="red" />
             <Metric icon={ChartNoAxesCombined} label="Transactions" value={k.totalTransactions || 0} sub={`${k.posTransactions || 0} POS · ${k.onlineTransactions || 0} online`} tone="blue" />
             <Metric icon={MapPin} label="Locations" value={(data?.salesByLocation || []).length} sub="Locations with completed prepaid sales" tone="green" />
-            <Metric icon={Store} label="Average Sale" value={peso((k.totalRevenue || 0) / Math.max(1, k.totalTransactions || 0))} sub="Revenue per completed transaction" tone="amber" />
+            <Metric icon={Store} label="Gross Profit" value={peso(k.grossProfit)} sub="₱40 per completed load" tone="amber" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
-            <Section title="Prepaid Revenue Trend" subtitle="Completed transactions from both Admin POS and subscriber PayMongo load requests.">
+            <Section title="Prepaid Sales Trend" subtitle="Completed transactions from both Admin POS and subscriber PayMongo load requests.">
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data?.trend || []} margin={{ top: 5, right: 12, left: -10, bottom: 0 }}>
@@ -337,7 +340,7 @@ export default function AdminAnalytics() {
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(value) => peso(value)} />
-                    <Area type="monotone" dataKey="sales" name="Prepaid Revenue" stroke="#dc2626" fill="#fee2e2" strokeWidth={2.5} />
+                    <Area type="monotone" dataKey="sales" name="Prepaid Sales" stroke="#dc2626" fill="#fee2e2" strokeWidth={2.5} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -360,7 +363,7 @@ export default function AdminAnalytics() {
                 <HorizontalBars items={data?.salesByPlan || []} valueKey="revenue" format={peso} />
                 <div className="overflow-x-auto rounded-xl border border-slate-100">
                   <table className="min-w-[620px] text-xs">
-                    <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2.5">Plan / Product</th><th className="px-3 py-2.5">Transactions</th><th className="px-3 py-2.5">Revenue</th></tr></thead>
+                    <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-wide text-slate-400"><tr><th className="px-3 py-2.5">Plan / Product</th><th className="px-3 py-2.5">Transactions</th><th className="px-3 py-2.5">Sales</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">{(data?.salesByPlan || []).slice(0, 8).map((row) => <tr key={row.label}><td className="px-3 py-3 font-semibold text-slate-700">{row.label}</td><td className="px-3 py-3 text-slate-500">{row.count}</td><td className="px-3 py-3 font-bold text-slate-800">{peso(row.revenue)}</td></tr>)}</tbody>
                   </table>
                 </div>

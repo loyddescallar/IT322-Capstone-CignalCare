@@ -18,9 +18,10 @@ import {
   Download,
 } from 'lucide-react';
 import customerApi from '../../api/customerApi';
+import { subscriberLifecycle } from '../../utils/adminBusinessRules';
 
 const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
-const ACTIVITY_FILTERS = ['All', 'Active', 'At Risk', 'Inactive'];
+const ACTIVITY_FILTERS = ['All', 'Active', 'At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'];
 const EMPTY = {
   accountName: '',
   accountNumber: '',
@@ -52,6 +53,14 @@ const actStyle = {
     dot: 'bg-red-500',
     icon: <Archive size={10} className="text-red-600" />,
   },
+  'No Load Yet': {
+    badge: 'bg-slate-100 text-slate-700', dot: 'bg-slate-400',
+    icon: <XCircle size={10} className="text-slate-500" />,
+  },
+  'Archive Eligible': {
+    badge: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500',
+    icon: <Archive size={10} className="text-orange-600" />,
+  },
 };
 
 function normalizeLocation(location) {
@@ -64,15 +73,7 @@ function normalizeLocation(location) {
 }
 
 function getActivityStatus(lastLoadDate) {
-  if (!lastLoadDate) return 'Inactive';
-
-  const parsed = new Date(lastLoadDate);
-  if (Number.isNaN(parsed.getTime())) return 'Inactive';
-
-  const days = (Date.now() - parsed.getTime()) / 86400000;
-  if (days <= 30) return 'Active';
-  if (days <= 60) return 'At Risk';
-  return 'Inactive';
+  return subscriberLifecycle(lastLoadDate);
 }
 
 function getCustomerStatus(customer) {
@@ -156,8 +157,6 @@ export default function AdminCustomers() {
   const [locTab, setLocTab] = useState('All');
   const [activityTab, setActivityTab] = useState('All');
   const [recordStatus, setRecordStatus] = useState('active');
-  const [ccaQ, setCcaQ] = useState('');
-  const [ccaResult, setCcaResult] = useState(null);
   const [mode, setMode] = useState(null);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState({ ...EMPTY });
@@ -190,8 +189,6 @@ export default function AdminCustomers() {
 
   useEffect(() => {
     loadData(recordStatus);
-    setCcaResult(null);
-    setCcaQ('');
   }, [recordStatus]);
 
   const displayedCustomers = useMemo(() => {
@@ -206,13 +203,8 @@ export default function AdminCustomers() {
         recordStatus === 'archived' || activityTab === 'All' || activity === activityTab;
       const matchesSearch =
         !query ||
-        String(customer.accountName || '').toLowerCase().includes(query) ||
         String(customer.accountNumber || '').toLowerCase().includes(query) ||
-        String(customer.ccaNumber || '').toLowerCase().includes(query) ||
-        String(customer.phone || '').toLowerCase().includes(query) ||
-        String(customer.email || '').toLowerCase().includes(query) ||
-        String(customer.address || '').toLowerCase().includes(query) ||
-        String(customer.location || '').toLowerCase().includes(query);
+        String(customer.ccaNumber || '').toLowerCase().includes(query);
 
       return matchesLocation && matchesActivity && matchesSearch;
     });
@@ -382,27 +374,11 @@ export default function AdminCustomers() {
   };
 
 
-  const handleCcaSearch = (event) => {
-    event.preventDefault();
-    const query = ccaQ.trim().toLowerCase();
-    if (!query) return;
-
-    const found = customers.find(
-      (customer) =>
-        String(customer.accountNumber || '').toLowerCase() === query ||
-        String(customer.ccaNumber || '').toLowerCase() === query
-    );
-
-    setCcaResult(found || 'not-found');
-  };
-
-  const currentListLabel = recordStatus === 'archived' ? 'archived customers' : 'active customers';
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Customers</h1>
+          <h1 className="text-lg font-bold text-gray-800">Subscribers</h1>
           <p className="mt-0.5 text-xs text-gray-500">
             Verified Descallar Satellite Services subscriber accounts
           </p>
@@ -426,15 +402,15 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="Active Records"
-          value={loading ? '...' : stats.total ?? 0}
+          label="Total Subscribers"
+          value={loading ? '...' : stats.allCustomers ?? 0}
           color="text-gray-800"
           icon={<Users size={15} className="text-gray-400" />}
         />
         <StatCard
-          label="This Month"
+          label="New This Month"
           value={loading ? '...' : stats.thisMonth ?? 0}
           color="text-blue-600"
           icon={<Users size={15} className="text-blue-400" />}
@@ -463,86 +439,8 @@ export default function AdminCustomers() {
           color="text-red-600"
           icon={<Archive size={15} className="text-red-500" />}
         />
-      </div>
-
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
-            <Search size={15} className="text-[#cc0000]" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700">CCA / Account Inquiry</h2>
-            <p className="text-xs text-gray-400">
-              Look up a subscriber by Account Number or CCA Number in the current list
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleCcaSearch} className="flex max-w-lg flex-col gap-2 sm:flex-row">
-          <input
-            type="text"
-            value={ccaQ}
-            onChange={(event) => {
-              setCcaQ(event.target.value);
-              if (!event.target.value) setCcaResult(null);
-            }}
-            placeholder="Account number or CCA number"
-            className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-[#cc0000]"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-[#cc0000] px-5 py-2.5 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto"
-          >
-            Search
-          </button>
-        </form>
-
-        {ccaResult === 'not-found' && (
-          <div className="mt-2.5 max-w-lg rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs text-red-600">
-            ❌ No record found for &quot;{ccaQ}&quot; in {currentListLabel}.
-          </div>
-        )}
-
-        {ccaResult && ccaResult !== 'not-found' && (() => {
-          const status = getCustomerStatus(ccaResult);
-          return (
-            <div className="mt-2.5 max-w-lg rounded-xl border border-green-100 bg-green-50 px-4 py-3">
-              <p className="mb-2 text-xs font-semibold text-green-700">✅ Record Found</p>
-              <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-                {[
-                  { label: 'Account Name', value: ccaResult.accountName || '—' },
-                  { label: 'Account No.', value: ccaResult.accountNumber || '—' },
-                  { label: 'CCA No.', value: ccaResult.ccaNumber || '—' },
-                  { label: 'Phone', value: ccaResult.phone || '—' },
-                  { label: 'Location', value: normalizeLocation(ccaResult.location) },
-                  { label: 'Registered', value: safeDate(ccaResult.created_at) },
-                ].map((field) => (
-                  <div key={field.label}>
-                    <span className="text-gray-400" style={{ fontSize: '9px' }}>
-                      {field.label}
-                    </span>
-                    <p className="text-xs font-medium text-gray-800">{field.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-2 flex items-center gap-2">
-                <span
-                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${actStyle[status].badge}`}
-                >
-                  {actStyle[status].icon} {status}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => navigate('/admin/customers/' + ccaResult.id)}
-                  className="flex items-center gap-1 text-xs text-[#cc0000] hover:underline"
-                >
-                  <ExternalLink size={11} /> View Full Profile
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+        <StatCard label="Archive Eligible" value={loading ? '...' : stats.archiveEligibleCount ?? 0} color="text-orange-600" icon={<Archive size={15} className="text-orange-500" />} />
+        <StatCard label="No Load Yet" value={loading ? '...' : stats.neverLoadedCount ?? 0} color="text-slate-600" icon={<XCircle size={15} className="text-slate-400" />} />
       </div>
 
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -551,7 +449,7 @@ export default function AdminCustomers() {
             <Search size={14} className="text-gray-400" />
             <input
               type="text"
-              placeholder="Search name, account, CCA, phone, email..."
+              placeholder="Search Account Number or CCA Number"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder-gray-400"
@@ -566,7 +464,7 @@ export default function AdminCustomers() {
                 recordStatus === 'active' ? 'bg-[#cc0000] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Active Records
+              Current Subscribers
             </button>
             <button
               type="button"
@@ -662,7 +560,7 @@ export default function AdminCustomers() {
               ) : displayedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-10 text-center text-gray-400">
-                    No {recordStatus === 'archived' ? 'archived' : 'active'} customers found.
+                    No {recordStatus === 'archived' ? 'archived' : 'current'} subscribers found.
                   </td>
                 </tr>
               ) : (
@@ -928,6 +826,8 @@ export default function AdminCustomers() {
             </div>
             <div className="max-h-[calc(100dvh-5rem)] overflow-y-auto p-4 sm:max-h-[78dvh] sm:p-5">
               {importError && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{importError}</div>}
+              <a href="/templates/CignalCare_Subscriber_Import_Template.xlsx" download className="mb-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"><Download size={14} /> Download Ready-to-Use Excel Template</a>
+              <p className="mb-3 text-xs text-gray-500">Complete the Subscribers sheet; do not rename the header row. Account and CCA numbers must follow the existing system validation rules. Assign location below.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Location for this file</label>
@@ -998,7 +898,8 @@ export default function AdminCustomers() {
               )}
               <p className="text-xs leading-relaxed text-gray-600">
                 Archive <span className="font-semibold">{selected.accountName}</span> ({selected.accountNumber})?
-                This will hide the customer from active lists while preserving records.
+                This will hide the subscriber from current lists while preserving records.
+                {getCustomerStatus(selected) === 'Archive Eligible' && ' This account has passed 120 days since its last completed reload.'}
               </p>
               <div className="mt-4 flex gap-2">
                 <button

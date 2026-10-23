@@ -1,82 +1,116 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Download, Filter } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 import customerApi from '../../api/customerApi';
 import { useNavigate } from 'react-router-dom';
+import SalesDateFilter from '../../components/admin/SalesDateFilter';
+import { dateBounds, manilaDayKey, isInManilaRange, isCompletedSale, salesSummary, transactionDate } from '../../utils/adminBusinessRules';
 
-const TX_STATUSES=['completed','pending','failed','cancelled'];
-const PAYMENT_METHODS=['GCash','Maya','Cash','Bank Transfer'];
-const MANILA_TIME_ZONE = 'Asia/Manila';
-function formatDate(d) { if(!d)return '—'; return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:MANILA_TIME_ZONE}); }
-function manilaDayKey(value) { if(!value)return ''; const date=new Date(value); return Number.isNaN(date.getTime())?'':date.toLocaleDateString('en-CA',{timeZone:MANILA_TIME_ZONE}); }
-
+const PAYMENT_METHODS = ['Cash', 'GCash', 'PayMongo'];
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  }) : '—';
+}
+const peso = amount => `₱${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export default function AdminTransactions() {
-  const navigate=useNavigate();
-  const [transactions,setTx]=useState([]); const [loading,setLoading]=useState(true);
-  const [search,setSearch]=useState(''); const [statusF,setStatusF]=useState('All'); const [paymentF,setPayF]=useState('All');
-
-  useEffect(()=>{
-    async function load(){setLoading(true);try{const r=await axiosClient.get('/load/prepaid-transactions');setTx(r.data?.transactions||[]);}catch{try{const r=await axiosClient.get('/load/admin');setTx(r.data?.history||[]);}catch(e){console.error(e);}}finally{setLoading(false);}};load();
-  },[]);
-
-  const filtered=useMemo(()=>{ const q=search.toLowerCase(); return transactions.filter(t=>statusF==='All'||t.status===statusF).filter(t=>paymentF==='All'||t.payment_method===paymentF).filter(t=>(t.account_number||t.accountNumber||'').toLowerCase().includes(q)||(t.account_name||t.accountName||'').toLowerCase().includes(q)||(t.reference_no||'').toLowerCase().includes(q)||(t.plan_name||t.description||'').toLowerCase().includes(q)); },[transactions,search,statusF,paymentF]);
-
-  const totalRevenue=transactions.reduce((s,t)=>s+Number(t.amount||t.loadAmount||0),0);
-  const today=manilaDayKey(new Date());
-  const todayRevenue=transactions.filter(t=>manilaDayKey(t.transaction_date||t.created_at)===today).reduce((s,t)=>s+Number(t.amount||t.loadAmount||0),0);
-  const pendingCount=transactions.filter(t=>t.status==='pending').length;
-  const failedCount=transactions.filter(t=>['failed','cancelled'].includes(t.status)).length;
-
-  const navigateToCustomer=async(accountNumber)=>{ if(!accountNumber)return; try{const r=await customerApi.getCustomerLookup(accountNumber); if(r.data?.user?.id)navigate('/admin/customers/'+r.data.user.id);}catch(e){console.error(e);} };
-
-  const handleExport=()=>{
-    const rows=[['ID','Reference No.','Account Name','Account No.','Plan','Amount','Payment Method','Processed By','Date','Expiry','Status']];
-    filtered.forEach(t=>rows.push([t.id,t.reference_no||'',t.account_name||t.accountName||'',t.account_number||t.accountNumber||'',t.plan_name||t.description||'',t.amount||t.loadAmount||0,t.payment_method||'',t.processed_by||'Admin',formatDate(t.transaction_date||t.created_at),t.expiry_date?formatDate(t.expiry_date):'',t.status||'completed']));
-    const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('\"','\"\"')}"`).join(',')).join('\n');
-    const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));
-    const a=document.createElement('a');
-    a.href=url;
-    a.download='transactions_'+today+'.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  const navigate = useNavigate();
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [payment, setPayment] = useState('All');
+  const [period, setPeriod] = useState('This Month');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  useEffect(() => {
+    let active = true;
+    axiosClient.get('/load/prepaid-transactions')
+      .then(response => { if (active) setTransactions(response.data?.transactions || []); })
+      .catch(requestError => {
+        console.error('LOAD COMPLETED SALES ERROR:', requestError);
+        if (active) setError('Unable to load completed sales. Refresh and try again.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  const { from, to } = dateBounds(period, fromDate, toDate);
+  const filtered = useMemo(() => transactions.filter(tx =>
+    isCompletedSale(tx) &&
+    (payment === 'All' || tx.payment_method === payment) &&
+    String(tx.account_number || '').toLowerCase().includes(search.trim().toLowerCase()) &&
+    isInManilaRange(transactionDate(tx), from, to) &&
+    !(period === 'Custom Range' && (!from || !to || from > to))
+  ), [transactions, payment, search, period, from, to]);
+  const summary = useMemo(() => salesSummary(filtered), [filtered]);
+  const navigateToSubscriber = async accountNumber => {
+    if (!accountNumber) return;
+    try {
+      const response = await customerApi.getCustomerLookup(accountNumber);
+      if (response.data?.user?.id) navigate('/admin/customers/' + response.data.user.id);
+    } catch (lookupError) { console.error('SUBSCRIBER LOOKUP ERROR:', lookupError); }
   };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-lg font-bold text-gray-800">Transactions</h1><p className="text-xs text-gray-500 mt-0.5">Prepaid load transaction history</p></div><button onClick={handleExport} className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 sm:w-auto"><Download size={13}/> Export CSV</button></div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[{label:'Total Revenue',value:'₱'+totalRevenue.toLocaleString(),color:'text-green-600'},{label:"Today's Revenue",value:'₱'+todayRevenue.toLocaleString(),color:'text-blue-600'},{label:'Pending',value:pendingCount,color:'text-amber-600'},{label:'Failed/Cancelled',value:failedCount,color:'text-red-600'}].map(s=><div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><p className="text-xs text-gray-500 mb-2">{s.label}</p><p className={`text-2xl font-bold ${s.color}`}>{loading?'...':s.value}</p></div>)}</div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1"><Search size={14} className="text-gray-400"/><input type="text" placeholder="Search account, reference, plan..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-transparent text-xs text-gray-600 placeholder-gray-400 outline-none w-full"/></div>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto"><Filter size={13} className="text-gray-400"/>
-            <select value={statusF} onChange={e=>setStatusF(e.target.value)} className="text-xs border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-[#cc0000] bg-white text-gray-600"><option value="All">All Status</option>{TX_STATUSES.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select>
-            <select value={paymentF} onChange={e=>setPayF(e.target.value)} className="text-xs border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-[#cc0000] bg-white text-gray-600"><option value="All">All Payments</option>{PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}</select>
-          </div>
-          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} records</span>
+  const handleExport = () => {
+    const headers = ['Reference Number', 'Subscriber Name', 'Account Number', 'Prepaid Plan', 'Sale Amount (PHP)', 'Gross Profit (PHP)', 'Payment Method', 'Processed By', 'Sale Date (Asia/Manila)', 'Expiry Date (Asia/Manila)', 'Status'];
+    const rows = filtered.map(tx => [tx.reference_no || '', tx.account_name || '', tx.account_number || '', tx.plan_name || '',
+      Number(tx.amount || 0).toFixed(2), '40.00', tx.payment_method || '', tx.processed_by || '',
+      formatDate(transactionDate(tx)), formatDate(tx.expiry_date), 'Completed']);
+    const escapeCell = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const csv = [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `cignalcare-completed-sales-${manilaDayKey(new Date())}.csv`;
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return <div className="space-y-4">
+    <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+      <div><h1 className="text-lg font-bold text-gray-800">Completed Sales</h1><p className="mt-0.5 text-xs text-gray-500">POS (Cash/GCash) and online PayMongo completed prepaid loads. Pending and failed requests stay in Load Requests.</p></div>
+      <button type="button" disabled={loading || Boolean(error)} onClick={handleExport} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"><Download size={15}/> Export CSV</button>
+    </div>
+    {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <SalesDateFilter period={period} setPeriod={setPeriod} from={fromDate} setFrom={setFromDate} to={toDate} setTo={setToDate} />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <label className="flex flex-col gap-1 text-xs text-gray-600">Payment Method
+            <select value={payment} onChange={e => setPayment(e.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><option value="All">All Payments</option>{PAYMENT_METHODS.map(method => <option key={method}>{method}</option>)}</select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-gray-600">Account Number
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"><Search size={14} className="text-gray-400"/><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search Account Number" className="w-full min-w-0 bg-transparent text-xs outline-none sm:w-48" /></div>
+          </label>
         </div>
-        <div className="overflow-x-auto"><table className="min-w-[1120px] w-full text-xs">
-          <thead><tr className="border-b border-gray-100 bg-gray-50">{['#','Reference No.','Account Name','Account No.','Plan','Amount','Payment','Processed By','Date','Expiry','Status'].map(h=><th key={h} className="text-left py-2.5 px-3 text-gray-500 font-semibold uppercase tracking-wide" style={{fontSize:'10px'}}>{h}</th>)}</tr></thead>
-          <tbody>
-            {loading?<tr><td colSpan={11} className="py-10 text-center text-gray-400">Loading transactions...</td></tr>
-            :filtered.length===0?<tr><td colSpan={11} className="py-10 text-center text-gray-400">No transactions found.</td></tr>
-            :filtered.map((t,i)=><tr key={t.id||i} className="border-b border-gray-50 hover:bg-gray-50 last:border-0">
-              <td className="py-2 px-3 font-mono text-gray-400">{t.id}</td>
-              <td className="py-2 px-3 font-mono text-gray-500" style={{fontSize:'10px'}}>{t.reference_no||'—'}</td>
-              <td className="py-2 px-3"><button onClick={()=>navigateToCustomer(t.account_number||t.accountNumber)} className="font-semibold text-gray-800 hover:text-[#cc0000] hover:underline text-left">{t.account_name||t.accountName||'—'}</button></td>
-              <td className="py-2 px-3 font-mono text-gray-600">{t.account_number||t.accountNumber||'—'}</td>
-              <td className="py-2 px-3 text-gray-600">{t.plan_name||t.description||'—'}</td>
-              <td className="py-2 px-3 font-bold text-[#cc0000]">₱{Number(t.amount||t.loadAmount||0).toLocaleString()}</td>
-              <td className="py-2 px-3"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${t.payment_method==='GCash'?'bg-blue-100 text-blue-700':t.payment_method==='Maya'?'bg-emerald-100 text-emerald-700':t.payment_method==='Cash'?'bg-gray-100 text-gray-700':'bg-purple-100 text-purple-700'}`}>{t.payment_method||'Cash'}</span></td>
-              <td className="py-2 px-3 text-gray-500">{t.processed_by||'Admin'}</td>
-              <td className="py-2 px-3 text-gray-400">{formatDate(t.transaction_date||t.created_at)}</td>
-              <td className="py-2 px-3 text-gray-400">{t.expiry_date?formatDate(t.expiry_date):'—'}</td>
-              <td className="py-2 px-3"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${t.status==='completed'?'bg-green-100 text-green-700':t.status==='pending'?'bg-amber-100 text-amber-700':t.status==='failed'?'bg-red-100 text-red-700':'bg-gray-100 text-gray-600'}`}>{t.status||'completed'}</span></td>
-            </tr>)}
-          </tbody>
-        </table></div>
       </div>
     </div>
-  );
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      {[
+        { label: 'Total Sales', value: peso(summary.sales), color: 'text-gray-900' },
+        { label: 'Gross Profit (₱40 / load)', value: peso(summary.grossProfit), color: 'text-green-700' },
+        { label: 'Completed Transactions', value: summary.transactions, color: 'text-blue-700' },
+      ].map(item => <div key={item.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="mb-2 text-xs text-gray-500">{item.label}</p><p className={`text-2xl font-bold ${item.color}`}>{loading ? '...' : item.value}</p></div>)}
+    </div>
+    <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-4 py-3"><h2 className="text-sm font-bold text-gray-800">Completed Load Transactions</h2><p className="mt-1 text-xs text-gray-400">{filtered.length} sales matching the selected filters · Asia/Manila dates</p></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[990px] text-left text-xs">
+        <thead className="bg-gray-50"><tr>{['Reference', 'Subscriber', 'Account No.', 'Plan', 'Amount', 'Gross Profit', 'Payment', 'Processed By', 'Sale Date', 'Status'].map(title => <th key={title} className="px-3 py-2.5 font-semibold text-gray-600">{title}</th>)}</tr></thead>
+        <tbody>{loading ? <tr><td colSpan={10} className="py-10 text-center text-gray-400">Loading completed sales…</td></tr>
+          : filtered.length === 0 ? <tr><td colSpan={10} className="py-10 text-center text-gray-400">No completed sales match these filters.</td></tr>
+          : filtered.map((tx, index) => <tr key={tx.id || index} className="border-t border-gray-100 hover:bg-gray-50">
+            <td className="px-3 py-2 font-mono text-gray-500">{tx.reference_no || '—'}</td>
+            <td className="px-3 py-2"><button className="font-semibold text-gray-800 hover:text-red-700 hover:underline" onClick={() => navigateToSubscriber(tx.account_number)}>{tx.account_name || '—'}</button></td>
+            <td className="px-3 py-2 font-mono">{tx.account_number || '—'}</td>
+            <td className="px-3 py-2">{tx.plan_name || '—'}</td>
+            <td className="px-3 py-2 font-bold text-red-700">{peso(tx.amount)}</td>
+            <td className="px-3 py-2 font-semibold text-green-700">₱40.00</td>
+            <td className="px-3 py-2">{tx.payment_method || '—'}</td>
+            <td className="px-3 py-2">{tx.processed_by || '—'}</td>
+            <td className="whitespace-nowrap px-3 py-2">{formatDate(transactionDate(tx))}</td>
+            <td className="px-3 py-2"><span className="rounded-full bg-green-100 px-2 py-1 font-semibold text-green-700">Completed</span></td>
+          </tr>)}</tbody>
+      </table></div>
+    </section>
+  </div>;
 }

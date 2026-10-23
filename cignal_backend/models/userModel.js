@@ -137,7 +137,7 @@ async function findById(id) {
     `SELECT u.*, lx.last_load as lastLoadDate
      FROM users u
      LEFT JOIN (
-       SELECT account_number, MAX(transaction_date) as last_load
+       SELECT account_number, MAX(created_at) as last_load
        FROM prepaid_transactions
        WHERE status='completed'
        GROUP BY account_number
@@ -154,7 +154,7 @@ async function findByAccountIdOrCca(accountId) {
     `SELECT u.*, lx.last_load as lastLoadDate
      FROM users u
      LEFT JOIN (
-       SELECT account_number, MAX(transaction_date) as last_load
+       SELECT account_number, MAX(created_at) as last_load
        FROM prepaid_transactions
        WHERE status='completed'
        GROUP BY account_number
@@ -178,7 +178,7 @@ async function getAllUsers(status = 'active') {
     `SELECT u.*, lx.last_load as lastLoadDate
      FROM users u
      LEFT JOIN (
-       SELECT account_number, MAX(transaction_date) as last_load
+       SELECT account_number, MAX(created_at) as last_load
        FROM prepaid_transactions
        WHERE status='completed'
        GROUP BY account_number
@@ -190,32 +190,28 @@ async function getAllUsers(status = 'active') {
 }
 
 async function getCustomerStats() {
-  await ensureAccountSchema();
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [rows] = await pool.query(
-    `SELECT COUNT(*) as allCustomers,
-      SUM(CASE WHEN COALESCE(u.status, 'active') <> 'archived' THEN 1 ELSE 0 END) as total,
-      SUM(CASE WHEN COALESCE(u.status, 'active') = 'archived' THEN 1 ELSE 0 END) as archivedCount,
-      SUM(CASE WHEN COALESCE(u.status, 'active') <> 'archived' AND DATE_FORMAT(u.created_at,'%Y-%m')=? THEN 1 ELSE 0 END) as thisMonth,
-      SUM(CASE WHEN COALESCE(u.status, 'active') <> 'archived' AND lx.last_load >= DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) as activeCount,
-      SUM(CASE WHEN COALESCE(u.status, 'active') <> 'archived' AND lx.last_load >= DATE_SUB(NOW(),INTERVAL 60 DAY) AND lx.last_load < DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) as atRiskCount,
-      SUM(CASE WHEN COALESCE(u.status, 'active') <> 'archived' AND (lx.last_load IS NULL OR lx.last_load < DATE_SUB(NOW(),INTERVAL 60 DAY)) THEN 1 ELSE 0 END) as inactiveCount
-     FROM users u
-     LEFT JOIN (
-       SELECT account_number, MAX(transaction_date) as last_load
-       FROM prepaid_transactions WHERE status='completed' GROUP BY account_number
-     ) lx ON lx.account_number = u.accountNumber
-     WHERE u.role='user'`,
-    [thisMonth]
-  );
-  const stats = rows[0] || {};
-  return {
-    allCustomers: Number(stats.allCustomers || 0), total: Number(stats.total || 0),
-    archivedCount: Number(stats.archivedCount || 0), thisMonth: Number(stats.thisMonth || 0),
-    activeCount: Number(stats.activeCount || 0), atRiskCount: Number(stats.atRiskCount || 0),
-    inactiveCount: Number(stats.inactiveCount || 0),
+  const { subscriberLifecycle, dayKey } = require('../utils/subscriberLifecycle');
+  const users = await getAllUsers('all');
+  const stats = {
+    allCustomers: users.length, total: users.length, thisMonth: 0,
+    activeCount: 0, atRiskCount: 0, inactiveCount: 0,
+    archivedCount: 0, neverLoadedCount: 0, archiveEligibleCount: 0,
   };
+  const thisMonth = dayKey(new Date()).slice(0, 7);
+  for (const subscriber of users) {
+    if (dayKey(subscriber.created_at)?.slice(0, 7) === thisMonth) stats.thisMonth += 1;
+    if (String(subscriber.status || '').toLowerCase() === 'archived') {
+      stats.archivedCount += 1;
+      continue;
+    }
+    const state = subscriberLifecycle(subscriber.lastLoadDate);
+    const field = {
+      Active: 'activeCount', 'At Risk': 'atRiskCount', Inactive: 'inactiveCount',
+      'No Load Yet': 'neverLoadedCount', 'Archive Eligible': 'archiveEligibleCount',
+    }[state];
+    stats[field] += 1;
+  }
+  return stats;
 }
 
 async function createUser(data) {

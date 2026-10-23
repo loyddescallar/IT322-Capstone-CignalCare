@@ -2,27 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Copy, X } from 'lucide-react';
 import customerApi from '../../api/customerApi';
 import axiosClient from '../../api/axiosClient';
+import SalesDateFilter from '../../components/admin/SalesDateFilter';
+import { dateBounds, manilaDayKey, isInManilaRange, isCompletedSale, isPosSale, salesSummary, subscriberLifecycle, transactionDate } from '../../utils/adminBusinessRules';
 
-const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Bank Transfer'];
+const PAYMENT_METHODS = ['Cash', 'GCash'];
 const E_WALLET_ACCOUNTS = {
   GCash: { name: 'Descallar Satellite Services', number: '09755718056' },
-  Maya: { name: 'Descallar Satellite Services', number: '09755718056' },
 };
 const MANILA_TIME_ZONE = 'Asia/Manila';
-
-function manilaDayKey(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-CA', { timeZone: MANILA_TIME_ZONE });
-}
 
 export default function AdminPOS() {
   const [customers, setCustomers] = useState([]);
   const [plans, setPlans] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [txFilter, setTxFilter] = useState('All');
+  const [period, setPeriod] = useState('Today');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [ccaQ, setCcaQ] = useState('');
   const [found, setFound] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -44,14 +40,15 @@ export default function AdminPOS() {
         const [customerResponse, plansResponse, historyResponse] = await Promise.all([
           customerApi.getCustomers(),
           axiosClient.get('/load/plans'),
-          axiosClient.get('/load/admin'),
+          axiosClient.get('/load/prepaid-transactions', { params: { source: 'pos' } }),
         ]);
         if (!active) return;
         setCustomers(customerResponse.data?.customers || []);
         setPlans((plansResponse.data?.plans || []).filter((item) => item.status === 'active'));
-        setHistory(historyResponse.data?.history || []);
+        setHistory(historyResponse.data?.transactions || []);
       } catch (requestError) {
         console.error('LOAD POS DATA ERROR:', requestError);
+        if (active) setError('Unable to load POS data. Refresh the page before processing a load.');
       } finally {
         if (active) setLoading(false);
       }
@@ -65,14 +62,15 @@ export default function AdminPOS() {
 
   const today = manilaDayKey(new Date());
   const todayLoads = useMemo(
-    () => history.filter((item) => manilaDayKey(item.created_at) === today),
+    () => history.filter((item) => isCompletedSale(item) && isPosSale(item) && manilaDayKey(transactionDate(item)) === today),
     [history, today]
   );
-  const totalRevenue = useMemo(
-    () => history.reduce((sum, item) => sum + Number(item.loadAmount || 0), 0),
-    [history]
+  const { from, to } = dateBounds(period, fromDate, toDate);
+  const displayedHistory = useMemo(
+    () => history.filter((item) => isCompletedSale(item) && isPosSale(item) && isInManilaRange(transactionDate(item), from, to) && !(period === 'Custom Range' && (!from || !to || from > to))),
+    [history, from, to, period]
   );
-  const displayedHistory = txFilter === 'Today' ? todayLoads : history;
+  const summary = useMemo(() => salesSummary(displayedHistory), [displayedHistory]);
   const eWalletAccount = E_WALLET_ACCOUNTS[payMethod] || null;
   const isNonCash = payMethod !== 'Cash';
   const change = cashTendered && plan
@@ -150,8 +148,8 @@ export default function AdminPOS() {
       setCash('');
       setPaymentReference('');
 
-      const historyResponse = await axiosClient.get('/load/admin');
-      setHistory(historyResponse.data?.history || []);
+      const historyResponse = await axiosClient.get('/load/prepaid-transactions', { params: { source: 'pos' } });
+      setHistory(historyResponse.data?.transactions || []);
     } catch (requestError) {
       console.error('PROCESS POS LOAD ERROR:', requestError);
       setError(requestError.response?.data?.error || 'Unable to process this load transaction.');
@@ -173,11 +171,12 @@ export default function AdminPOS() {
         <p className="mt-0.5 text-xs text-gray-500">Process verified prepaid load transactions for subscribers.</p>
       </div>
 
+      <SalesDateFilter period={period} setPeriod={setPeriod} from={fromDate} setFrom={setFromDate} to={toDate} setTo={setToDate} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Loads Today', value: loading ? '...' : todayLoads.length, color: 'text-blue-600' },
-          { label: 'Total Transactions', value: loading ? '...' : history.length, color: 'text-gray-800' },
-          { label: 'Total Revenue', value: loading ? '...' : `₱${totalRevenue.toLocaleString()}`, color: 'text-green-600' },
+          { label: 'Total Sales', value: loading ? '...' : `₱${summary.sales.toLocaleString()}`, color: 'text-gray-800' },
+          { label: 'Gross Profit', value: loading ? '...' : `₱${summary.grossProfit.toLocaleString()}`, color: 'text-green-600' },
+          { label: 'Transactions', value: loading ? '...' : summary.transactions, color: 'text-blue-600' },
           { label: 'Available Plans', value: loading ? '...' : plans.length, color: 'text-[#cc0000]' },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -227,6 +226,13 @@ export default function AdminPOS() {
               <button type="submit" className="w-full rounded-xl bg-[#cc0000] px-4 py-2.5 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto">Search</button>
             </form>
             {notFound && <p className="mt-1.5 text-xs text-red-600">No subscriber found for “{ccaQ}”.</p>}
+            {found && ['At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'].includes(subscriberLifecycle(found.lastLoadDate)) && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" role="status">
+                {subscriberLifecycle(found.lastLoadDate) === 'No Load Yet'
+                  ? 'This subscriber has no completed reload on record. Verify the account details before processing.'
+                  : `Subscriber is ${subscriberLifecycle(found.lastLoadDate)}. Verify the account details before accepting payment.`}
+              </div>
+            )}
             {found && (
               <div className="mt-2 rounded-xl border border-green-100 bg-green-50 px-3 py-2">
                 <p className="text-xs font-semibold text-green-700">✓ {found.accountName}</p>
@@ -315,10 +321,6 @@ export default function AdminPOS() {
                     </div>
                   )}
 
-                  {payMethod === 'Bank Transfer' && (
-                    <p className="text-xs leading-5 text-amber-700">Use only the business bank details authorized by Descallar Satellite Services. Confirm the incoming transfer in the merchant/bank account before processing the load.</p>
-                  )}
-
                   <div>
                     <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Payment / Reference Number *</label>
                     <input
@@ -361,32 +363,46 @@ export default function AdminPOS() {
         </div>
 
         <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <h2 className="text-sm font-semibold text-gray-700">Recent Transactions</h2>
-            <div className="flex gap-1">
-              {['Today', 'All'].map((filter) => (
-                <button key={filter} type="button" onClick={() => setTxFilter(filter)} className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${txFilter === filter ? 'bg-[#cc0000] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{filter}</button>
-              ))}
-            </div>
+          <div className="border-b border-gray-100 px-4 py-3">
+            <h2 className="text-sm font-semibold text-gray-700">Recent Transactions — Today Only</h2>
+            <p className="mt-1 text-xs text-gray-400">{todayLoads.length} completed POS load(s) today in Manila time. Older records remain in sales history.</p>
           </div>
           <div className="max-h-[460px] divide-y divide-gray-50 overflow-y-auto">
             {loading ? (
               <div className="py-8 text-center text-xs text-gray-400">Loading...</div>
-            ) : displayedHistory.length === 0 ? (
+            ) : todayLoads.length === 0 ? (
               <div className="py-8 text-center text-xs text-gray-400">No transactions.</div>
-            ) : displayedHistory.slice(0, 25).map((item, index) => (
+            ) : todayLoads.slice(0, 25).map((item, index) => (
               <div key={item.id || index} className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-gray-50">
                 <div>
-                  <p className="text-xs font-semibold text-gray-800">{item.accountNumber}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">{item.description || 'Prepaid Load'}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString('en-PH', { timeZone: MANILA_TIME_ZONE })}</p>
+                  <p className="text-xs font-semibold text-gray-800">{item.account_number}</p>
+                  <p className="mt-0.5 text-xs text-gray-400">{item.plan_name || 'POS Prepaid Load'} · {item.payment_method}</p>
+                  <p className="mt-0.5 text-xs text-gray-400">{new Date(transactionDate(item)).toLocaleDateString('en-PH', { timeZone: MANILA_TIME_ZONE })}</p>
                 </div>
-                <p className="text-sm font-bold text-[#cc0000]">₱{Number(item.loadAmount || 0).toLocaleString()}</p>
+                <p className="text-sm font-bold text-[#cc0000]">₱{Number(item.amount || 0).toLocaleString()}</p>
               </div>
             ))}
           </div>
         </div>
       </div>
+      <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-4 py-3">
+          <h2 className="text-sm font-semibold text-gray-700">POS Sales History — {period}</h2>
+          <p className="mt-1 text-xs text-gray-500">Completed POS sales within the selected date range ({displayedHistory.length} records).</p>
+        </div>
+        <div className="max-h-80 overflow-auto">
+          <table className="w-full min-w-[650px] text-left text-xs">
+            <thead className="sticky top-0 bg-gray-50"><tr>{['Date', 'Account Number', 'Plan', 'Payment', 'Amount'].map(title => <th key={title} className="px-4 py-2.5 font-semibold text-gray-600">{title}</th>)}</tr></thead>
+            <tbody>{displayedHistory.map((item, index) => <tr key={item.id || index} className="border-t border-gray-100">
+              <td className="px-4 py-2">{new Date(transactionDate(item)).toLocaleString('en-PH', { timeZone: MANILA_TIME_ZONE })}</td>
+              <td className="px-4 py-2 font-mono">{item.account_number}</td>
+              <td className="px-4 py-2">{item.plan_name || 'Prepaid Load'}</td>
+              <td className="px-4 py-2">{item.payment_method}</td>
+              <td className="px-4 py-2 font-semibold">₱{Number(item.amount || 0).toLocaleString()}</td>
+            </tr>)}{!loading && !displayedHistory.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No completed POS sales found for this period.</td></tr>}</tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

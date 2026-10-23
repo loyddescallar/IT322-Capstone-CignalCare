@@ -33,12 +33,7 @@ const PLAN_STATUSES = [
   "inactive",
 ];
 
-const POS_PAYMENT_METHODS = new Set([
-  "Cash",
-  "GCash",
-  "Maya",
-  "Bank Transfer",
-]);
+const POS_PAYMENT_METHODS = new Set(["Cash", "GCash"]);
 
 function makePosReference() {
   return `POS-${Date.now()}-${Math.random()
@@ -389,13 +384,16 @@ async function getPrepaidTransactionsController(
   res
 ) {
   try {
-    const transactions =
-      await getAllPrepaidTransactions();
-
-    return res.json({
-      success: true,
-      transactions,
+    const { source = 'all', paymentMethod = 'All', accountNumber = '' } = req.query;
+    if (!['all', 'pos'].includes(source) ||
+        !['All', 'Cash', 'GCash', 'PayMongo'].includes(paymentMethod) ||
+        String(accountNumber).length > 100) {
+      return res.status(400).json({ error: 'Invalid transaction filters.' });
+    }
+    const transactions = await getAllPrepaidTransactions({
+      source, paymentMethod, accountNumber: String(accountNumber).trim(),
     });
+    return res.json({ success: true, transactions });
   } catch (err) {
     console.error(
       "GET PREPAID TRANSACTIONS ERROR",

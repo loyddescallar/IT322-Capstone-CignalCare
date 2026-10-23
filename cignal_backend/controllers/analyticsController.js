@@ -212,7 +212,7 @@ async function getAdminAnalytics(req, res) {
         `SELECT tr.*,u.location FROM technician_requests tr LEFT JOIN users u ON u.id=tr.user_id ORDER BY tr.created_at DESC`
       ),
       pool.query(
-        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed' ORDER BY pt.transaction_date DESC`
+        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed' ORDER BY pt.created_at DESC`
       ),
     ]);
 
@@ -240,7 +240,7 @@ async function getAdminAnalytics(req, res) {
       (request) => byLoc(request) && inRange(request.created_at, days)
     );
     const sales = allSales.filter(
-      (sale) => byLoc(sale) && inRange(sale.transaction_date || sale.created_at, days)
+      (sale) => byLoc(sale) && inRange(sale.created_at || sale.transaction_date, days)
     );
     const outcomeRows = outcomes.filter(
       (outcome) => byLoc(outcome) && inRange(outcome.created_at, days)
@@ -251,7 +251,7 @@ async function getAdminAnalytics(req, res) {
 
     const today = manilaDayKey(new Date());
     const salesToday = sales.filter(
-      (sale) => manilaDayKey(sale.transaction_date || sale.created_at) === today
+      (sale) => manilaDayKey(sale.created_at || sale.transaction_date) === today
     );
     const ticketsToday = tickets.filter((ticket) => manilaDayKey(ticket.created_at) === today);
     const resolved = tickets.filter(ticketResolved);
@@ -332,7 +332,7 @@ async function getAdminAnalytics(req, res) {
         }),
         sales: Number(
           sales
-            .filter((sale) => manilaDayKey(sale.transaction_date || sale.created_at) === key)
+            .filter((sale) => manilaDayKey(sale.created_at || sale.transaction_date) === key)
             .reduce((sum, sale) => sum + Number(sale.amount || 0), 0)
             .toFixed(2)
         ),
@@ -426,6 +426,7 @@ async function getAdminAnalytics(req, res) {
           sales.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)
         ),
         totalTransactions: sales.length,
+        grossProfit: sales.length * 40,
         posTransactions,
         onlineTransactions,
         activeSubscribers: activeCustomers.length,
