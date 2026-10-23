@@ -9,6 +9,7 @@ const {
   getLoadHistoryByUser,
   getAllLoadHistory,
   getAllPrepaidTransactions,
+  getPagedPrepaidTransactions,
   updateLoadStatus,
 } = require("../models/loadModel");
 
@@ -422,6 +423,39 @@ async function getPrepaidTransactionsController(
   }
 }
 
+function validSalesDate(value) {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+async function getPagedPrepaidTransactionsController(req, res) {
+  try {
+    const { page = '1', pageSize = '25', paymentMethod = 'All',
+      accountNumber = '', from = '', to = '' } = req.query;
+    const numberPage = Number(page);
+    const numberSize = Number(pageSize);
+    if (!Number.isInteger(numberPage) || numberPage < 1 || numberPage > 1000000 ||
+        !Number.isInteger(numberSize) || numberSize < 1 || numberSize > 100 ||
+        !['All', 'Cash', 'GCash', 'PayMongo'].includes(paymentMethod) ||
+        typeof accountNumber !== 'string' || accountNumber.length > 100 ||
+        typeof from !== 'string' || typeof to !== 'string' ||
+        !validSalesDate(from) || !validSalesDate(to) ||
+        (from && to && from > to)) {
+      return res.status(400).json({ error: 'Invalid completed-sale filters or pagination.' });
+    }
+    const result = await getPagedPrepaidTransactions({
+      page: numberPage, pageSize: numberSize, paymentMethod,
+      accountNumber: accountNumber.trim(), from, to,
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('GET PAGED PREPAID TRANSACTIONS ERROR', err);
+    return res.status(500).json({ error: 'Unable to load completed sales.' });
+  }
+}
+
 async function getPlansController(
   req,
   res
@@ -725,6 +759,7 @@ module.exports = {
   getMyLoadHistory,
   getAllLoadHistoryController,
   getPrepaidTransactionsController,
+  getPagedPrepaidTransactionsController,
   getPlansController,
   createPlanController,
   updatePlanController,

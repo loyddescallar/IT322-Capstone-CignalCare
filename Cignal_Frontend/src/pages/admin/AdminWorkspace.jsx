@@ -290,6 +290,8 @@ export default function AdminWorkspace() {
   const [newLoadCount, setNewLoadCount] = useState(0);
   const [notifList, setNotifList] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState('');
+  const [notifRetryKey, setNotifRetryKey] = useState(0);
 
   const notifRef = useRef(null);
 
@@ -317,30 +319,38 @@ export default function AdminWorkspace() {
 
   useEffect(() => {
     let active = true;
+    let busy = false;
 
     async function loadNotifications() {
+      if (!active || busy || document.visibilityState === 'hidden') return;
+      busy = true;
       setNotifLoading(true);
       try {
         const response = await notificationApi.getMine();
         if (!active) return;
-
-        const notifications = response.data?.notifications || [];
-        setNotifList(notifications.map(normalizeNotification));
+        setNotifList((response.data?.notifications || []).map(normalizeNotification));
+        setNotifError('');
       } catch (error) {
         console.error('LOAD ADMIN NOTIFICATIONS ERROR:', error);
+        if (active) setNotifError('Unable to refresh notifications.');
       } finally {
+        busy = false;
         if (active) setNotifLoading(false);
       }
     }
 
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadNotifications();
+    };
     loadNotifications();
     const timer = setInterval(loadNotifications, 30000);
-
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       active = false;
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [location.pathname]);
+  }, [notifRetryKey]);
 
 
   const handleNotificationClick = async (notification) => {
@@ -357,6 +367,8 @@ export default function AdminWorkspace() {
         await notificationApi.markRead(notification.id);
       } catch (error) {
         console.error('MARK NOTIFICATION READ ERROR:', error);
+        setNotifList((prev) => prev.map((item) => item.id === notification.id ? { ...item, read: false } : item));
+        setNotifError('Unable to mark notification as read.');
       }
     }
 
@@ -366,17 +378,13 @@ export default function AdminWorkspace() {
   };
 
   const handleMarkAllRead = async () => {
-    setNotifList((prev) =>
-      prev.map((notification) => ({
-        ...notification,
-        read: true,
-      }))
-    );
-
     try {
       await notificationApi.markAllRead();
+      setNotifList((prev) => prev.map((notification) => ({ ...notification, read: true })));
+      setNotifError('');
     } catch (error) {
       console.error('MARK NOTIFICATIONS READ ERROR:', error);
+      setNotifError('Unable to mark all notifications as read.');
     }
   };
 
@@ -617,6 +625,12 @@ export default function AdminWorkspace() {
                   </button>
                 </div>
 
+                {notifError && (
+                  <div role="alert" className="flex items-center justify-between gap-2 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <span>{notifError}</span>
+                    <button type="button" onClick={() => setNotifRetryKey((value) => value + 1)} className="font-semibold underline">Retry</button>
+                  </div>
+                )}
                 <div className="max-h-72 divide-y divide-gray-50 overflow-y-auto">
                   {notifLoading && notifList.length === 0 ? (
                     <div className="px-4 py-8 text-center text-xs text-gray-400">
@@ -624,7 +638,7 @@ export default function AdminWorkspace() {
                     </div>
                   ) : notifList.length === 0 ? (
                     <div className="px-4 py-8 text-center text-xs text-gray-400">
-                      No notifications yet.
+                      {notifError ? 'Notifications are unavailable.' : 'No notifications yet.'}
                     </div>
                   ) : (
                     notifList.map((notification) => {

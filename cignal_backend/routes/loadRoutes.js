@@ -6,6 +6,7 @@ const {
   getMyLoadHistory,
   getAllLoadHistoryController,
   getPrepaidTransactionsController,
+  getPagedPrepaidTransactionsController,
   getPlansController,
   createPlanController,
   updatePlanController,
@@ -20,6 +21,7 @@ router.put('/plans/:id', authRequired, requireRole('admin'), updatePlanControlle
 router.delete('/plans/:id', authRequired, requireRole('admin'), deletePlanController);
 
 router.get('/prepaid-transactions', authRequired, requireRole('admin'), getPrepaidTransactionsController);
+router.get('/prepaid-transactions/paged', authRequired, requireRole('admin'), getPagedPrepaidTransactionsController);
 router.post('/', authRequired, requireRole('admin'), addLoad);
 router.get('/my-prepaid-status', authRequired, requireRole('user'), getMyPrepaidStatus);
 router.get('/my', authRequired, getMyLoadHistory);

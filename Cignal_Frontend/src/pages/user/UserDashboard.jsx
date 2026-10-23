@@ -42,6 +42,8 @@ export default function UserDashboard() {
   const [planNotice, setPlanNotice] = useState('');
   const [prepaid,       setPrepaid]       = useState(null);
   const [notifications, setNotifs]        = useState([]);
+  const [notifError, setNotifError]        = useState(false);
+  const [notifReload, setNotifReload]      = useState(0);
   const [notifOpen,     setNotifOpen]     = useState(false);
   const notifRef = useRef(null);
   useOutsideClick(notifRef, ()=>setNotifOpen(false));
@@ -74,10 +76,19 @@ export default function UserDashboard() {
         setPrepaid({daysLeft,expiry:exp.toLocaleDateString('en-PH',{timeZone:'Asia/Manila'}),status:daysLeft>7?'active':daysLeft>0?'expiring':'expired'});
       }).catch(()=>setPrepaid(null));
     }
-    axiosClient.get('/notifications').then(r=>setNotifs(r.data?.notifications||[])).catch(()=>{
-      setNotifs([{id:1,type:'info',message:'Welcome to CignalCare+. Your account is active.',is_read:0,created_at:new Date().toISOString()}]);
-    });
+
   },[]);
+
+  // Never invent notifications when the API is unavailable.
+  useEffect(() => {
+    let active = true;
+    axiosClient.get('/notifications').then(r => {
+      if (!active) return;
+      setNotifs(r.data?.notifications || []);
+      setNotifError(false);
+    }).catch(() => { if (active) setNotifError(true); });
+    return () => { active = false; };
+  }, [notifReload]);
 
   // Scroll animations
   useEffect(()=>{
@@ -108,10 +119,11 @@ export default function UserDashboard() {
           <div className="fixed left-3 right-3 top-36 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-80">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-semibold text-gray-800">Notifications</p>
-              <button onClick={()=>{setNotifs(p=>p.map(n=>({...n,is_read:1})));axiosClient.patch('/notifications/read-all').catch(()=>{});}} className="text-xs text-cignalRed hover:underline font-semibold">Mark all read</button>
+              <button onClick={async()=>{try{await axiosClient.patch('/notifications/read-all');setNotifs(p=>p.map(n=>({...n,is_read:1})));setNotifError(false);}catch{setNotifError(true);}}} className="text-xs text-cignalRed hover:underline font-semibold">Mark all read</button>
             </div>
+            {notifError&&<div role="alert" className="flex items-center justify-between gap-2 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span>Notifications are temporarily unavailable.</span><button type="button" className="font-semibold underline" onClick={()=>setNotifReload(n=>n+1)}>Retry</button></div>}
             <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-              {notifications.length===0?<p className="text-xs text-gray-400 text-center py-6">No notifications.</p>
+              {notifications.length===0?<p className="text-xs text-gray-400 text-center py-6">{notifError ? 'Unable to load notifications.' : 'No notifications.'}</p>
               :notifications.map(n=>(
                 <div key={n.id} className={`flex items-start gap-3 px-4 py-3 ${!n.is_read?'bg-blue-50/30':''}`}>
                   {NOTIF_ICONS[n.type]||NOTIF_ICONS.info}
