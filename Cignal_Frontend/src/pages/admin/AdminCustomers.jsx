@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import customerApi from '../../api/customerApi';
 import { subscriberLifecycle } from '../../utils/adminBusinessRules';
+import { rowsToSafeCsv } from '../../utils/safeCsv';
 
 const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
 const ACTIVITY_FILTERS = ['All', 'Active', 'At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'];
@@ -325,11 +326,10 @@ export default function AdminCustomers() {
 
   const downloadCredentialsCsv = () => {
     if (!importCredentials.length) return;
-    const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const csv = [
-      ['Name', 'Account Number', 'Temporary Password', 'Recovery Code', 'Temporary Password Expires At', 'Location'].join(','),
-      ...importCredentials.map((item) => [item.accountName, item.accountNumber, item.temporaryPassword, item.recoveryCode, item.temporaryPasswordExpiresAt, item.location].map(escape).join(',')),
-    ].join('\n');
+    const csv = rowsToSafeCsv([
+      ['Name', 'Account Number', 'Temporary Password', 'Recovery Code', 'Temporary Password Expires At', 'Location'],
+      ...importCredentials.map((item) => [item.accountName, item.accountNumber, item.temporaryPassword, item.recoveryCode, item.temporaryPasswordExpiresAt, item.location]),
+    ]);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

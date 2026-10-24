@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { rowsToSafeCsv } from '../../utils/safeCsv';
 import {
   ChartNoAxesCombined,
   CheckCircle2,
@@ -101,19 +102,26 @@ export default function AdminAnalytics() {
   const [location, setLocation] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setAnalyticsError('');
+    setData(null);
     analyticsApi
       .getAdminAnalytics({ days, location: location || undefined })
-      .then((response) => active && setData(response.data))
-      .catch((error) => console.error('ADMIN ANALYTICS ERROR:', error))
-      .finally(() => active && setLoading(false));
+      .then((response) => { if (active) setData(response.data); })
+      .catch((error) => {
+        console.error('ADMIN ANALYTICS ERROR:', error);
+        if (active) setAnalyticsError('Unable to load analytics. Please retry.');
+      })
+      .finally(() => { if (active) setLoading(false); });
     return () => {
       active = false;
     };
-  }, [days, location]);
+  }, [days, location, retryKey]);
 
   const k = data?.kpis || {};
   const locations = useMemo(
@@ -186,9 +194,7 @@ export default function AdminAnalytics() {
       ['Technician Escalations', supportFunnel.technicianEscalations || 0],
     ];
 
-    const csv = rows
-      .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\r\n');
+    const csv = rowsToSafeCsv(rows);
     const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -217,7 +223,7 @@ export default function AdminAnalytics() {
             <option value="">All Locations</option>
             {LOCATIONS.filter(Boolean).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <button onClick={exportCsv} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#b90000] sm:w-auto">
+          <button onClick={exportCsv} disabled={loading || !data || Boolean(analyticsError)} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#b90000] sm:w-auto">
             <Download size={14} /> Export Report
           </button>
         </div>
@@ -235,9 +241,10 @@ export default function AdminAnalytics() {
         ))}
       </div>
 
+      {analyticsError && <div role="alert" className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"><span>{analyticsError}</span><button className="font-semibold underline" onClick={() => setRetryKey(n => n + 1)}>Retry</button></div>}
       {loading && <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">Loading analytics...</div>}
 
-      {!loading && tab === 'overview' && (
+      {!loading && data && tab === 'overview' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Metric icon={Store} label="Prepaid Sales" value={peso(k.totalRevenue)} sub={`${k.totalTransactions || 0} completed transactions`} tone="red" />
@@ -323,7 +330,7 @@ export default function AdminAnalytics() {
         </div>
       )}
 
-      {!loading && tab === 'sales' && (
+      {!loading && data && tab === 'sales' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={Store} label="Prepaid Sales" value={peso(k.totalRevenue)} sub="POS + completed PayMongo loads" tone="red" />
@@ -373,7 +380,7 @@ export default function AdminAnalytics() {
         </div>
       )}
 
-      {!loading && tab === 'support' && (
+      {!loading && data && tab === 'support' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={CheckCircle2} label="Resolution Rate" value={`${k.resolutionRate || 0}%`} sub={`${k.totalTickets || 0} support tickets`} tone="green" />
@@ -508,7 +515,7 @@ export default function AdminAnalytics() {
         </div>
       )}
 
-      {!loading && tab === 'service' && (
+      {!loading && data && tab === 'service' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric icon={Wrench} label="Technician Requests" value={data?.technician?.total || 0} sub="Selected period" tone="red" />
