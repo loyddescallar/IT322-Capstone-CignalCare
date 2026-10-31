@@ -51,8 +51,9 @@ function validateOrigins(env) {
 function evaluate(env) {
   const production = String(env.NODE_ENV || '').trim().toLowerCase() === 'production';
   const driver = String(env.DB_DRIVER || (PRESENT(env.DATABASE_URL) ? 'postgres' : 'mysql')).toLowerCase();
+  // Match config/db.js: local MySQL defaults host and permits an empty password.
   const dbReady = driver === 'postgres' ? PRESENT(env.DATABASE_URL) :
-    ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'].every(k => PRESENT(env[k]));
+    driver === 'mysql' && ['DB_USER', 'DB_NAME'].every(k => PRESENT(env[k]));
   const cloudReady = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].every(k => PRESENT(env[k]));
   const paymentReady = ['PAYMONGO_SECRET_KEY', 'PAYMONGO_WEBHOOK_SECRET'].every(k => PRESENT(env[k]));
   const payMode = !PRESENT(env.PAYMONGO_SECRET_KEY) ? 'not_configured' :
@@ -62,8 +63,8 @@ function evaluate(env) {
   const checks = {
     runtime: result(production ? 'PRODUCTION_ENV' : 'NON_PRODUCTION_ENV', production ? 'NODE_ENV is production.' : 'This report does not describe a deployed production runtime.'),
     database: result(dbReady ? 'CONFIGURED_NOT_PROBED' : 'NOT_CONFIGURED', dbReady ? `Database connection variables present (driver: ${driver}); no network call in default mode.` : `Database connection variables incomplete (driver: ${driver}).`),
-    cloudinary: result(cloudReady ? 'CONFIGURED_NOT_PROBED' : 'NOT_CONFIGURED', cloudReady ? 'Cloudinary credentials present; authentication, private PDF delivery and security setting not verified.' : 'Cloudinary credentials incomplete.'),
-    pdf_delivery: result(YES(env.CLOUDINARY_PDF_DELIVERY_CONFIRMED) ? 'OPERATOR_ATTESTED_NOT_PROBED' : 'NOT_CONFIRMED', YES(env.CLOUDINARY_PDF_DELIVERY_CONFIRMED) ? 'Flag is set, but the script cannot prove actual PDF download succeeds.' : 'PDF delivery must be verified in Cloudinary before enabling CLOUDINARY_PDF_DELIVERY_CONFIRMED=true.'),
+    cloudinary: result(cloudReady ? 'CONFIGURED_NOT_PROBED' : 'NOT_CONFIGURED', cloudReady ? 'Cloudinary credentials present; authenticated private photo delivery not live-verified.' : 'Cloudinary credentials incomplete.'),
+    pdf_delivery: result(YES(env.CLOUDINARY_PDF_DELIVERY_CONFIRMED) ? 'OPERATOR_ATTESTED_NOT_PROBED' : 'LEGACY_ONLY_NOT_PROBED', YES(env.CLOUDINARY_PDF_DELIVERY_CONFIRMED) ? 'Historical PDF delivery attested but not live-verified.' : 'New chat uploads are photos only; historical PDF access needs a separate review if those old files must remain available.'),
     shared_quotas: shared,
     operational_alerts: alert,
     cors: origins,
@@ -77,7 +78,8 @@ function evaluate(env) {
       if (['NOT_CONFIGURED', 'INVALID'].includes(checks[key].status)) blockers.push(key);
     }
     if (checks.payment.status === 'REVIEW_REQUIRED') blockers.push('payment');
-    if (checks.pdf_delivery.status === 'NOT_CONFIRMED') blockers.push('pdf_delivery');
+    // PDF delivery is no longer required for NEW photo-only chat uploads.
+    // Legacy PDF availability and public URL revocation remain separate reviews.
     if (checks.operational_alerts.status !== 'CONFIGURED_NOT_PROBED') blockers.push('operational_alerts');
     if (driver !== 'postgres') blockers.push('production_database_target_review');
   }

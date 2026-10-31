@@ -13,7 +13,7 @@ test('D readiness checker reports local mode and never exposes secret values', (
   for(const secret of ['SECRET_DB','SECRET_CLOUD','SECRET_REDIS','SECRET_JWT']) assert.ok(!serialized.includes(secret));
   assert.equal(report.environment,'local_or_staging');
   assert.equal(report.checks.shared_quotas.status,'CONFIGURED_NOT_PROBED');
-  assert.equal(report.checks.pdf_delivery.status,'NOT_CONFIRMED');
+  assert.equal(report.checks.pdf_delivery.status,'LEGACY_ONLY_NOT_PROBED');
 });
 
 test('D production missing configuration creates blockers and never asserts readiness',()=>{
@@ -23,7 +23,7 @@ test('D production missing configuration creates blockers and never asserts read
   assert.ok(report.blockers.includes('cloudinary'));
   assert.ok(report.blockers.includes('authentication'));
   assert.ok(report.blockers.includes('payment'));
-  assert.ok(report.blockers.includes('pdf_delivery'));
+  assert.ok(!report.blockers.includes('pdf_delivery')); // historical PDFs are separate from new photo-only chat
 });
 
 test('D configured services are explicitly NOT marked live-verified',()=>{
@@ -71,4 +71,10 @@ test('D CLI refuses unknown commands and paths in report filenames',()=>{
   assert.throws(()=>cli.parseArgs(['--apply']),/Unknown option/);
   assert.throws(()=>cli.parseArgs(['--output=..\\secrets.json']),/simple JSON name/);
   assert.throws(()=>cli.parseArgs(['--output=../secrets.json']),/simple JSON name/);
+});
+
+
+test('D checker accepts local MySQL defaults used by the actual DB adapter',()=>{
+  const r=evaluate({NODE_ENV:'development',DB_DRIVER:'mysql',DB_USER:'tester',DB_NAME:'cignalcare'});
+  assert.equal(r.checks.database.status,'CONFIGURED_NOT_PROBED');
 });

@@ -469,11 +469,11 @@ function createPostgresAdapter() {
 
   const { Pool } = require("pg");
 
+  // Fail closed on untrusted PostgreSQL certificates; preserve verified TLS
+  // even if the original DATABASE_URL contained ?sslmode=require.
+  const { buildPostgresTlsConfig } = require('../utils/postgresTlsConfig');
   const rawPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    ...buildPostgresTlsConfig(process.env),
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,

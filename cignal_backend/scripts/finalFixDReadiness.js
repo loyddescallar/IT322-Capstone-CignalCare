@@ -102,7 +102,7 @@ async function main({argv,env} = defaults) {
     notes:[
       'Configuration presence is NOT live-provider verification.',
       'This tool never changes database tables, provider assets, alert settings, or code.',
-      'Cloudinary PDF delivery requires an independent authenticated PDF download test.',
+      'Historical Cloudinary PDFs require review only for legacy records; new chat uploads are photos only.',
       'Run the same checks against production/staging environment, not only local MySQL.',
     ],
     ...evaluate(env),
