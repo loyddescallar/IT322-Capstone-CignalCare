@@ -1,3 +1,5 @@
+const shared = require('../utils/sharedQuotaStore');
+const { notifyOperational } = require('../utils/operationalAlert');
 const buckets = new Map();
 
 function clientKey(req, scope) {
@@ -14,6 +16,22 @@ function cleanupExpired(now) {
 
 function createRateLimiter({ scope, windowMs, maxRequests, message }) {
   return (req, res, next) => {
+    if (shared.configured()) {
+      const actor = req.ip || req.socket?.remoteAddress || 'unknown';
+      const quotas = [{ key: shared.hashedKey('auth:' + scope, actor), max: maxRequests, ttlSeconds: Math.ceil(windowMs / 1000) }];
+      shared.reserveSharedQuota(quotas).then(ok => {
+        if (!ok) {
+          res.setHeader('Retry-After', String(Math.ceil(windowMs / 1000)));
+          notifyOperational('AUTH_RATE_LIMIT', { scope, status: 429 });
+          return res.status(429).json({ error: message });
+        }
+        return next();
+      }).catch(() => {
+        notifyOperational('SHARED_QUOTA_UNAVAILABLE', { scope });
+        res.status(503).json({ error: 'Authentication protection is temporarily unavailable.' });
+      });
+      return undefined;
+    }
     const now = Date.now();
     cleanupExpired(now);
     const key = clientKey(req, scope);

@@ -4,6 +4,10 @@ const ALLOWED_LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 
 let accountSchemaReady = false;
 
 async function ensureAccountSchema() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'account');
+  }
   if (accountSchemaReady) return;
 
   await pool.query(`ALTER TABLE users

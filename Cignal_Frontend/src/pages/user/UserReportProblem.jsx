@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock3, Flag, Image as ImageIcon, MessageSquareText, ShieldCheck, X } from 'lucide-react';
 import UserPageShell from '../../components/UserPageShell';
 import ticketApi from '../../api/ticketApi';
+import { validateChatAttachment } from '../../utils/chatUtils';
 
 const CATEGORIES = [
   'Connection Issue',
@@ -42,6 +43,11 @@ export default function UserReportProblem() {
     if (!form.subject.trim()) {
       setError('Subject is required.');
       return;
+    }
+
+    if (attachedPhoto) {
+      const photoError = validateChatAttachment(attachedPhoto);
+      if (photoError) { setError(photoError); return; }
     }
 
     setLoading(true);

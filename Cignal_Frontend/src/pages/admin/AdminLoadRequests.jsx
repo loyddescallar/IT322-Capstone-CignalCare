@@ -44,6 +44,11 @@ export default function AdminLoadRequests() {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [paging, setPaging] = useState({ page: 1, total: 0, totalPages: 0 });
+  const [summary, setSummary] = useState({ kpis: {} });
+  const [listError, setListError] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('All');
@@ -54,50 +59,47 @@ export default function AdminLoadRequests() {
   const [saveError, setSaveError] = useState('');
   const [photoModal, setPhotoModal] = useState(null);
 
-  const loadRequests = async () => {
+  const loadRequests = async (signal) => {
     setLoading(true);
+    setListError('');
     try {
-      const response = await getAllLoadRequests();
-      setRequests(response.data?.requests || response.data || []);
+      const response = await getAllLoadRequests({
+        signal,
+        params: { view: 'filtered', page, pageSize: 25, search: debouncedSearch, status: statusFilter, location: locationFilter },
+      });
+      if (signal?.aborted) return;
+      setRequests(response.data?.requests || []);
+      setPaging(response.data?.pagination || { page, total: 0, totalPages: 0 });
+      setSummary(response.data?.summary || { kpis: {} });
     } catch (err) {
-      console.error(err);
+      if (signal?.aborted || err?.code === 'ERR_CANCELED') return;
+      console.error('LOAD REQUESTS ERROR:', err);
+      setListError('Unable to load requests. Please retry.');
+      setRequests([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-  const filtered = useMemo(() => {
-    const query = search.toLowerCase();
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadRequests(controller.signal);
+    return () => controller.abort();
+  }, [page, debouncedSearch, statusFilter, locationFilter]);
 
-    return requests
-      .filter((request) => statusFilter === 'All' || request.status === statusFilter)
-      .filter((request) => locationFilter === 'All' || request.location === locationFilter)
-      .filter((request) => {
-        const haystack = [
-          request.account_name,
-          request.account_number,
-          request.reference_no,
-          request.plan_name,
-          request.payment_method,
-          request.payment_status,
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        return haystack.includes(query);
-      });
-  }, [requests, search, statusFilter, locationFilter]);
-
+  // Display the remotely filtered page; preserve global KPI semantics.
+  const filtered = requests;
   const kpis = [
-    { label: 'Total', value: requests.length, dot: 'bg-gray-400', color: 'text-gray-800' },
-    { label: 'Pending Payment', value: requests.filter((request) => request.payment_status === 'pending').length, dot: 'bg-amber-400', color: 'text-amber-600' },
-    { label: 'Ready to Process', value: requests.filter((request) => ['paid', 'manual_review'].includes(request.payment_status || 'manual_review') && !['Completed', 'Rejected'].includes(request.status)).length, dot: 'bg-blue-500', color: 'text-blue-600' },
-    { label: 'Completed', value: requests.filter((request) => request.status === 'Completed').length, dot: 'bg-green-500', color: 'text-green-600' },
-    { label: 'Rejected', value: requests.filter((request) => request.status === 'Rejected').length, dot: 'bg-red-500', color: 'text-red-600' },
+    { label: 'Total', value: summary.kpis?.total || 0, dot: 'bg-gray-400', color: 'text-gray-800' },
+    { label: 'Pending Payment', value: summary.kpis?.pendingPayment || 0, dot: 'bg-amber-400', color: 'text-amber-600' },
+    { label: 'Ready to Process', value: summary.kpis?.readyToProcess || 0, dot: 'bg-blue-500', color: 'text-blue-600' },
+    { label: 'Completed', value: summary.kpis?.completed || 0, dot: 'bg-green-500', color: 'text-green-600' },
+    { label: 'Rejected', value: summary.kpis?.rejected || 0, dot: 'bg-red-500', color: 'text-red-600' },
   ];
 
   const openModal = (request) => {
@@ -119,9 +121,9 @@ export default function AdminLoadRequests() {
         setRequests((current) => current.map((request) =>
           request.id === updatedRequest.id ? updatedRequest : request
         ));
-      } else {
-        await loadRequests();
       }
+      // Refresh both the current page and global KPI summary after mutation.
+      await loadRequests();
 
       setSelected(null);
     } catch (err) {
@@ -167,22 +169,22 @@ export default function AdminLoadRequests() {
               type="text"
               placeholder="Search name, account, reference..."
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setPage(1); setSearch(event.target.value); }}
               className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder:text-gray-400"
             />
           </div>
 
           <label className="flex w-full flex-col gap-1 text-xs text-gray-600 sm:w-auto">Coverage Location
-            <select aria-label="Filter requests by location" value={locationFilter} onChange={event => setLocationFilter(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-red-600">
+            <select aria-label="Filter requests by location" value={locationFilter} onChange={event => { setPage(1); setLocationFilter(event.target.value); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-red-600">
               {['All', ...LOCATIONS].map(location => <option key={location}>{location}</option>)}
             </select>
           </label>
           <label className="flex w-full flex-col gap-1 text-xs text-gray-600 sm:w-auto">Request Status
-            <select aria-label="Filter requests by status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-red-600">
+            <select aria-label="Filter requests by status" value={statusFilter} onChange={event => { setPage(1); setStatusFilter(event.target.value); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-red-600">
               {['All', ...STATUSES].map(status => <option key={status}>{status}</option>)}
             </select>
           </label>
-          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} requests</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{paging.total} matching requests</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -248,6 +250,15 @@ export default function AdminLoadRequests() {
               )}
             </tbody>
           </table>
+        </div>
+        {listError && <p role="alert" className="mt-2 text-xs text-red-600">{listError}</p>}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+          <span>{filtered.length} shown of {paging.total} matching requests</span>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={loading || page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button>
+            <span>Page {page} of {Math.max(paging.totalPages, 1)}</span>
+            <button type="button" disabled={loading || !paging.totalPages || page >= paging.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button>
+          </div>
         </div>
       </div>
 

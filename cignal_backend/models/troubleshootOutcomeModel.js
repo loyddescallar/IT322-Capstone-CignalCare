@@ -4,6 +4,10 @@ const pool = require('../config/db');
 let ready = false;
 
 async function ensureTroubleshootOutcomeSchema() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'troubleshoot_outcomes');
+  }
   if (ready) return;
 
   await pool.query(`CREATE TABLE IF NOT EXISTS troubleshoot_outcomes (
@@ -89,8 +93,25 @@ async function getAllOutcomes() {
   return rows;
 }
 
+// Analytics GET must never create/alter tables. Deployment migrations must
+// prepare the schema. Before first provision, no outcomes is the safe default.
+async function getAnalyticsOutcomesReadOnly(cutoff = null) {
+  const where = cutoff ? ' WHERE created_at >= ?' : '';
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM troubleshoot_outcomes${where} ORDER BY created_at DESC`,
+      cutoff ? [cutoff] : []
+    );
+    return rows;
+  } catch (error) {
+    if (error?.code === '42P01' || error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
+}
+
 module.exports = {
   ensureTroubleshootOutcomeSchema,
   recordOutcome,
   getAllOutcomes,
+  getAnalyticsOutcomesReadOnly,
 };

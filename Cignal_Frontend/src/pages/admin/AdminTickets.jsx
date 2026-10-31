@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 
 import ticketApi from '../../api/ticketApi';
+import useAdaptiveMessagePolling from '../../hooks/useAdaptiveMessagePolling';
+import { sameChatMessages } from '../../utils/sameChatMessages.mjs';
 import ChatAttachment from '../../components/ChatAttachment';
 import customerApi from '../../api/customerApi';
 import {
@@ -106,6 +108,12 @@ export default function AdminTickets() {
   const currentAdmin = getStoredChatUser(true);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [paging, setPaging] = useState({ page: 1, total: 0, totalPages: 0 });
+  const [summary, setSummary] = useState({ statusCounts: {}, locationCounts: {} });
+  const [listError, setListError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatus] = useState('All');
   const [catFilter, setCat] = useState('All');
@@ -118,83 +126,60 @@ export default function AdminTickets() {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const messagesEndRef = useRef(null);
 
-  async function loadTickets() {
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
     setLoading(true);
-    try {
-      const response = await ticketApi.getAdminTickets();
+    setListError('');
+    ticketApi.getAdminTickets({
+      signal: controller.signal,
+      params: { view: 'filtered', page, pageSize: 25, search: debouncedSearch, status: statusFilter, category: catFilter, location: locTab },
+    }).then((response) => {
+      if (!active) return;
       setTickets(response.data?.tickets || []);
-    } catch (error) {
+      setPaging(response.data?.pagination || { page, total: 0, totalPages: 0 });
+      setSummary(response.data?.summary || { statusCounts: {}, locationCounts: {} });
+    }).catch((error) => {
+      if (!active || error?.code === 'ERR_CANCELED') return;
       console.error('LOAD TICKETS ERROR:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      setListError('Unable to load tickets. Please retry.');
+      setTickets([]);
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [page, debouncedSearch, statusFilter, catFilter, locTab, refreshKey]);
 
-  useEffect(() => {
-    loadTickets();
-  }, []);
-
-  async function loadMessages(ticketId) {
+  async function loadMessages(ticketId, signal) {
     try {
-      const response = await ticketApi.getTicketMessages(ticketId);
-      setMessages(response.data?.messages || []);
+      const response = await ticketApi.getTicketMessages(ticketId, { signal });
+      if (signal?.aborted) return;
+      const incoming = response.data?.messages || [];
+      setMessages((current) => sameChatMessages(current, incoming) ? current : incoming);
     } catch (error) {
-      console.error('LOAD MESSAGES ERROR:', error);
+      if (error?.code !== 'ERR_CANCELED') {
+        console.error('LOAD MESSAGES ERROR:', error);
+      }
     }
   }
 
-  useEffect(() => {
-    if (!selectedTicket) return undefined;
-
-    loadMessages(selectedTicket.id);
-    const interval = setInterval(() => loadMessages(selectedTicket.id), 4000);
-
-    return () => clearInterval(interval);
-  }, [selectedTicket]);
+  useAdaptiveMessagePolling(
+    (signal) => loadMessages(selectedTicket?.id, signal),
+    selectedTicket?.id,
+    Boolean(selectedTicket?.id)
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const supportTickets = useMemo(
-    () => tickets.filter((ticket) => ticket.category !== 'Technician Request'),
-    [tickets]
-  );
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-
-    return supportTickets
-      .filter((ticket) => locTab === 'All' || normalizeLocation(ticket.location) === locTab)
-      .filter((ticket) => {
-        const status = displayStatus(ticket.status);
-        if (statusFilter === 'All') return status !== 'Archived';
-        return status === statusFilter;
-      })
-      .filter((ticket) => catFilter === 'All' || ticket.category === catFilter)
-      .filter((ticket) => {
-        if (!q) return true;
-
-        return (
-          String(ticket.id).includes(q) ||
-          ticket.subject?.toLowerCase().includes(q) ||
-          ticket.category?.toLowerCase().includes(q) ||
-          ticket.accountName?.toLowerCase().includes(q) ||
-          ticket.accountNumber?.toLowerCase().includes(q)
-        );
-      });
-  }, [supportTickets, search, statusFilter, catFilter, locTab]);
-
-  const counts = useMemo(() => {
-    const scoped = locTab === 'All'
-      ? supportTickets
-      : supportTickets.filter((ticket) => normalizeLocation(ticket.location) === locTab);
-
-    return STATUSES.reduce((acc, status) => {
-      acc[status] = scoped.filter((ticket) => displayStatus(ticket.status) === status).length;
-      return acc;
-    }, {});
-  }, [supportTickets, locTab]);
+  // The server filters across the full dataset before pagination.
+  // KPI totals and location badges come from independent SQL aggregations.
+  const filtered = tickets;
+  const counts = summary.statusCounts || {};
 
   const openTicket = (ticket) => {
     setSelected({ ...ticket, status: displayStatus(ticket.status) });
@@ -208,6 +193,7 @@ export default function AdminTickets() {
     try {
       await ticketApi.updateTicketStatus(ticketId, status);
       setTickets((previous) => previous.map((ticket) => (ticket.id === ticketId ? { ...ticket, status } : ticket)));
+      setRefreshKey((value) => value + 1);
       if (selectedTicket?.id === ticketId) setSelected((previous) => (previous ? { ...previous, status } : previous));
     } catch (error) {
       console.error('UPDATE TICKET STATUS ERROR:', error);
@@ -245,6 +231,7 @@ export default function AdminTickets() {
       }
 
       setTickets((previous) => previous.map((ticket) => (ticket.id === archiveTarget.id ? { ...ticket, status: 'Archived' } : ticket)));
+      setRefreshKey((value) => value + 1);
 
       if (selectedTicket?.id === archiveTarget.id) {
         setSelected((previous) => (previous ? { ...previous, status: 'Archived' } : previous));
@@ -283,7 +270,7 @@ export default function AdminTickets() {
         {STATUSES.map((status) => (
           <div
             key={status}
-            onClick={() => setStatus(statusFilter === status ? 'All' : status)}
+            onClick={() => { setPage(1); setStatus(statusFilter === status ? 'All' : status); }}
             className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
               statusFilter === status ? 'border-[#cc0000] ring-1 ring-red-100' : 'border-gray-100'
             }`}
@@ -304,7 +291,7 @@ export default function AdminTickets() {
           <button
             key={location}
             type="button"
-            onClick={() => setLocTab(location)}
+            onClick={() => { setPage(1); setLocTab(location); }}
             className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               locTab === location
                 ? 'bg-[#cc0000] text-white'
@@ -315,7 +302,7 @@ export default function AdminTickets() {
             {location}
             {location !== 'All' && (
               <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs font-bold ${locTab === location ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>
-                {supportTickets.filter((ticket) => normalizeLocation(ticket.location) === location).length}
+                {summary.locationCounts?.[location] || 0}
               </span>
             )}
           </button>
@@ -332,7 +319,7 @@ export default function AdminTickets() {
                 type="text"
                 placeholder="Search subject, ID, account..."
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => { setPage(1); setSearch(event.target.value); }}
                 className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder-gray-400"
               />
             </div>
@@ -342,7 +329,7 @@ export default function AdminTickets() {
                 <button
                   key={status}
                   type="button"
-                  onClick={() => setStatus(status)}
+                  onClick={() => { setPage(1); setStatus(status); }}
                   className={`rounded-md px-2.5 py-1.5 text-xs transition-colors ${
                     statusFilter === status ? 'bg-[#cc0000] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
@@ -354,7 +341,7 @@ export default function AdminTickets() {
 
             <select
               value={catFilter}
-              onChange={(event) => setCat(event.target.value)}
+              onChange={(event) => { setPage(1); setCat(event.target.value); }}
               className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700 outline-none sm:ml-auto sm:w-auto sm:py-1.5"
             >
               <option value="All">All Categories</option>
@@ -417,7 +404,15 @@ export default function AdminTickets() {
             </table>
           </div>
 
-          <p className="mt-2 text-xs text-gray-400">{filtered.length} ticket{filtered.length !== 1 ? 's' : ''} shown</p>
+          {listError && <p role="alert" className="mt-2 text-xs text-red-600">{listError}</p>}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+            <span>{filtered.length} shown of {paging.total} matching tickets</span>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={loading || page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button>
+              <span>Page {page} of {Math.max(paging.totalPages, 1)}</span>
+              <button type="button" disabled={loading || !paging.totalPages || page >= paging.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
         </div>
 
         {/* Detail + Chat Panel */}

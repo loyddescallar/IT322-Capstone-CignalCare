@@ -8,22 +8,14 @@ fs.mkdirSync(uploadDir, { recursive: true });
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
-const allowedMimeTypes = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-]);
-
-const allowedExtensions = new Set([
-  '.jpg',
-  '.jpeg',
-  '.png',
-  '.gif',
-  '.webp',
-  '.pdf',
-]);
+// Only still-photo formats are accepted for NEW chat uploads.
+// The protected download endpoint retains legacy PDF/GIF support.
+const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const photoMimeByExtension = Object.freeze({
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.png': 'image/png', '.webp': 'image/webp',
+});
 
 function safeFileName(originalName = 'attachment') {
   const ext = path.extname(originalName).toLowerCase();
@@ -50,10 +42,11 @@ function fileFilter(_req, file, callback) {
   const mimeType = String(file.mimetype || '').toLowerCase();
   const extension = path.extname(file.originalname || '').toLowerCase();
 
-  if (!allowedMimeTypes.has(mimeType) || !allowedExtensions.has(extension)) {
-    return callback(
-      new Error('Only JPG, PNG, GIF, WEBP, and PDF attachments are allowed.')
-    );
+  if (!allowedMimeTypes.has(mimeType) || !allowedExtensions.has(extension) ||
+      photoMimeByExtension[extension] !== mimeType) {
+    const error = new Error('Only JPG, PNG, or WEBP photo attachments are allowed (5 MB maximum).');
+    error.statusCode = 415;
+    return callback(error);
   }
 
   return callback(null, true);

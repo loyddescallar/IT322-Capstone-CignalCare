@@ -26,7 +26,14 @@ function getGeminiApiKey() {
 }
 
 function getGeminiModel() {
-  return String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim();
+  // Fail safe if GEMINI_MODEL requests a powerful/expensive model.
+  const model = String(process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
+  const allowed = new Set(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
+  if (!allowed.has(model)) {
+    console.warn('CIGNALCARE_AI_MODEL_BLOCKED: falling back to gemini-3.1-flash-lite');
+    return 'gemini-3.1-flash-lite';
+  }
+  return model;
 }
 
 function getGeminiTimeoutMs() {
@@ -115,7 +122,8 @@ async function generateGeminiReply({ message, context = [], knowledgeText = '' }
       system_instruction: CIGNALCARE_ASSISTANT_PROMPT,
       input: buildInput(message, context, knowledgeText),
       generation_config: {
-        thinking_level: 'low',
+        thinking_level: 'minimal',
+        max_output_tokens: 2048,
         temperature: 0.25,
       },
     }),
@@ -345,7 +353,8 @@ ${transcript || 'No additional chat messages provided'}
       system_instruction: 'You prepare factual support-form drafts for CignalCare+. Never invent facts and never perform system actions.',
       input,
       generation_config: {
-        thinking_level: 'low',
+        thinking_level: 'minimal',
+        max_output_tokens: 1024,
         temperature: 0.1,
       },
     }),

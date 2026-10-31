@@ -1,8 +1,7 @@
 const pool = require('../config/db');
-const { getAllOutcomes } = require('../models/troubleshootOutcomeModel');
+const { getAnalyticsOutcomesReadOnly } = require('../models/troubleshootOutcomeModel');
 const {
-  getIncidentStats,
-  syncIncidentCandidates,
+  getIncidentStatsReadOnly,
   issueDescriptor,
   getIncidentDetectionPolicy,
 } = require('../models/incidentModel');
@@ -199,25 +198,35 @@ function buildSupportFunnel(rows) {
 
 async function getAdminAnalytics(req, res) {
   try {
-    await syncIncidentCandidates();
+    // SQL filters reduce transfer/memory; retain JS filtering for Manila-day
+    // semantics and the exact existing API response shape.
+    const rawDays = Number(req.query.days || 30);
+    const days = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : null;
+    const cutoff = days ? new Date(Date.now() - days * 86400000) : null;
+    const periodParams = cutoff ? [cutoff] : [];
+    const ticketPeriod = cutoff ? ' WHERE t.created_at >= ?' : '';
+    const techPeriod = cutoff ? ' WHERE tr.created_at >= ?' : '';
+    const salesPeriod = cutoff ? ' AND pt.created_at >= ?' : '';
 
     const [userResult, ticketResult, techResult, salesResult] = await Promise.all([
       pool.query(
         `SELECT id, accountName, accountNumber, location, status, created_at FROM users WHERE role='user'`
       ),
       pool.query(
-        `SELECT t.*,u.location,u.accountNumber,u.accountName FROM tickets t LEFT JOIN users u ON u.id=t.user_id ORDER BY t.created_at DESC`
+        `SELECT t.*,u.location,u.accountNumber,u.accountName FROM tickets t LEFT JOIN users u ON u.id=t.user_id${ticketPeriod} ORDER BY t.created_at DESC`, periodParams
       ),
       pool.query(
-        `SELECT tr.*,u.location FROM technician_requests tr LEFT JOIN users u ON u.id=tr.user_id ORDER BY tr.created_at DESC`
+        `SELECT tr.*,u.location FROM technician_requests tr LEFT JOIN users u ON u.id=tr.user_id${techPeriod} ORDER BY tr.created_at DESC`, periodParams
       ),
       pool.query(
-        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed' ORDER BY pt.created_at DESC`
+        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed'${salesPeriod} ORDER BY pt.created_at DESC`, periodParams
       ),
     ]);
 
-    const outcomes = await getAllOutcomes();
-    const incidents = await getIncidentStats();
+    const [outcomes, incidents] = await Promise.all([
+      getAnalyticsOutcomesReadOnly(cutoff),
+      getIncidentStatsReadOnly(cutoff),
+    ]);
     const incidentDetectionPolicy = getIncidentDetectionPolicy();
     const customers = userResult[0];
     const allTickets = ticketResult[0];
@@ -225,8 +234,6 @@ async function getAdminAnalytics(req, res) {
     const allSales = salesResult[0];
 
     const locationFilter = String(req.query.location || '').trim();
-    const rawDays = Number(req.query.days || 30);
-    const days = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : null;
     const byLoc = (row) =>
       !locationFilter || normLoc(row.location) === normLoc(locationFilter);
 

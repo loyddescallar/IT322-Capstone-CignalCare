@@ -4,6 +4,10 @@ const { FIXED_LOAD_VALIDITY_DAYS } = require("../utils/loadValidity");
 let columnsReady = false;
 
 async function ensureLoadRequestColumns() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'load_requests');
+  }
   if (columnsReady) return;
 
   await pool.query(`
@@ -195,6 +199,19 @@ async function getLoadRequestsByUser(userId) {
   );
 
   return rows;
+}
+
+// Optional admin pagination, with stable ordering and independent total count.
+async function getLoadRequestsPage({ limit, offset }) {
+  await ensureLoadRequestColumns();
+  const [counts] = await pool.query('SELECT COUNT(*) AS total FROM load_requests');
+  const [rows] = await pool.query(`
+    SELECT *
+    FROM load_requests
+    ORDER BY created_at DESC, id DESC
+    LIMIT ? OFFSET ?
+  `, [limit, offset]);
+  return { requests: rows, total: Number(counts?.[0]?.total || 0) };
 }
 
 async function getAllLoadRequests() {
@@ -684,6 +701,7 @@ module.exports = {
   getLoadRequestByPayMongoIdentifiers,
   getLoadRequestsByUser,
   getAllLoadRequests,
+  getLoadRequestsPage,
   updateLoadRequestStatus,
   attachPayMongoCheckout,
   markPayMongoCheckoutCreationFailed,

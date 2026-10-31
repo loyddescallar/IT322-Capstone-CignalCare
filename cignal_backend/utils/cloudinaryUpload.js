@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { encodePrivateAttachment, inspectAttachmentBytes } = require('./privateChatAttachment');
 const { v2: cloudinary } = require('cloudinary');
 
 const MAX_UPLOAD_BYTES = Number(process.env.CLOUDINARY_MAX_UPLOAD_MB || 5) * 1024 * 1024;
@@ -9,7 +10,13 @@ const IMAGE_MIME_TYPES = new Set([
   'image/gif',
   'image/webp',
 ]);
+// Retained for backwards API compatibility only; new chat uploads cannot use raw files.
 const RAW_MIME_TYPES = new Set(['application/pdf']);
+const CHAT_PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const CHAT_PHOTO_MIME_BY_EXT = Object.freeze({
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.png': 'image/png', '.webp': 'image/webp',
+});
 const UPLOAD_STORAGE_ERROR_CODE = 'UPLOAD_STORAGE_UNAVAILABLE';
 
 let configured = false;
@@ -129,16 +136,6 @@ function getImageUploadOptions(folder) {
   };
 }
 
-function getRawUploadOptions(folder) {
-  return {
-    folder: sanitizeFolder(folder),
-    resource_type: 'raw',
-    unique_filename: true,
-    overwrite: false,
-    use_filename: true,
-  };
-}
-
 async function removeLocalFileQuietly(filePath) {
   if (!filePath) return;
 
@@ -211,13 +208,33 @@ async function uploadLocalFileMaybe(file, folder = 'cignalcare/chat') {
 
   const stats = await fs.promises.stat(file.path);
   const mimeType = String(file.mimetype || '').toLowerCase();
-  const allowPdf = RAW_MIME_TYPES.has(mimeType);
+  const extension = path.extname(file.originalname || '').toLowerCase();
+  if (!CHAT_PHOTO_MIMES.has(mimeType) ||
+      CHAT_PHOTO_MIME_BY_EXT[extension] !== mimeType) {
+    await removeLocalFileQuietly(file.path);
+    const error = new Error('Only JPG, PNG, or WEBP photo attachments are allowed (5 MB maximum).');
+    error.statusCode = 415;
+    throw error;
+  }
 
   assertAllowedUpload({
     mimeType,
     sizeBytes: stats.size,
-    allowPdf: true,
+    allowPdf: false,
   });
+  const headerHandle = await fs.promises.open(file.path, 'r');
+  let signature;
+  try {
+    const buffer = Buffer.alloc(32);
+    const { bytesRead } = await headerHandle.read(buffer, 0, buffer.length, 0);
+    signature = buffer.subarray(0, bytesRead);
+  } finally { await headerHandle.close(); }
+  if (!inspectAttachmentBytes(signature, mimeType)) {
+    await removeLocalFileQuietly(file.path);
+    const error = new Error('Invalid attachment contents for the declared file type.');
+    error.statusCode = 400;
+    throw error;
+  }
 
   const localFallback = file.filename || path.basename(file.path);
 
@@ -233,25 +250,31 @@ async function uploadLocalFileMaybe(file, folder = 'cignalcare/chat') {
       url: localFallback,
       storage: 'local',
       publicId: null,
-      resourceType: allowPdf ? 'raw' : 'image',
+      resourceType: 'image',
     };
   }
 
   try {
-    const options = allowPdf
-      ? getRawUploadOptions(folder)
-      : getImageUploadOptions(folder);
+    const options = getImageUploadOptions(folder);
+    // Restrict originals and derived assets from the moment of upload.
+    // Never persist publicly deliverable URLs for new ticket attachments.
+    options.type = 'authenticated';
 
     const result = await cloudinary.uploader.upload(file.path, options);
 
-    if (!result.secure_url && !result.url) {
-      throw new Error('Cloudinary returned no upload URL.');
+    if (!result.public_id) {
+      throw new Error('Cloudinary returned no asset identifier.');
     }
 
     await removeLocalFileQuietly(file.path);
 
     return {
-      url: result.secure_url || result.url,
+      url: encodePrivateAttachment({
+        publicId: result.public_id,
+        resourceType: result.resource_type || options.resource_type,
+        format: result.format || (mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1]),
+      }),
+      deliveryType: 'authenticated',
       storage: 'cloudinary',
       publicId: result.public_id || null,
       resourceType: result.resource_type || options.resource_type,
@@ -273,18 +296,19 @@ async function uploadLocalFileMaybe(file, folder = 'cignalcare/chat') {
       url: localFallback,
       storage: 'local',
       publicId: null,
-      resourceType: allowPdf ? 'raw' : 'image',
+      resourceType: 'image',
       error: error.message,
     };
   }
 }
 
-async function deleteCloudinaryAssetMaybe(publicId, resourceType = 'image') {
+async function deleteCloudinaryAssetMaybe(publicId, resourceType = 'image', deliveryType = 'upload') {
   if (!publicId || !ensureCloudinaryConfigured()) return false;
 
   try {
     await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,
+      type: deliveryType,
       invalidate: true,
     });
     return true;

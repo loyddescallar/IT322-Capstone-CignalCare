@@ -3,9 +3,10 @@ import axiosClient from './axiosClient';
 const ticketApi = {
   createTicket: (ticket) => axiosClient.post('/tickets', ticket),
   getMyTickets: () => axiosClient.get('/tickets/my'),
-  getAdminTickets: () => axiosClient.get('/tickets/admin'),
+  getAdminTickets: (config = {}) => axiosClient.get('/tickets/admin', config),
   getTicket: (id) => axiosClient.get(`/tickets/${id}`),
-  getTicketMessages: (id) => axiosClient.get(`/tickets/${id}/messages`),
+  getTicketMessages: (id, config = {}) =>
+    axiosClient.get(`/tickets/${id}/messages`, config),
 
   sendTicketMessage: (id, message) =>
     axiosClient.post(`/tickets/${id}/messages`, { message }),
@@ -28,7 +29,9 @@ const ticketApi = {
 
     // Do not manually set multipart/form-data. The browser must add the
     // boundary value automatically.
-    return axiosClient.post(`/tickets/${id}/messages`, formData);
+    return axiosClient.post(`/tickets/${id}/messages`, formData, {
+      timeout: 60000, // Allow more time for uploads on slower connections.
+    });
   },
 
   sendUserTyping: (id, typing) =>

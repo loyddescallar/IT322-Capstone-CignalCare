@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExternalLink, ImageOff, Paperclip } from 'lucide-react';
-import { getAttachmentUrl } from '../api/axiosClient';
+import axiosClient from '../api/axiosClient';
 import { isImageAttachment } from '../utils/chatUtils';
 
 export default function ChatAttachment({
@@ -9,9 +9,39 @@ export default function ChatAttachment({
   compact = false,
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const attachmentUrl = getAttachmentUrl(message?.attachment);
+  const hasAttachment = Boolean(message?.attachment);
+  const messageId = message?.id;
+  const [localObjectUrl, setLocalObjectUrl] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
+  const ticketId = message?.ticket_id;
 
-  if (!attachmentUrl) return null;
+  useEffect(() => {
+    if (!hasAttachment) { setLocalObjectUrl(''); setLoadFailed(false); return; }
+    if (!ticketId || !messageId) { setLoadFailed(true); return; }
+    const controller = new AbortController();
+    let url = '';
+    setLocalObjectUrl('');
+    setLoadFailed(false);
+    setImageFailed(false);
+    axiosClient.get(`/tickets/${encodeURIComponent(ticketId)}/attachments/message/${encodeURIComponent(messageId)}`, {
+      responseType: 'blob', signal: controller.signal,
+    }).then((response) => {
+      if (controller.signal.aborted) return;
+      url = URL.createObjectURL(response.data);
+      setLocalObjectUrl(url);
+    }).catch((error) => {
+      if (!controller.signal.aborted) {
+        setLoadFailed(error?.response?.status === 424 ? 'PDF delivery is blocked by the storage provider. Ask the administrator to enable PDF delivery.' : 'Attachment could not be opened. Please try again.');
+      }
+    });
+    return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
+  }, [hasAttachment, ticketId, messageId]);
+
+  const attachmentUrl = localObjectUrl;
+  if (!hasAttachment) return null;
+  if (!attachmentUrl) {
+    return <div role="status" className="mt-2 text-xs opacity-75">{loadFailed || 'Loading attachment…'}</div>;
+  }
 
   const linkClasses = mine
     ? 'text-white/80 hover:text-white'

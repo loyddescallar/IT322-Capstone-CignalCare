@@ -1,8 +1,10 @@
 const {
   TICKET_STATUSES,
+  ensureTicketWorkflowSchema,
   createTicket,
   getTicketsByUser,
   getAllTickets,
+  getTicketsPage,
   getTicketById,
   updateTicketStatus,
   archiveTicket,
@@ -11,6 +13,9 @@ const { createNotification, createAdminNotification } = require('../models/notif
 const { notifySafely } = require('../utils/safeNotification');
 const { isAdmin, isSelf } = require('../utils/ownership');
 const { linkTicketIfActive } = require('../models/incidentModel');
+const pool = require('../config/db');
+const { getFilteredTicketPage } = require('../utils/adminFilteredLists');
+const { parseAdminPagination, paginationMeta } = require('../utils/adminPagination');
 
 function canAccessTicket(req, ticket) {
   return ticket && (isAdmin(req) || isSelf(req, ticket.user_id));
@@ -65,11 +70,23 @@ async function getMyTicketsController(req, res) {
 
 async function getAllTicketsController(req, res) {
   try {
+    const paging = parseAdminPagination(req.query);
+    if (paging.error) return res.status(400).json({ error: paging.error });
+    if (paging.enabled) {
+      if (req.query.view === 'filtered') {
+        await ensureTicketWorkflowSchema();
+        const { tickets, total, summary } = await getFilteredTicketPage(pool, paging, req.query);
+        return res.json({ tickets, pagination: paginationMeta(paging.page, paging.pageSize, total), summary });
+      }
+      const {tickets, total} = await getTicketsPage(paging);
+      return res.json({ tickets, pagination: paginationMeta(paging.page, paging.pageSize, total) });
+    }
+    // Preserve the unchanged response for existing admin UI and integrations.
     const tickets = await getAllTickets();
     return res.json({ tickets });
   } catch (err) {
     console.error('GET ALL TICKETS ERROR', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(err.statusCode === 400 ? 400 : 500).json({ error: err.statusCode === 400 ? err.message : 'Server error' });
   }
 }
 

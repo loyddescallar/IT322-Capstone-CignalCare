@@ -56,6 +56,10 @@ const EXTRA_COLUMNS = [
 ];
 
 async function ensureTechnicianColumns() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'technician');
+  }
   if (columnsReady) return;
 
   const [rows] = await pool.query(`

@@ -10,28 +10,6 @@ const {
   buildTroubleshootingSessionContext,
 } = require('../services/chatbotKnowledgeService');
 
-const RATE_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 12;
-const requestWindows = new Map();
-
-function checkRateLimit(userId) {
-  const key = String(userId || 'anonymous');
-  const now = Date.now();
-  const current = requestWindows.get(key);
-
-  if (!current || now - current.startedAt >= RATE_WINDOW_MS) {
-    requestWindows.set(key, { startedAt: now, count: 1 });
-    return true;
-  }
-
-  if (current.count >= MAX_REQUESTS_PER_WINDOW) {
-    return false;
-  }
-
-  current.count += 1;
-  return true;
-}
-
 function sanitizeContext(context, limit = 8) {
   if (!Array.isArray(context)) return [];
 
@@ -112,9 +90,11 @@ async function sendChatbotMessage(req, res) {
     });
   }
 
-  if (!checkRateLimit(req.user?.id)) {
-    return res.status(429).json({
-      error: 'Too many chatbot requests. Please wait a moment and try again.',
+  if (!req.aiAccess?.allowed) {
+    return res.status(req.aiAccess?.reason === 'quota' ? 429 : 503).json({
+      error: req.aiAccess?.reason === 'quota'
+        ? 'AI limit reached. Please use built-in troubleshooting or try again later.'
+        : 'AI is disabled for cost protection. Built-in troubleshooting is available.',
     });
   }
 
@@ -220,6 +200,18 @@ async function prepareSupportDraft(req, res) {
 
   if (!hasUserContent && !verifiedSession.valid) {
     return res.status(400).json({ error: 'Conversation or troubleshooting context is required' });
+  }
+
+  if (!req.aiAccess?.allowed) {
+    return res.json({
+      draft: buildFallbackSupportDraft({
+        context,
+        target,
+        troubleshootingSessionText: verifiedSession.draftText,
+      }),
+      source: 'built-in-fallback',
+      requiresReview: true,
+    });
   }
 
   try {
