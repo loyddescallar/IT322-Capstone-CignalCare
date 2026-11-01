@@ -29,6 +29,7 @@ export default function UserReportProblem() {
   const [attachedPhoto, setAttachedPhoto] = useState(prefill.prefillScreenPhotoFile || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [createdTicketId, setCreatedTicketId] = useState(null);
 
   const handleChange = (event) => {
     setForm((previous) => ({
@@ -50,35 +51,38 @@ export default function UserReportProblem() {
       if (photoError) { setError(photoError); return; }
     }
 
+    // Once the ticket exists, do not create another just because the follow-up
+    // description/photo request failed. Allow retrying only that secondary step.
     setLoading(true);
     setError('');
-
+    let ticketId = createdTicketId;
     try {
-      const response = await ticketApi.createTicket({
-        category: form.category,
-        subject: form.subject.trim(),
-        description: form.description.trim(),
-      });
+      if (!ticketId) {
+        const response = await ticketApi.createTicket({
+          category: form.category,
+          subject: form.subject.trim(),
+        });
+        ticketId = response.data?.id;
+        if (!ticketId) throw new Error('Ticket server returned no ticket ID. Check My Tickets before trying again.');
+        setCreatedTicketId(ticketId);
+      }
 
-      const ticketId = response.data?.id;
-
-      if (ticketId && (form.description.trim() || attachedPhoto)) {
+      if (form.description.trim() || attachedPhoto) {
         if (attachedPhoto) {
           await ticketApi.sendTicketAttachment(ticketId, {
             file: attachedPhoto,
             message: form.description.trim() || 'TV screen photo attached from Load Request signal check.',
           });
-        } else if (form.description.trim()) {
+        } else {
           await ticketApi.sendTicketMessage(ticketId, form.description.trim());
         }
       }
-
       navigate('/user/tickets');
     } catch (submitError) {
-      setError(
-        submitError.response?.data?.error ||
-          'Failed to submit. Please try again.'
-      );
+      const detail = submitError.response?.data?.error || submitError.message || 'Request failed.';
+      setError(ticketId
+        ? `Ticket #${ticketId} was CREATED, but saving its details/photo was not confirmed: ${detail}. Check My Tickets before retrying details only. Do not create another ticket.`
+        : detail);
     } finally {
       setLoading(false);
     }
@@ -109,6 +113,10 @@ export default function UserReportProblem() {
             {error && (
               <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
+                {createdTicketId && (
+                  <button type="button" onClick={() => navigate('/user/tickets')}
+                    className="mt-3 block font-semibold underline">View My Tickets</button>
+                )}
               </div>
             )}
 
@@ -168,7 +176,7 @@ export default function UserReportProblem() {
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs leading-5 text-slate-400">Submitting creates a support ticket that you can monitor from My Tickets.</p>
                 <button type="submit" disabled={loading} className="w-full rounded-xl bg-[#cc0000] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
-                  {loading ? 'Submitting...' : 'Submit Support Ticket'}
+                  {loading ? 'Submitting...' : createdTicketId ? 'Retry Saving Ticket Details' : 'Submit Support Ticket'}
                 </button>
               </div>
             </form>

@@ -5,7 +5,7 @@ import { getAllLoadRequests, updateLoadStatus } from '../../api/loadRequestApi';
 import customerApi from '../../api/customerApi';
 
 const STATUSES = ['Received', 'Under Review', 'Attending', 'Completed', 'Rejected'];
-const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 
 const STATUS_CONFIG = {
   Received: { badge: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },

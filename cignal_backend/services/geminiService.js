@@ -28,12 +28,26 @@ function getGeminiApiKey() {
 function getGeminiModel() {
   // Fail safe if GEMINI_MODEL requests a powerful/expensive model.
   const model = String(process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
-  const allowed = new Set(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
+  // Approved stable text models with Google Gemini API standard Free Tier access.
+  // This is a compatibility allowlist, not a quota or billing guarantee.
+  const allowed = new Set([
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash',
+  ]);
   if (!allowed.has(model)) {
     console.warn('CIGNALCARE_AI_MODEL_BLOCKED: falling back to gemini-3.1-flash-lite');
     return 'gemini-3.1-flash-lite';
   }
   return model;
+}
+
+// Gemini 3.8 Flash rejects `minimal` with HTTP 400. Flash-Lite supports it.
+// This explicit per-model setting keeps token use low without changing the
+// operator-selected GEMINI_MODEL or removing the provider quota safeguards.
+function getGeminiThinkingLevel(model = getGeminiModel()) {
+  return model === 'gemini-3.8-flash' ? 'low' : 'minimal';
 }
 
 function getGeminiTimeoutMs() {
@@ -122,7 +136,7 @@ async function generateGeminiReply({ message, context = [], knowledgeText = '' }
       system_instruction: CIGNALCARE_ASSISTANT_PROMPT,
       input: buildInput(message, context, knowledgeText),
       generation_config: {
-        thinking_level: 'minimal',
+        thinking_level: getGeminiThinkingLevel(),
         max_output_tokens: 2048,
         temperature: 0.25,
       },
@@ -353,7 +367,7 @@ ${transcript || 'No additional chat messages provided'}
       system_instruction: 'You prepare factual support-form drafts for CignalCare+. Never invent facts and never perform system actions.',
       input,
       generation_config: {
-        thinking_level: 'minimal',
+        thinking_level: getGeminiThinkingLevel(),
         max_output_tokens: 1024,
         temperature: 0.1,
       },
@@ -372,5 +386,6 @@ module.exports = {
   generateGeminiSupportDraft,
   buildFallbackSupportDraft,
   getGeminiModel,
+  getGeminiThinkingLevel,
   getGeminiTimeoutMs,
 };

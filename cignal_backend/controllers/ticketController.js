@@ -35,7 +35,14 @@ async function createTicketController(req, res) {
       subject: subject.trim(),
     });
 
-    const linkedIncident = await linkTicketIfActive(id, req.user.location, `${category} ${subject}`);
+    // The ticket is already saved. Incident linking is supplementary and must
+    // never turn a successful INSERT into a misleading HTTP 500 (retry/duplicate).
+    let linkedIncident = null;
+    try {
+      linkedIncident = await linkTicketIfActive(id, req.user.location, `${category} ${subject}`);
+    } catch (incidentError) {
+      console.warn('TICKET INCIDENT LINK WARNING:', incidentError?.message || incidentError);
+    }
 
     await notifySafely('CREATE TICKET', async () => {
       await createNotification({
@@ -54,7 +61,10 @@ async function createTicketController(req, res) {
     return res.status(201).json({ message: 'Ticket created', id, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TICKET ERROR', err);
-    return res.status(500).json({ error: 'Server error' });
+    if (err?.code === 'SCHEMA_NOT_READY') {
+      return res.status(503).json({ error: 'Local database schema is incomplete. Ask the developer to run the read-only C2 schema check.' });
+    }
+    return res.status(500).json({ error: 'Unable to create a ticket. Check the backend terminal for details.' });
   }
 }
 

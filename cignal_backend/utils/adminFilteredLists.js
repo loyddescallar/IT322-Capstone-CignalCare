@@ -2,7 +2,7 @@
 // Does not modify legacy endpoints, DB schemas, or payment processing.
 const STATUSES = ['Submitted', 'Under Review', 'Job Order Assigned', 'Resolved', 'Archived'];
 const LOAD_STATUSES = ['Received', 'Under Review', 'Attending', 'Completed', 'Rejected'];
-const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 
 function textParam(value, field, max = 100) {
   if (value === undefined || value === null) return '';

@@ -39,6 +39,7 @@ const LOCATIONS = [
   'Calatagan',
   'Lian',
   'Nasugbu',
+  'Tuy',
 ];
 
 const EMPTY_FORM = {

@@ -5,7 +5,7 @@ import UserPageShell from '../../components/UserPageShell';
 import axiosClient from '../../api/axiosClient';
 import LocationPinPicker from '../../components/LocationPinPicker';
 
-const MAX_ATTACHMENT_MB = 8;
+const MAX_ATTACHMENT_MB = 5;
 
 async function fileToBase64(file) {
   if (!file) return null;
@@ -30,7 +30,7 @@ export default function UserTechnicianRequest() {
 
   const [form, setForm] = useState({
     contactName:     user.accountName || '',
-    contactPhone:    user.phone || '',
+    contactPhone:    '', // Require an explicitly entered contact; the saved profile may be outdated.
     altContact:      '',
     address:         user.address || '',
     landmark:        '',
@@ -44,14 +44,22 @@ export default function UserTechnicianRequest() {
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [submittedContactPhone, setSubmittedContactPhone] = useState('');
 
   const hc = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
   const addFiles = e => {
-    const selected = Array.from(e.target.files || []).find(
-      file => file.type?.startsWith('image/') && file.size <= MAX_ATTACHMENT_MB * 1024 * 1024
-    );
-    setFiles(selected ? [selected] : []);
+    const selected = Array.from(e.target.files || [])[0];
+    if (selected && !selected.type?.startsWith('image/')) {
+      setErrors(prev => ({ ...prev, attachment: 'Please select an image file.' }));
+      setFiles([]);
+    } else if (selected && selected.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, attachment: `Image must be ${MAX_ATTACHMENT_MB}MB or smaller.` }));
+      setFiles([]);
+    } else {
+      setErrors(prev => { const next = { ...prev }; delete next.attachment; return next; });
+      setFiles(selected ? [selected] : []);
+    }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
   const removeFile = i => setFiles(prev => prev.filter((_, idx) => idx !== i));
@@ -59,6 +67,7 @@ export default function UserTechnicianRequest() {
 
   const validate = () => {
     const e = {};
+    if (!user.accountNumber)            e.accountNumber   = 'Subscriber account is missing from this session. Please log out and log in again.';
     if (!form.contactName.trim())      e.contactName      = 'Full name is required.';
     if (!form.contactPhone.trim())     e.contactPhone     = 'Phone number is required.';
     if (!form.address.trim())          e.address          = 'Service address is required.';
@@ -75,7 +84,8 @@ export default function UserTechnicianRequest() {
       const firstImage = files.find(file => file.type?.startsWith('image/')) || null;
       const screenPhotoBase64 = firstImage ? await fileToBase64(firstImage) : null;
 
-      await axiosClient.post('/technicians/requests', {
+      const submittedPhone = form.contactPhone.trim();
+      const response = await axiosClient.post('/technicians/requests', {
         accountNumber:    user.accountNumber || '',
         contactName:      form.contactName.trim(),
         contactPhone:     form.contactPhone.trim(),
@@ -89,10 +99,11 @@ export default function UserTechnicianRequest() {
         latitude:         locationPin?.latitude ?? null,
         longitude:        locationPin?.longitude ?? null,
       });
+      setSubmittedContactPhone(response.data?.contactPhone || submittedPhone);
       setSuccess(true);
     } catch(e) {
       console.error(e);
-      setErrors({ submit: e.response?.data?.error || 'Unable to submit the technician request. Please try again.' });
+      setErrors({ submit: e.response?.data?.error || e.message || 'Unable to submit the technician request. Please try again.' });
     }
     finally { setLoading(false); }
   };
@@ -146,7 +157,8 @@ export default function UserTechnicianRequest() {
                   </div>
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-slate-600">Phone Number *</label>
-                    <input name="contactPhone" value={form.contactPhone} onChange={hc} placeholder="09XXXXXXXXX" className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-[#cc0000] focus:ring-4 focus:ring-red-100 ${errors.contactPhone ? 'border-red-400' : 'border-slate-200'}`} />
+                    <input name="contactPhone" value={form.contactPhone} onChange={hc} type="tel" autoComplete="tel" placeholder="09XXXXXXXXX" className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-[#cc0000] focus:ring-4 focus:ring-red-100 ${errors.contactPhone ? 'border-red-400' : 'border-slate-200'}`} />
+                    <p className="mt-1 text-xs text-slate-500">Enter the number to call for this request. Your account profile will not be changed.</p>
                     {errors.contactPhone && <p className="mt-1 text-xs text-red-600">{errors.contactPhone}</p>}
                   </div>
                   <div className="md:col-span-2">
@@ -266,10 +278,10 @@ export default function UserTechnicianRequest() {
           <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 text-center shadow-2xl sm:p-8">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100"><CheckCircle2 size={32} className="text-green-600" /></div>
             <h2 className="mb-2 text-xl font-bold text-slate-800">Request Submitted</h2>
-            <p className="mb-6 text-sm leading-6 text-slate-500">Our team will contact <strong>{form.contactPhone}</strong> to confirm the technician schedule.</p>
+            <p className="mb-6 text-sm leading-6 text-slate-500">Our team will contact <strong>{submittedContactPhone}</strong> to confirm the technician schedule.</p>
             <div className="flex flex-col gap-2">
               <button onClick={() => navigate('/user/tickets')} className="w-full rounded-xl bg-[#cc0000] py-3 font-semibold text-white hover:bg-red-700">View My Tickets</button>
-              <button onClick={() => { setSuccess(false); setForm({ contactName:user.accountName||'', contactPhone:user.phone||'', altContact:'', address:user.address||'', landmark:'', serviceType:'Signal / Dish Repair', preferredDate:'', preferredTime:'', issueDescription:'' }); setFiles([]); setLocationPin(null); }} className="w-full rounded-xl border border-slate-200 py-3 text-sm text-slate-600 hover:bg-slate-50">Submit Another Request</button>
+              <button onClick={() => { setSuccess(false); setForm({ contactName:user.accountName||'', contactPhone:'', altContact:'', address:user.address||'', landmark:'', serviceType:'Signal / Dish Repair', preferredDate:'', preferredTime:'', issueDescription:'' }); setFiles([]); setLocationPin(null); }} className="w-full rounded-xl border border-slate-200 py-3 text-sm text-slate-600 hover:bg-slate-50">Submit Another Request</button>
             </div>
           </div>
         </div>

@@ -234,7 +234,13 @@ export default function CignalBot() {
     const troubleshootingSession = readActiveTroubleshootingSession(location.pathname);
     const shouldUseLiveData =
       shouldUseLiveSystemData(cleanText) || Boolean(troubleshootingSession);
-    const ruleResponse = shouldUseLiveData ? null : getRuleBasedResponse(cleanText);
+    // Ordinary messages must reach the backend so Gemini can answer when enabled.
+    // Keep only the explicit local navigation command instant/offline. The
+    // backend still provides verified-system hints and safe offline fallbacks.
+    const ruleResponse =
+      !shouldUseLiveData && cleanText.toLowerCase() === 'back to menu'
+        ? getRuleBasedResponse(cleanText)
+        : null;
 
     if (ruleResponse) {
       await new Promise((resolve) => setTimeout(resolve, 350));

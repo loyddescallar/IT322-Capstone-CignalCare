@@ -73,13 +73,17 @@ async function createTechnicianRequest(req, res) {
       normalizedLongitude = Number(normalizedLongitude.toFixed(6));
     }
 
+    // Preserve the contact number entered for this request; do not substitute
+    // the account's possibly outdated profile phone.
+    const submittedContactPhone = String(contactPhone).trim();
+
     const screenPhotoUrl = await uploadImageMaybe(screen_photo, 'cignalcare/technician/screens');
 
     const id = await createRequest({
       user_id: customer.id,
       accountNumber: customer.accountNumber,
       contactName: contactName.trim(),
-      contactPhone: contactPhone.trim(),
+      contactPhone: submittedContactPhone,
       issueDescription: issueDescription.trim(),
       preferred_date,
       preferred_time,
@@ -91,7 +95,14 @@ async function createTechnicianRequest(req, res) {
       longitude: normalizedLongitude,
     });
 
-    const linkedIncident = await linkTechnicianIfActive(id, customer.location, issueDescription.trim());
+    // The technician request is already persisted. If optional incident
+    // association fails, still report the successful creation to the caller.
+    let linkedIncident = null;
+    try {
+      linkedIncident = await linkTechnicianIfActive(id, customer.location, issueDescription.trim());
+    } catch (incidentError) {
+      console.warn('TECHNICIAN INCIDENT LINK WARNING:', incidentError?.message || incidentError);
+    }
 
     await notifySafely('CREATE TECHNICIAN REQUEST', async () => {
       await createNotification({
@@ -107,10 +118,13 @@ async function createTechnicianRequest(req, res) {
       });
     });
 
-    return res.status(201).json({ message: 'Request submitted', id, incident: linkedIncident || null });
+    return res.status(201).json({ message: 'Request submitted', id, contactPhone: submittedContactPhone, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TECHNICIAN REQUEST ERROR', err);
 
+    if (err?.code === 'SCHEMA_NOT_READY') {
+      return res.status(503).json({ error: 'Local database schema is incomplete. Ask the developer to run the read-only C2 schema check.' });
+    }
     if (isUploadStorageError(err)) {
       return res.status(err.statusCode || 503).json({ error: err.message });
     }

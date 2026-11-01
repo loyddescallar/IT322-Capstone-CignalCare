@@ -289,7 +289,7 @@ async function getAdminAnalytics(req, res) {
     });
     const repeatUsers = Object.values(userTickets).filter((count) => count >= 2).length;
 
-    const locs = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+    const locs = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
     const locationMap = {};
     for (const loc of locs) {
       const subscribers = customers.filter(
@@ -326,29 +326,41 @@ async function getAdminAnalytics(req, res) {
     // Preserve the existing API field for older frontend consumers.
     const guidePerformance = boxIssueEffectiveness.slice(0, 10);
 
-    const trend = [];
-    for (let i = 6; i >= 0; i -= 1) {
+    // Generate chart points for the selected period rather than always returning
+    // seven days. Use maps so a 365-day view does not repeatedly rescan rows.
+    const trendDays = days ? Math.min(365, Math.max(1, Math.ceil(days))) : 7;
+    const trendByDay = new Map();
+    for (let i = trendDays - 1; i >= 0; i -= 1) {
       const date = new Date(Date.now() - i * 86400000);
       const key = manilaDayKey(date);
-      trend.push({
+      trendByDay.set(key, {
         date: key,
         label: date.toLocaleDateString('en-PH', {
           timeZone: 'Asia/Manila',
           month: 'short',
           day: 'numeric',
         }),
-        sales: Number(
-          sales
-            .filter((sale) => manilaDayKey(sale.created_at || sale.transaction_date) === key)
-            .reduce((sum, sale) => sum + Number(sale.amount || 0), 0)
-            .toFixed(2)
-        ),
-        support: tickets.filter((ticket) => manilaDayKey(ticket.created_at) === key).length,
-        resolved: resolved.filter(
-          (ticket) => manilaDayKey(ticket.updated_at || ticket.created_at) === key
-        ).length,
+        sales: 0,
+        support: 0,
+        resolved: 0,
       });
     }
+    for (const sale of sales) {
+      const point = trendByDay.get(manilaDayKey(sale.created_at || sale.transaction_date));
+      if (point) point.sales += Number(sale.amount || 0);
+    }
+    for (const ticket of tickets) {
+      const point = trendByDay.get(manilaDayKey(ticket.created_at));
+      if (point) point.support += 1;
+    }
+    for (const ticket of resolved) {
+      const point = trendByDay.get(manilaDayKey(ticket.updated_at || ticket.created_at));
+      if (point) point.resolved += 1;
+    }
+    const trend = [...trendByDay.values()].map((point) => ({
+      ...point,
+      sales: Number(point.sales.toFixed(2)),
+    }));
 
     const salesByPlan = {};
     sales.forEach((sale) => {

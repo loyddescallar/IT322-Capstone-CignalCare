@@ -26,7 +26,7 @@ import {
   isOwnMessage,
 } from '../../utils/chatUtils';
 
-const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 const ACTIVE_STATUSES = ['Submitted', 'Under Review', 'Job Order Assigned', 'Resolved'];
 const STATUSES = [...ACTIVE_STATUSES, 'Archived'];
 const CATEGORIES = ['Billing Concern', 'Technical Problem', 'Connection Issue', 'Technician Request', 'Channel Concern', 'Other'];

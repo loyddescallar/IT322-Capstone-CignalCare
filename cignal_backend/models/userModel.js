@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-const ALLOWED_LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const ALLOWED_LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 let accountSchemaReady = false;
 
 async function ensureAccountSchema() {
