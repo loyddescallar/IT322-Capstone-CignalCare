@@ -142,9 +142,12 @@ export default function AdminAnalytics() {
       [],
       ['SUMMARY'],
       ['Metric', 'Value'],
-      ['Total Prepaid Sales (PHP)', k.totalRevenue || 0],
+      ['Total Collected Sales (PHP)', k.totalRevenue || 0],
+      ['Prepaid Revenue (PHP)', k.prepaidRevenue || 0],
+      ['Service Revenue (PHP)', k.serviceRevenue || 0],
       ['Gross Profit (PHP)', k.grossProfit || 0],
-      ['Total Prepaid Transactions', k.totalTransactions || 0],
+      ['Completed Transactions (All)', k.totalTransactions || 0],
+      ['Completed Service Payments', k.serviceTransactions || 0],
       ['POS Transactions', k.posTransactions || 0],
       ['Online PayMongo Transactions', k.onlineTransactions || 0],
       ['Active Subscribers', k.activeSubscribers || 0],
@@ -247,7 +250,7 @@ export default function AdminAnalytics() {
       {!loading && data && tab === 'overview' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Metric icon={Store} label="Prepaid Sales" value={peso(k.totalRevenue)} sub={`${k.totalTransactions || 0} completed transactions`} tone="red" />
+            <Metric icon={Store} label="Collected Sales" value={peso(k.totalRevenue)} sub={`${k.totalTransactions || 0} completed load + service payments`} tone="red" />
             <Metric icon={Users} label="Active Subscribers" value={k.activeSubscribers || 0} sub={location || 'Across all locations'} tone="blue" />
             <Metric icon={Headset} label="Support Tickets" value={k.totalTickets || 0} sub={`${k.resolutionRate || 0}% resolved`} tone="amber" />
             <Metric icon={CheckCircle2} label="Self-Service Success" value={`${k.selfServiceResolutionRate || 0}%`} sub={`${k.selfServiceAssessments || 0} completed assessments`} tone="green" />
@@ -255,7 +258,7 @@ export default function AdminAnalytics() {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-12">
-            <Section title="Sales & Support Trend" subtitle="Seven-day comparison of completed POS + online prepaid sales and subscriber support activity." className="xl:col-span-7">
+            <Section title="Sales & Support Trend" subtitle="Daily collected prepaid and service revenue alongside support activity for the selected period." className="xl:col-span-7">
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data?.trend || []} margin={{ top: 6, right: 12, left: -12, bottom: 0 }}>
@@ -267,9 +270,9 @@ export default function AdminAnalytics() {
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(value, name) => name === 'Prepaid Sales' ? peso(value) : value} />
+                    <Tooltip formatter={(value, name) => name === 'Sales Revenue' ? peso(value) : value} />
                     <Area yAxisId="left" type="monotone" dataKey="support" name="Support Requests" stroke="#dc2626" fill="url(#supportGradient)" strokeWidth={2.4} />
-                    <Area yAxisId="right" type="monotone" dataKey="sales" name="Prepaid Sales" stroke="#2563eb" fill="url(#salesGradient)" strokeWidth={2.2} />
+                    <Area yAxisId="right" type="monotone" dataKey="sales" name="Sales Revenue" stroke="#2563eb" fill="url(#salesGradient)" strokeWidth={2.2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -333,13 +336,15 @@ export default function AdminAnalytics() {
       {!loading && data && tab === 'sales' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric icon={Store} label="Prepaid Sales" value={peso(k.totalRevenue)} sub="POS + completed PayMongo loads" tone="red" />
+            <Metric icon={Store} label="Collected Sales" value={peso(k.totalRevenue)} sub="Prepaid loads + service payments" tone="red" />
+            <Metric icon={Store} label="Prepaid Revenue" value={peso(k.prepaidRevenue)} sub={`${k.prepaidTransactions || 0} prepaid loads`} tone="blue" />
+            <Metric icon={Wrench} label="Service Revenue" value={peso(k.serviceRevenue)} sub={`${k.serviceTransactions || 0} service payments (revenue, not profit)`} tone="green" />
             <Metric icon={ChartNoAxesCombined} label="Transactions" value={k.totalTransactions || 0} sub={`${k.posTransactions || 0} POS · ${k.onlineTransactions || 0} online`} tone="blue" />
-            <Metric icon={MapPin} label="Locations" value={(data?.salesByLocation || []).length} sub="Locations with completed prepaid sales" tone="green" />
+            <Metric icon={MapPin} label="Locations" value={(data?.salesByLocation || []).length} sub="Locations with completed prepaid or service sales" tone="green" />
             <Metric icon={Store} label="Gross Profit" value={peso(k.grossProfit)} sub="₱40 per completed load" tone="amber" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
-            <Section title="Prepaid Sales Trend" subtitle="Completed transactions from both Admin POS and subscriber PayMongo load requests.">
+            <Section title="Collected Sales Trend" subtitle="Completed prepaid loads and actually collected service payments.">
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data?.trend || []} margin={{ top: 5, right: 12, left: -10, bottom: 0 }}>
@@ -347,15 +352,15 @@ export default function AdminAnalytics() {
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(value) => peso(value)} />
-                    <Area type="monotone" dataKey="sales" name="Prepaid Sales" stroke="#dc2626" fill="#fee2e2" strokeWidth={2.5} />
+                    <Area type="monotone" dataKey="sales" name="Sales Revenue" stroke="#dc2626" fill="#fee2e2" strokeWidth={2.5} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </Section>
-            <Section title="Revenue by Location" subtitle="Compare where completed prepaid sales are generated across all channels.">
+            <Section title="Revenue by Location" subtitle="Compare completed prepaid and collected service revenue by subscriber location.">
               <HorizontalBars items={data?.salesByLocation || []} labelKey="location" valueKey="revenue" format={peso} />
             </Section>
-            <Section title="Sales Channel Mix" subtitle="See how completed prepaid transactions are split between Admin POS and online PayMongo.">
+            <Section title="Sales Channel Mix" subtitle="Completed prepaid POS/PayMongo and manually collected service payments.">
               <div className="space-y-3">
                 {(data?.salesByChannel || []).map((row) => (
                   <div key={row.channel} className="rounded-xl border border-slate-100 bg-slate-50 p-3">

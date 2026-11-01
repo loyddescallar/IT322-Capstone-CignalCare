@@ -261,6 +261,8 @@ export default function AdminCustomerProfile() {
   const [tickets, setTickets] = useState([]);
   const [techReqs, setTechReqs] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [servicePayments, setServicePayments] = useState([]);
+  const [servicePaymentSummary, setServicePaymentSummary] = useState({ revenue: 0, transactions: 0 });
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState('transactions');
@@ -281,17 +283,20 @@ export default function AdminCustomerProfile() {
 
       if (!loadedCustomer) return;
 
-      const [ticketRes, techRes, loadRes] = await Promise.all([
+      const [ticketRes, techRes, loadRes, serviceRes] = await Promise.all([
         ticketApi.getAdminTickets().catch(() => ({ data: { tickets: [] } })),
         axiosClient
           .get('/technicians/requests/admin')
           .catch(() => ({ data: { requests: [] } })),
         axiosClient.get('/load/admin').catch(() => ({ data: { history: [] } })),
+        axiosClient.get('/service-payments', { params: { accountNumber: String(loadedCustomer.accountNumber), page: 1, pageSize: 25 } }).catch(() => ({ data: { transactions: [], summary: { revenue: 0, transactions: 0 } } })),
       ]);
 
       const allTickets = ticketRes.data?.tickets || [];
       const allTechReqs = techRes.data?.requests || [];
       const allTransactions = loadRes.data?.history || [];
+      setServicePayments(serviceRes.data?.transactions || []);
+      setServicePaymentSummary(serviceRes.data?.summary || { revenue: 0, transactions: 0 });
 
       setTickets(
         allTickets.filter(
@@ -732,6 +737,23 @@ export default function AdminCustomerProfile() {
           </div>
         </div>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-sm font-semibold text-slate-700">Collected Service Payments</h2>
+            <p className="mt-1 text-xs text-slate-500">FT-02 · {servicePaymentSummary.transactions} recorded payments · ₱{Number(servicePaymentSummary.revenue || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} service revenue (not profit)</p></div>
+        </div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs">
+          <thead className="bg-slate-50"><tr>{['Date', 'Service', 'Amount Collected', 'Payment', 'Technician Request', 'Reference'].map(x => <th key={x} className="px-3 py-2">{x}</th>)}</tr></thead>
+          <tbody>{servicePayments.length ? servicePayments.map(item => <tr key={item.id} className="border-t border-slate-100">
+            <td className="px-3 py-2">{String(item.transaction_date || '').slice(0,10)}</td><td className="px-3 py-2">{item.service_type}</td>
+            <td className="px-3 py-2 font-bold">₱{Number(item.amount || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</td>
+            <td className="px-3 py-2">{item.payment_method}</td><td className="px-3 py-2">{item.technician_request_id || '—'}</td>
+            <td className="px-3 py-2 font-mono">{item.reference_no}</td>
+          </tr>) : <tr><td className="py-5 text-center text-slate-400" colSpan={6}>No collected service payments for this subscriber.</td></tr>}</tbody>
+        </table></div>
+        {servicePaymentSummary.transactions > servicePayments.length && <p className="mt-2 text-xs text-slate-500">Showing the latest 25 service payments. See Admin → Completed Sales for full history.</p>}
+      </section>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

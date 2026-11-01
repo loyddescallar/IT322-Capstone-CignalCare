@@ -207,8 +207,9 @@ async function getAdminAnalytics(req, res) {
     const ticketPeriod = cutoff ? ' WHERE t.created_at >= ?' : '';
     const techPeriod = cutoff ? ' WHERE tr.created_at >= ?' : '';
     const salesPeriod = cutoff ? ' AND pt.created_at >= ?' : '';
+    const servicePeriod = cutoff ? ' WHERE sp.transaction_date >= ?' : '';
 
-    const [userResult, ticketResult, techResult, salesResult] = await Promise.all([
+    const [userResult, ticketResult, techResult, salesResult, serviceResult] = await Promise.all([
       pool.query(
         `SELECT id, accountName, accountNumber, location, status, created_at FROM users WHERE role='user'`
       ),
@@ -221,6 +222,9 @@ async function getAdminAnalytics(req, res) {
       pool.query(
         `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed'${salesPeriod} ORDER BY pt.created_at DESC`, periodParams
       ),
+      pool.query(
+        `SELECT sp.*,u.location FROM service_payments sp LEFT JOIN users u ON u.id=sp.user_id${servicePeriod} ORDER BY sp.transaction_date DESC`, periodParams
+      ),
     ]);
 
     const [outcomes, incidents] = await Promise.all([
@@ -232,6 +236,7 @@ async function getAdminAnalytics(req, res) {
     const allTickets = ticketResult[0];
     const allTech = techResult[0];
     const allSales = salesResult[0];
+    const allServicePayments = serviceResult[0];
 
     const locationFilter = String(req.query.location || '').trim();
     const byLoc = (row) =>
@@ -249,6 +254,11 @@ async function getAdminAnalytics(req, res) {
     const sales = allSales.filter(
       (sale) => byLoc(sale) && inRange(sale.created_at || sale.transaction_date, days)
     );
+    const servicePayments = allServicePayments.filter(
+      (payment) => byLoc(payment) && inRange(payment.transaction_date, days)
+    );
+    const prepaidRevenue = Number(sales.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const serviceRevenue = Number(servicePayments.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
     const outcomeRows = outcomes.filter(
       (outcome) => byLoc(outcome) && inRange(outcome.created_at, days)
     );
@@ -260,6 +270,7 @@ async function getAdminAnalytics(req, res) {
     const salesToday = sales.filter(
       (sale) => manilaDayKey(sale.created_at || sale.transaction_date) === today
     );
+    const servicesToday = servicePayments.filter((payment) => manilaDayKey(payment.transaction_date) === today);
     const ticketsToday = tickets.filter((ticket) => manilaDayKey(ticket.created_at) === today);
     const resolved = tickets.filter(ticketResolved);
     const resolvedToday = resolved.filter(
@@ -349,6 +360,10 @@ async function getAdminAnalytics(req, res) {
       const point = trendByDay.get(manilaDayKey(sale.created_at || sale.transaction_date));
       if (point) point.sales += Number(sale.amount || 0);
     }
+    for (const payment of servicePayments) {
+      const point = trendByDay.get(manilaDayKey(payment.transaction_date));
+      if (point) point.sales += Number(payment.amount || 0);
+    }
     for (const ticket of tickets) {
       const point = trendByDay.get(manilaDayKey(ticket.created_at));
       if (point) point.support += 1;
@@ -371,7 +386,7 @@ async function getAdminAnalytics(req, res) {
     });
 
     const salesByLocation = {};
-    sales.forEach((sale) => {
+    [...sales, ...servicePayments].forEach((sale) => {
       const key = normLoc(sale.location);
       if (!salesByLocation[key]) {
         salesByLocation[key] = { location: key, revenue: 0, count: 0 };
@@ -385,6 +400,12 @@ async function getAdminAnalytics(req, res) {
       const key = salesChannel(sale);
       if (!salesByChannel[key]) salesByChannel[key] = { channel: key, revenue: 0, count: 0 };
       salesByChannel[key].revenue += Number(sale.amount || 0);
+      salesByChannel[key].count += 1;
+    });
+    servicePayments.forEach((payment) => {
+      const key = `Service — ${payment.payment_method}`;
+      if (!salesByChannel[key]) salesByChannel[key] = { channel: key, revenue: 0, count: 0 };
+      salesByChannel[key].revenue += Number(payment.amount || 0);
       salesByChannel[key].count += 1;
     });
     const posTransactions = sales.filter((sale) => salesChannel(sale) === 'POS').length;
@@ -435,16 +456,18 @@ async function getAdminAnalytics(req, res) {
       filters: { days, location: locationFilter || null },
       kpis: {
         salesToday: Number(
-          salesToday.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)
+          [...salesToday, ...servicesToday].reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)
         ),
         supportToday: ticketsToday.length,
         resolvedToday: resolvedToday.length,
         technicianRequests: tech.filter((request) => request.status !== 'Cancelled').length,
         technicianEscalations: techEscalations,
-        totalRevenue: Number(
-          sales.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)
-        ),
-        totalTransactions: sales.length,
+        totalRevenue: Number((prepaidRevenue + serviceRevenue).toFixed(2)),
+        prepaidRevenue,
+        serviceRevenue,
+        prepaidTransactions: sales.length,
+        serviceTransactions: servicePayments.length,
+        totalTransactions: sales.length + servicePayments.length,
         grossProfit: sales.length * 40,
         posTransactions,
         onlineTransactions,
