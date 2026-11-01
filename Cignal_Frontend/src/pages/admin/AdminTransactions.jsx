@@ -36,6 +36,12 @@ export default function AdminTransactions() {
   const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [serviceTransactions, setServiceTransactions] = useState([]);
+  const [serviceSummary, setServiceSummary] = useState({ transactions: 0, revenue: 0 });
+  const [servicePagination, setServicePagination] = useState({ total: 0, totalPages: 0 });
+  const [servicePage, setServicePage] = useState(1);
+  const [serviceError, setServiceError] = useState('');
+  const [serviceLoading, setServiceLoading] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -79,6 +85,36 @@ export default function AdminTransactions() {
     return () => { active = false; };
   }, [filters, page, invalidRange, refreshKey]);
 
+  useEffect(() => {
+    let active = true;
+    if (invalidRange) {
+      setServiceTransactions([]); setServiceSummary({ transactions: 0, revenue: 0 });
+      setServiceLoading(false);
+      return () => { active = false; };
+    }
+    setServiceLoading(true); setServiceError('');
+    // Service payments are collected manually; PayMongo only applies to prepaid loads.
+    if (payment === 'PayMongo') {
+      setServiceTransactions([]); setServiceSummary({ transactions: 0, revenue: 0 });
+      setServiceLoading(false);
+      return () => { active = false; };
+    }
+    axiosClient.get('/service-payments', { params: {
+      from, to, paymentMethod: payment, accountNumber: debouncedSearch,
+      page: servicePage, pageSize: PAGE_SIZE,
+    } }).then(({ data }) => {
+      if (!active) return;
+      setServiceTransactions(data?.transactions || []);
+      setServiceSummary(data?.summary || { transactions: 0, revenue: 0 });
+      setServicePagination(data?.pagination || { total: 0, totalPages: 0 });
+    }).catch(e => {
+      if (!active) return;
+      setServiceTransactions([]); setServiceSummary({ transactions: 0, revenue: 0 });
+      setServiceError(e?.response?.status === 503 ? 'Apply FT-02 migration before loading service sales.' : 'Could not load service payments.');
+    }).finally(() => { if (active) setServiceLoading(false); });
+    return () => { active = false; };
+  }, [from, to, payment, debouncedSearch, servicePage, invalidRange, refreshKey]);
+
   const navigateToSubscriber = async accountNumber => {
     if (!accountNumber) return;
     try {
@@ -101,10 +137,26 @@ export default function AdminTransactions() {
       const matched = (response.data?.transactions || []).filter(tx =>
         isCompletedSale(tx) && isInManilaRange(transactionDate(tx), from, to)
       );
-      const headers = ['Reference Number', 'Subscriber Name', 'Account Number', 'Prepaid Plan', 'Sale Amount (PHP)', 'Gross Profit (PHP)', 'Payment Method', 'Processed By', 'Sale Date (Asia/Manila)', 'Expiry Date (Asia/Manila)', 'Status'];
-      const rows = matched.map(tx => [tx.reference_no || '', tx.account_name || '', tx.account_number || '', tx.plan_name || '',
+      const headers = ['Transaction Type', 'Reference Number', 'Subscriber Name', 'Account Number', 'Plan / Service', 'Sale Amount (PHP)', 'Prepaid Gross Profit (PHP)', 'Payment Method', 'Processed By', 'Sale Date (Asia/Manila)', 'Expiry Date (Asia/Manila)', 'Status', 'Service Notes', 'Technician Request ID'];
+      const rows = matched.map(tx => ['Prepaid Load', tx.reference_no || '', tx.account_name || '', tx.account_number || '', tx.plan_name || '',
         Number(tx.amount || 0).toFixed(2), '40.00', tx.payment_method || '', tx.processed_by || '',
-        formatDate(transactionDate(tx)), formatDate(tx.expiry_date), 'Completed']);
+        formatDate(transactionDate(tx)), formatDate(tx.expiry_date), 'Completed', '', '']);
+      if (payment !== 'PayMongo') {
+        const serviceRows = [];
+        let servicePageCursor = 1;
+        let totalPages = 1;
+        do {
+          const result = await axiosClient.get('/service-payments', { params: {
+            from, to, paymentMethod: payment, accountNumber: search.trim(), page: servicePageCursor, pageSize: 100,
+          } });
+          serviceRows.push(...(result.data?.transactions || []));
+          totalPages = Number(result.data?.pagination?.totalPages || 0);
+          servicePageCursor += 1;
+        } while (servicePageCursor <= totalPages);
+        serviceRows.forEach(tx => rows.push(['Service Payment', tx.reference_no || '', tx.account_name || '', tx.account_number || '', tx.service_type || '',
+          Number(tx.amount || 0).toFixed(2), '', tx.payment_method || '', tx.processed_by || '',
+          String(tx.transaction_date || '').slice(0,10), '', 'Collected', tx.description || '', tx.technician_request_id || '']));
+      }
       const csv = rowsToSafeCsv([headers, ...rows]);
       const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');
@@ -124,29 +176,31 @@ export default function AdminTransactions() {
 
   return <div className="space-y-4">
     <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-      <div><h1 className="text-lg font-bold text-gray-800">Completed Sales</h1><p className="mt-0.5 text-xs text-gray-500">POS (Cash/GCash) and online PayMongo completed prepaid loads. Pending and failed requests stay in Load Requests.</p></div>
+      <div><h1 className="text-lg font-bold text-gray-800">Completed Sales</h1><p className="mt-0.5 text-xs text-gray-500">Completed prepaid-load sales and manually collected technician-service payments. Service revenue is not service profit.</p></div>
       <button type="button" disabled={loading || exporting || Boolean(error) || invalidRange} onClick={handleExport} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"><Download size={15}/> {exporting ? 'Exporting…' : 'Export All Matching CSV'}</button>
     </div>
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><span>{error}</span><button type="button" className="font-semibold underline" onClick={() => setRefreshKey(v => v + 1)}>Retry</button></div>}
     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <SalesDateFilter period={period} setPeriod={v => { setPeriod(v); setPage(1); }} from={fromDate} setFrom={v => { setFromDate(v); setPage(1); }} to={toDate} setTo={v => { setToDate(v); setPage(1); }} />
+        <SalesDateFilter period={period} setPeriod={v => { setPeriod(v); setPage(1); setServicePage(1); }} from={fromDate} setFrom={v => { setFromDate(v); setPage(1); setServicePage(1); }} to={toDate} setTo={v => { setToDate(v); setPage(1); setServicePage(1); }} />
         <div className="flex flex-col gap-2 sm:flex-row">
           <label className="flex flex-col gap-1 text-xs text-gray-600">Payment Method
-            <select value={payment} onChange={e => { setPayment(e.target.value); setPage(1); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><option value="All">All Payments</option>{PAYMENT_METHODS.map(method => <option key={method}>{method}</option>)}</select>
+            <select value={payment} onChange={e => { setPayment(e.target.value); setPage(1); setServicePage(1); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><option value="All">All Payments</option>{PAYMENT_METHODS.map(method => <option key={method}>{method}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-gray-600">Account Number
-            <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"><Search size={14} className="text-gray-400"/><input type="search" value={search} maxLength={100} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search Account Number" className="w-full min-w-0 bg-transparent text-xs outline-none sm:w-48" /></div>
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"><Search size={14} className="text-gray-400"/><input type="search" value={search} maxLength={100} onChange={e => { setSearch(e.target.value); setPage(1); setServicePage(1); }} placeholder="Search Account Number" className="w-full min-w-0 bg-transparent text-xs outline-none sm:w-48" /></div>
           </label>
         </div>
       </div>
     </div>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
       {[
-        { label: 'Total Sales', value: peso(summary.sales), color: 'text-gray-900' },
+        { label: 'Total Collected Sales', value: peso(Number(summary.sales || 0) + Number(serviceSummary.revenue || 0)), color: 'text-gray-900' },
+        { label: 'Prepaid Load Revenue', value: peso(summary.sales), color: 'text-red-700' },
+        { label: 'Service Payment Revenue', value: peso(serviceSummary.revenue), color: 'text-purple-700' },
         { label: 'Gross Profit (₱40 / load)', value: peso(summary.grossProfit), color: 'text-green-700' },
-        { label: 'Completed Transactions', value: summary.transactions, color: 'text-blue-700' },
-      ].map(item => <div key={item.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="mb-2 text-xs text-gray-500">{item.label}</p><p className={`text-2xl font-bold ${item.color}`}>{loading ? '...' : item.value}</p></div>)}
+        { label: 'Completed Transactions', value: Number(summary.transactions || 0) + Number(serviceSummary.transactions || 0), color: 'text-blue-700' },
+      ].map(item => <div key={item.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"><p className="mb-2 text-xs text-gray-500">{item.label}</p><p className={`text-2xl font-bold ${item.color}`}>{(loading || serviceLoading) ? '...' : item.value}</p></div>)}
     </div>
     <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3"><div><h2 className="text-sm font-bold text-gray-800">Completed Load Transactions</h2><p className="mt-1 text-xs text-gray-400">{pagination.total} sales matching the selected filters · Asia/Manila dates</p></div><p className="text-xs text-gray-500">Page {pagination.totalPages ? page : 0} of {pagination.totalPages}</p></div>
@@ -171,6 +225,22 @@ export default function AdminTransactions() {
         <p className="text-xs text-gray-500">Up to {PAGE_SIZE} transactions per page</p>
         <div className="flex gap-2"><button type="button" disabled={loading || page <= 1} onClick={() => setPage(v => Math.max(1, v - 1))} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Previous</button><button type="button" disabled={loading || page >= pagination.totalPages} onClick={() => setPage(v => v + 1)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Next</button></div>
       </div>
+    </section>
+    <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
+        <div><h2 className="text-sm font-bold text-gray-800">Completed Service Payment Transactions (FT-02)</h2>
+        <p className="mt-1 text-xs text-gray-500">{servicePagination.total || 0} collected payments in this filter. Service revenue is reported separately; no ₱40 load profit applies.</p></div>
+        <div className="flex gap-2"><button type="button" disabled={serviceLoading || servicePage <= 1} onClick={() => setServicePage(v => Math.max(1, v-1))} className="rounded-lg border border-gray-200 px-3 py-2 text-xs disabled:opacity-40">Previous</button>
+        <button type="button" disabled={serviceLoading || servicePage >= (servicePagination.totalPages || 0)} onClick={() => setServicePage(v => v+1)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs disabled:opacity-40">Next</button></div>
+      </div>
+      {serviceError && <div role="alert" className="mx-4 my-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{serviceError}</div>}
+      <div className="overflow-x-auto"><table className="w-full min-w-[940px] text-left text-xs"><thead className="bg-gray-50"><tr>{['Reference','Subscriber','Account','Service','Amount Collected','Method','GCash Ref','Technician Request','Transaction Date','Processed By'].map(h => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
+      <tbody>{serviceLoading ? <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">Loading service history…</td></tr> : serviceTransactions.length ? serviceTransactions.map(tx => <tr key={tx.id} className="border-t border-gray-100 hover:bg-gray-50">
+        <td className="px-3 py-2 font-mono">{tx.reference_no}</td>
+        <td className="px-3 py-2"><button className="font-semibold hover:underline" onClick={() => navigateToSubscriber(tx.account_number)}>{tx.account_name}</button></td>
+        <td className="px-3 py-2">{tx.account_number}</td><td className="px-3 py-2">{tx.service_type}{tx.description ? <p className="mt-0.5 max-w-xs break-words text-gray-500">{tx.description}</p> : null}</td>
+        <td className="px-3 py-2 font-bold">{peso(tx.amount)}</td><td className="px-3 py-2">{tx.payment_method}</td><td className="px-3 py-2">{tx.external_reference || '—'}</td><td className="px-3 py-2">{tx.technician_request_id || '—'}</td><td className="px-3 py-2">{String(tx.transaction_date || '').slice(0,10)}</td><td className="px-3 py-2">{tx.processed_by}</td>
+      </tr>) : <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">No service payments match these filters.</td></tr>}</tbody></table></div>
     </section>
   </div>;
 }

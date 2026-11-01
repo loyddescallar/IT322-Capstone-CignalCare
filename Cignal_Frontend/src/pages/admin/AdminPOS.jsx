@@ -3,6 +3,7 @@ import { Check, CheckCircle2, Copy, X } from 'lucide-react';
 import customerApi from '../../api/customerApi';
 import axiosClient from '../../api/axiosClient';
 import SalesDateFilter from '../../components/admin/SalesDateFilter';
+import ServicePaymentTerminal from '../../components/admin/ServicePaymentTerminal';
 import { dateBounds, manilaDayKey, isInManilaRange, isCompletedSale, isPosSale, salesSummary, subscriberLifecycle, transactionDate } from '../../utils/adminBusinessRules';
 
 const PAYMENT_METHODS = ['Cash', 'GCash'];
@@ -15,6 +16,8 @@ export default function AdminPOS() {
   const [customers, setCustomers] = useState([]);
   const [plans, setPlans] = useState([]);
   const [history, setHistory] = useState([]);
+  const [serviceSummary, setServiceSummary] = useState({ transactions: 0, revenue: 0 });
+  const [serviceRefreshKey, setServiceRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('Today');
   const [fromDate, setFromDate] = useState('');
@@ -75,6 +78,17 @@ export default function AdminPOS() {
     [history, from, to, period]
   );
   const summary = useMemo(() => salesSummary(displayedHistory), [displayedHistory]);
+  useEffect(() => {
+    let active = true;
+    if (period === 'Custom Range' && (!from || !to || from > to)) {
+      setServiceSummary({ transactions: 0, revenue: 0 });
+      return () => { active = false; };
+    }
+    axiosClient.get('/service-payments', { params: { from, to, page: 1, pageSize: 1 } })
+      .then(({ data }) => { if (active) setServiceSummary(data?.summary || { transactions: 0, revenue: 0 }); })
+      .catch(() => { if (active) setServiceSummary({ transactions: 0, revenue: 0 }); });
+    return () => { active = false; };
+  }, [from, to, period, serviceRefreshKey]);
   const eWalletAccount = E_WALLET_ACCOUNTS[payMethod] || null;
   const isNonCash = payMethod !== 'Cash';
   const change = cashTendered && plan
@@ -207,11 +221,12 @@ export default function AdminPOS() {
       </div>
 
       <SalesDateFilter period={period} setPeriod={setPeriod} from={fromDate} setFrom={setFromDate} to={toDate} setTo={setToDate} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[
-          { label: 'Total Sales', value: loading ? '...' : `₱${summary.sales.toLocaleString()}`, color: 'text-gray-800' },
+          { label: 'Total Collected Sales', value: loading ? '...' : `₱${(summary.sales + Number(serviceSummary.revenue || 0)).toLocaleString()}`, color: 'text-gray-800' },
+          { label: 'Service Revenue', value: loading ? '...' : `₱${Number(serviceSummary.revenue || 0).toLocaleString()}`, color: 'text-purple-700' },
           { label: 'Gross Profit', value: loading ? '...' : `₱${summary.grossProfit.toLocaleString()}`, color: 'text-green-600' },
-          { label: 'Transactions', value: loading ? '...' : summary.transactions, color: 'text-blue-600' },
+          { label: 'Transactions', value: loading ? '...' : summary.transactions + Number(serviceSummary.transactions || 0), color: 'text-blue-600' },
           { label: 'Available Plans', value: loading ? '...' : plans.length, color: 'text-[#cc0000]' },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -430,6 +445,7 @@ export default function AdminPOS() {
           </div>
         </div>
       </div>
+      <ServicePaymentTerminal customers={customers} onPaymentRecorded={() => setServiceRefreshKey(key => key + 1)} />
       <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-4 py-3">
           <h2 className="text-sm font-semibold text-gray-700">POS Sales History — {period}</h2>

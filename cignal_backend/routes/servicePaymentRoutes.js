@@ -1,0 +1,10 @@
+'use strict';
+const express = require('express');
+const { authRequired, requireRole } = require('../middleware/auth');
+const { createServicePayment, getServicePayments, getServiceSubscriberRequests } = require('../controllers/servicePaymentController');
+const router = express.Router();
+router.use(authRequired, requireRole('admin'));
+router.get('/', getServicePayments);
+router.get('/technician-requests', getServiceSubscriberRequests);
+router.post('/', createServicePayment);
+module.exports = router;
