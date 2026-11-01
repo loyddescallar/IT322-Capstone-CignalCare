@@ -28,18 +28,24 @@ async function notifyNewCandidates(candidates) {
 
 async function listAdminIncidents(req, res) {
   try {
-    const created = await syncIncidentCandidates();
-    await notifyNewCandidates(created);
+    // GET must be read-only; detection is a separate authenticated POST.
     const incidents = await listIncidents({ status: req.query.status || null });
-
-    return res.json({
-      incidents,
-      newlyDetected: created.length,
-      detectionPolicy: getIncidentDetectionPolicy(),
-    });
+    return res.json({ incidents, newlyDetected: 0, detectionPolicy: getIncidentDetectionPolicy() });
   } catch (error) {
     console.error('LIST INCIDENTS ERROR:', error);
     return res.status(500).json({ error: 'Unable to load support incidents.' });
+  }
+}
+
+async function detectAdminIncidentCandidates(req, res) {
+  try {
+    const created = await syncIncidentCandidates();
+    await notifyNewCandidates(created);
+    const incidents = await listIncidents({ status: req.query.status || null });
+    return res.json({ incidents, newlyDetected: created.length, detectionPolicy: getIncidentDetectionPolicy() });
+  } catch (error) {
+    console.error('DETECT INCIDENTS ERROR:', error);
+    return res.status(500).json({ error: 'Unable to detect incident candidates.' });
   }
 }
 
@@ -122,6 +128,7 @@ async function resolveAdminIncident(req, res) {
 
 module.exports = {
   listAdminIncidents,
+  detectAdminIncidentCandidates,
   getMyIncidents,
   confirmAdminIncident,
   dismissAdminIncident,

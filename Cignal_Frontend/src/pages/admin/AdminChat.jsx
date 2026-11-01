@@ -12,6 +12,8 @@ import {
   X,
 } from 'lucide-react';
 import ticketApi from '../../api/ticketApi';
+import useAdaptiveMessagePolling from '../../hooks/useAdaptiveMessagePolling';
+import { sameChatMessages } from '../../utils/sameChatMessages.mjs';
 import ChatAttachment from '../../components/ChatAttachment';
 import {
   formatChatTimestamp,
@@ -104,22 +106,24 @@ export default function AdminChat() {
     }
   };
 
-  const loadMessages = async () => {
+  const loadMessages = async (signal) => {
     try {
-      const response = await ticketApi.getTicketMessages(ticketId);
-      setMessages(response.data?.messages || []);
+      const response = await ticketApi.getTicketMessages(ticketId, { signal });
+      if (signal?.aborted) return;
+      const incoming = response.data?.messages || [];
+      setMessages((current) => sameChatMessages(current, incoming) ? current : incoming);
     } catch (loadError) {
-      console.error('LOAD ADMIN CHAT MESSAGES ERROR:', loadError);
+      if (loadError?.code !== 'ERR_CANCELED') {
+        console.error('LOAD ADMIN CHAT MESSAGES ERROR:', loadError);
+      }
     }
   };
 
   useEffect(() => {
     loadTicket();
-    loadMessages();
-
-    const interval = window.setInterval(loadMessages, 3000);
-    return () => window.clearInterval(interval);
   }, [ticketId]);
+
+  useAdaptiveMessagePolling(loadMessages, ticketId);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -379,14 +383,14 @@ export default function AdminChat() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Attach a file"
+                aria-label="Attach a photo"
               >
                 <Paperclip size={18} />
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(event) =>
                   handleFileSelection(event.target.files?.[0] || null)

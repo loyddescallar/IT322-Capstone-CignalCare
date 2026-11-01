@@ -387,7 +387,7 @@ CREATE TABLE `users` (
   `ccaNumber` varchar(50) NOT NULL,
   `address` varchar(255) NOT NULL,
   `phone` varchar(30) NOT NULL,
-  `location` enum('Balayan','Calaca','Lian','Calatagan','Nasugbu','Lemery') NOT NULL DEFAULT 'Balayan',
+  `location` enum('Balayan','Calaca','Lian','Calatagan','Nasugbu','Lemery','Tuy') NOT NULL DEFAULT 'Balayan',
   `email` varchar(150) DEFAULT NULL,
   `password_hash` varchar(255) DEFAULT NULL,
   `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
@@ -396,6 +396,10 @@ CREATE TABLE `users` (
   `recovery_code_issued_at` timestamp NULL DEFAULT NULL,
   `auth_session_version` int(11) NOT NULL DEFAULT 1,
   `email_verified_at` timestamp NULL DEFAULT NULL,
+  `recovery_phone` varchar(30) DEFAULT NULL,
+  `recovery_phone_verified_at` timestamp NULL DEFAULT NULL,
+  `terms_version` varchar(40) DEFAULT NULL,
+  `terms_accepted_at` timestamp NULL DEFAULT NULL,
   `email_verification_code_hash` varchar(64) DEFAULT NULL,
   `email_verification_expires_at` timestamp NULL DEFAULT NULL,
   `email_verification_attempts` int(11) NOT NULL DEFAULT 0,
@@ -813,6 +817,22 @@ ALTER TABLE `troubleshoot_issues`
 --
 ALTER TABLE `troubleshoot_steps`
   ADD CONSTRAINT `fk_ts_issue` FOREIGN KEY (`issue_id`) REFERENCES `troubleshoot_issues` (`id`) ON DELETE CASCADE;
+
+-- Account recovery table required by the current secure login/recovery workflow.
+CREATE TABLE `account_recovery_challenges` (
+  `user_id` int(11) NOT NULL,
+  `purpose` varchar(50) NOT NULL,
+  `channel` varchar(20) NOT NULL,
+  `code_hash` varchar(64) NOT NULL,
+  `target_value` varchar(255) DEFAULT NULL,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `attempts` int(11) NOT NULL DEFAULT 0,
+  `last_sent_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`,`purpose`,`channel`),
+  CONSTRAINT `fk_recovery_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

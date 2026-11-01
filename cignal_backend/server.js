@@ -110,10 +110,8 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'CignalCare+ API' });
 });
 
-app.use(
-  '/uploads/messages',
-  express.static(path.join(__dirname, 'uploads', 'messages'))
-);
+// Chat attachments are private. Never expose the uploads folder via express.static.
+// Authenticated GET /api/tickets/:id/attachments/:filename serves local files.
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);

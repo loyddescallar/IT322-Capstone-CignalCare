@@ -3,10 +3,12 @@ export const MAX_CHAT_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 export const CHAT_ATTACHMENT_TYPES = new Set([
   'image/jpeg',
   'image/png',
-  'image/gif',
   'image/webp',
-  'application/pdf',
 ]);
+const PHOTO_EXTENSIONS = Object.freeze({
+  jpg: 'image/jpeg', jpeg: 'image/jpeg',
+  png: 'image/png', webp: 'image/webp',
+});
 
 export function getStoredChatUser(preferAdmin = false) {
   const keys = preferAdmin ? ['adminUser', 'user'] : ['user', 'adminUser'];
@@ -82,12 +84,14 @@ export function formatChatTimestamp(value) {
 export function validateChatAttachment(file) {
   if (!file) return '';
 
-  if (!CHAT_ATTACHMENT_TYPES.has(file.type)) {
-    return 'Only JPG, PNG, GIF, WEBP, and PDF attachments are allowed.';
+  const extension = String(file.name || '').split('.').pop().toLowerCase();
+  if (!CHAT_ATTACHMENT_TYPES.has(file.type) || PHOTO_EXTENSIONS[extension] !== file.type) {
+    return 'Only JPG, PNG, or WEBP photos can be sent in chat.';
   }
 
-  if (file.size > MAX_CHAT_ATTACHMENT_BYTES) {
-    return 'Attachment must be 5MB or smaller.';
+  if (!Number.isFinite(file.size) || file.size <= 0 ||
+      file.size > MAX_CHAT_ATTACHMENT_BYTES) {
+    return 'Photo must be larger than 0 bytes and 5 MB or smaller.';
   }
 
   return '';

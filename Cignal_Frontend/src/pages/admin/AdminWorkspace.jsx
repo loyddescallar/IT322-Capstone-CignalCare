@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, lazy } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -26,18 +26,18 @@ import {
 import { getAllLoadRequests } from '../../api/loadRequestApi';
 import notificationApi from '../../api/notificationApi';
 
-import AdminDashboard from './AdminDashboard';
-import AdminCustomers from './AdminCustomers';
-import AdminCustomerProfile from './AdminCustomerProfile';
-import AdminTickets from './AdminTickets';
-import AdminTechnicianRequests from './AdminTechnicianRequests';
-import AdminPOS from './AdminPOS';
-import AdminPlans from './AdminPlans';
-import AdminTransactions from './AdminTransactions';
-import AdminLoadRequests from './AdminLoadRequests';
-import AdminAnalytics from './AdminAnalytics';
-import AdminIncidents from './AdminIncidents';
-import AdminSecurity from './AdminSecurity';
+const AdminDashboard = lazy(() => import('./AdminDashboard'));
+const AdminCustomers = lazy(() => import('./AdminCustomers'));
+const AdminCustomerProfile = lazy(() => import('./AdminCustomerProfile'));
+const AdminTickets = lazy(() => import('./AdminTickets'));
+const AdminTechnicianRequests = lazy(() => import('./AdminTechnicianRequests'));
+const AdminPOS = lazy(() => import('./AdminPOS'));
+const AdminPlans = lazy(() => import('./AdminPlans'));
+const AdminTransactions = lazy(() => import('./AdminTransactions'));
+const AdminLoadRequests = lazy(() => import('./AdminLoadRequests'));
+const AdminAnalytics = lazy(() => import('./AdminAnalytics'));
+const AdminIncidents = lazy(() => import('./AdminIncidents'));
+const AdminSecurity = lazy(() => import('./AdminSecurity'));
 
 const navGroups = [
   {
@@ -307,14 +307,19 @@ export default function AdminWorkspace() {
   }, [navigate]);
 
   useEffect(() => {
-    getAllLoadRequests()
+    // Fetch one record at most; server supplies the filtered TOTAL across all pages.
+    // Never use the length of the current page as a notification count.
+    let active = true;
+    getAllLoadRequests({
+      params: { view: 'filtered', page: 1, pageSize: 1, status: 'Received' },
+    })
       .then((response) => {
-        const requests = response.data?.requests || response.data || [];
-        setNewLoadCount(
-          requests.filter((request) => request.status === 'Received').length
-        );
+        if (!active) return;
+        const total = response.data?.pagination?.total;
+        if (Number.isSafeInteger(total) && total >= 0) setNewLoadCount(total);
       })
       .catch(() => {});
+    return () => { active = false; };
   }, [location.pathname]);
 
   useEffect(() => {

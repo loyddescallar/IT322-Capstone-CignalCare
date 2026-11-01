@@ -1,8 +1,10 @@
 const {
   TICKET_STATUSES,
+  ensureTicketWorkflowSchema,
   createTicket,
   getTicketsByUser,
   getAllTickets,
+  getTicketsPage,
   getTicketById,
   updateTicketStatus,
   archiveTicket,
@@ -11,6 +13,9 @@ const { createNotification, createAdminNotification } = require('../models/notif
 const { notifySafely } = require('../utils/safeNotification');
 const { isAdmin, isSelf } = require('../utils/ownership');
 const { linkTicketIfActive } = require('../models/incidentModel');
+const pool = require('../config/db');
+const { getFilteredTicketPage } = require('../utils/adminFilteredLists');
+const { parseAdminPagination, paginationMeta } = require('../utils/adminPagination');
 
 function canAccessTicket(req, ticket) {
   return ticket && (isAdmin(req) || isSelf(req, ticket.user_id));
@@ -30,7 +35,14 @@ async function createTicketController(req, res) {
       subject: subject.trim(),
     });
 
-    const linkedIncident = await linkTicketIfActive(id, req.user.location, `${category} ${subject}`);
+    // The ticket is already saved. Incident linking is supplementary and must
+    // never turn a successful INSERT into a misleading HTTP 500 (retry/duplicate).
+    let linkedIncident = null;
+    try {
+      linkedIncident = await linkTicketIfActive(id, req.user.location, `${category} ${subject}`);
+    } catch (incidentError) {
+      console.warn('TICKET INCIDENT LINK WARNING:', incidentError?.message || incidentError);
+    }
 
     await notifySafely('CREATE TICKET', async () => {
       await createNotification({
@@ -49,7 +61,10 @@ async function createTicketController(req, res) {
     return res.status(201).json({ message: 'Ticket created', id, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TICKET ERROR', err);
-    return res.status(500).json({ error: 'Server error' });
+    if (err?.code === 'SCHEMA_NOT_READY') {
+      return res.status(503).json({ error: 'Local database schema is incomplete. Ask the developer to run the read-only C2 schema check.' });
+    }
+    return res.status(500).json({ error: 'Unable to create a ticket. Check the backend terminal for details.' });
   }
 }
 
@@ -65,11 +80,23 @@ async function getMyTicketsController(req, res) {
 
 async function getAllTicketsController(req, res) {
   try {
+    const paging = parseAdminPagination(req.query);
+    if (paging.error) return res.status(400).json({ error: paging.error });
+    if (paging.enabled) {
+      if (req.query.view === 'filtered') {
+        await ensureTicketWorkflowSchema();
+        const { tickets, total, summary } = await getFilteredTicketPage(pool, paging, req.query);
+        return res.json({ tickets, pagination: paginationMeta(paging.page, paging.pageSize, total), summary });
+      }
+      const {tickets, total} = await getTicketsPage(paging);
+      return res.json({ tickets, pagination: paginationMeta(paging.page, paging.pageSize, total) });
+    }
+    // Preserve the unchanged response for existing admin UI and integrations.
     const tickets = await getAllTickets();
     return res.json({ tickets });
   } catch (err) {
     console.error('GET ALL TICKETS ERROR', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(err.statusCode === 400 ? 400 : 500).json({ error: err.statusCode === 400 ? err.message : 'Server error' });
   }
 }
 

@@ -186,7 +186,9 @@ function extractPayMongoWebhookData(json) {
     null;
 
   const payment = Array.isArray(resourceAttributes?.payments)
-    ? resourceAttributes.payments[0]
+    ? (resourceAttributes.payments.find((candidate) =>
+        String(candidate?.attributes?.status || '').toLowerCase() === 'paid'
+      ) || resourceAttributes.payments[0])
     : resourceAttributes?.payment ||
       (resource?.type === 'payment' ? resource : null);
 

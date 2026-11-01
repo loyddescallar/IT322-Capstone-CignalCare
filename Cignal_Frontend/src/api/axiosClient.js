@@ -28,6 +28,8 @@ export const getAttachmentUrl = (fileName) => {
  */
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
+  // Prevent indefinite waiting on a stalled network. Uploads override this.
+  timeout: 30000,
 });
 
 axiosClient.interceptors.request.use(

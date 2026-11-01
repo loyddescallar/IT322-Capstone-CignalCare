@@ -4,6 +4,8 @@ import { ArrowLeft, Paperclip, Send, X } from 'lucide-react';
 import UserLayout from '../../components/UserLayout';
 import ChatAttachment from '../../components/ChatAttachment';
 import ticketApi from '../../api/ticketApi';
+import useAdaptiveMessagePolling from '../../hooks/useAdaptiveMessagePolling';
+import { sameChatMessages } from '../../utils/sameChatMessages.mjs';
 import {
   formatChatTimestamp,
   getStoredChatUser,
@@ -40,12 +42,16 @@ export default function UserChat() {
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const loadMessages = async () => {
+  const loadMessages = async (signal) => {
     try {
-      const response = await ticketApi.getTicketMessages(ticketId);
-      setMessages(response.data?.messages || []);
+      const response = await ticketApi.getTicketMessages(ticketId, { signal });
+      if (signal?.aborted) return;
+      const incoming = response.data?.messages || [];
+      setMessages((current) => sameChatMessages(current, incoming) ? current : incoming);
     } catch (loadError) {
-      console.error('LOAD USER CHAT MESSAGES ERROR:', loadError);
+      if (loadError?.code !== 'ERR_CANCELED') {
+        console.error('LOAD USER CHAT MESSAGES ERROR:', loadError);
+      }
     }
   };
 
@@ -68,14 +74,13 @@ export default function UserChat() {
         if (active) setError('Unable to load this conversation.');
       });
 
-    loadMessages();
-    const interval = window.setInterval(loadMessages, 3000);
-
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
   }, [ticketId]);
+
+  // Poll only while the tab is visible; no overlapping or stale fetches.
+  useAdaptiveMessagePolling(loadMessages, ticketId);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -257,14 +262,14 @@ export default function UserChat() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Attach a file"
+                aria-label="Attach a photo"
               >
                 <Paperclip size={18} />
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(event) =>
                   handleFileSelection(event.target.files?.[0] || null)

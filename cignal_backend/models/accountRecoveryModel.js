@@ -5,6 +5,10 @@ const { getJwtSecret } = require('../utils/authConfig');
 let schemaReady = false;
 
 async function ensureAccountRecoverySchema() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'account_recovery');
+  }
   if (schemaReady) return;
 
   await pool.query(`

@@ -1,30 +1,31 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 
 // Admin
-import AdminWorkspace from './pages/admin/AdminWorkspace';
-import AdminChat from './pages/admin/AdminChat';
+const AdminWorkspace = lazy(() => import('./pages/admin/AdminWorkspace'));
+const AdminChat = lazy(() => import('./pages/admin/AdminChat'));
 
 // Auth
-import Login from './pages/auth/Login';
-import ChangePassword from './pages/auth/ChangePassword';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import AdminLogin from './pages/auth/AdminLogin';
+const Login = lazy(() => import('./pages/auth/Login'));
+const ChangePassword = lazy(() => import('./pages/auth/ChangePassword'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const AdminLogin = lazy(() => import('./pages/auth/AdminLogin'));
 
 // User
-import UserDashboard from './pages/user/UserDashboard';
-import UserTickets from './pages/user/UserTickets';
-import UserChat from './pages/user/UserChat';
-import TicketDetails from './pages/user/TicketDetails';
-import UserTechnicianRequest from './pages/user/UserTechnicianRequest';
-import UserReportProblem from './pages/user/UserReportProblem';
-import UserRetrieveInfo from './pages/user/UserRetrieveInfo';
-import UserLoadRequest from './pages/user/UserLoadRequest';
-import UserLoadHistory from './pages/user/UserLoadHistory';
-import Troubleshoot from './pages/user/Troubleshoot';
-import TroubleshootModel from './pages/user/TroubleshootModel';
-import TroubleshootIssue from './pages/user/TroubleshootIssue';
-import AccountSecurity from './pages/user/AccountSecurity';
-import TermsAcceptance from './pages/user/TermsAcceptance';
+const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
+const UserTickets = lazy(() => import('./pages/user/UserTickets'));
+const UserChat = lazy(() => import('./pages/user/UserChat'));
+const TicketDetails = lazy(() => import('./pages/user/TicketDetails'));
+const UserTechnicianRequest = lazy(() => import('./pages/user/UserTechnicianRequest'));
+const UserReportProblem = lazy(() => import('./pages/user/UserReportProblem'));
+const UserRetrieveInfo = lazy(() => import('./pages/user/UserRetrieveInfo'));
+const UserLoadRequest = lazy(() => import('./pages/user/UserLoadRequest'));
+const UserLoadHistory = lazy(() => import('./pages/user/UserLoadHistory'));
+const Troubleshoot = lazy(() => import('./pages/user/Troubleshoot'));
+const TroubleshootModel = lazy(() => import('./pages/user/TroubleshootModel'));
+const TroubleshootIssue = lazy(() => import('./pages/user/TroubleshootIssue'));
+const AccountSecurity = lazy(() => import('./pages/user/AccountSecurity'));
+const TermsAcceptance = lazy(() => import('./pages/user/TermsAcceptance'));
 
 function readStoredUser() {
   try {
@@ -83,7 +84,8 @@ const userRoute = (element) => <RoleRoute role="user">{element}</RoleRoute>;
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center p-6 text-sm text-gray-500">Loading page…</div>}>
+      <Routes>
       {/* Auth */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
@@ -133,6 +135,7 @@ export default function App() {
       {/* Default */}
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

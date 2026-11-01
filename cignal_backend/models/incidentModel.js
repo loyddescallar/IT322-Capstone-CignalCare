@@ -71,6 +71,10 @@ function issueDescriptor(ticket) {
 }
 
 async function ensureIncidentSchema() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'incidents');
+  }
   if (schemaReady) return;
 
   await pool.query(`CREATE TABLE IF NOT EXISTS support_incidents (
@@ -386,6 +390,22 @@ async function getIncidentStats() {
   return rows;
 }
 
+// Read-only analytics path: no incident auto-detection or schema changes
+// while an administrator merely views metrics.
+async function getIncidentStatsReadOnly(cutoff = null) {
+  const where = cutoff ? ' WHERE created_at >= ?' : '';
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM support_incidents${where} ORDER BY created_at DESC`,
+      cutoff ? [cutoff] : []
+    );
+    return rows;
+  } catch (error) {
+    if (error?.code === '42P01' || error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
+}
+
 module.exports = {
   ensureIncidentSchema,
   getIncidentDetectionPolicy,
@@ -402,4 +422,5 @@ module.exports = {
   linkTicketIfActive,
   linkTechnicianIfActive,
   getIncidentStats,
+  getIncidentStatsReadOnly,
 };

@@ -1,10 +1,12 @@
 const {
+  ensureLoadRequestColumns,
   createLoadRequest,
   getActivePlanForRequest,
   getLoadRequestById,
   getLoadRequestByPayMongoIdentifiers,
   getLoadRequestsByUser,
   getAllLoadRequests,
+  getLoadRequestsPage,
   updateLoadRequestStatus,
   attachPayMongoCheckout,
   markPayMongoCheckoutCreationFailed,
@@ -30,6 +32,7 @@ const {
   markPayMongoWebhookEventProcessed,
   markPayMongoWebhookEventFailed,
 } = require('../models/paymongoWebhookEventModel');
+const { validatePaidPaymentEvent } = require('../utils/paymentEventValidation');
 
 const ALLOWED_STATUS = [
   'Received',
@@ -38,6 +41,11 @@ const ALLOWED_STATUS = [
   'Completed',
   'Rejected',
 ];
+
+const { parseAdminPagination, paginationMeta } = require('../utils/adminPagination');
+
+const { getFilteredLoadPage } = require('../utils/adminFilteredLists');
+const pool = require('../config/db');
 
 const MANUAL_PAYMENT_METHODS = new Set(['GCash', 'Maya']);
 
@@ -411,6 +419,18 @@ async function getMyLoadRequestsController(req, res) {
 
 async function getAllLoadRequestsController(req, res) {
   try {
+    const paging = parseAdminPagination(req.query);
+    if (paging.error) return res.status(400).json({ error: paging.error });
+    if (paging.enabled) {
+      if (req.query.view === 'filtered') {
+        await ensureLoadRequestColumns();
+        const { requests, total, summary } = await getFilteredLoadPage(pool, paging, req.query);
+        return res.json({ requests, pagination: paginationMeta(paging.page, paging.pageSize, total), summary });
+      }
+      const {requests, total} = await getLoadRequestsPage(paging);
+      return res.json({ requests, pagination: paginationMeta(paging.page, paging.pageSize, total) });
+    }
+    // Preserve existing response until admin filters/KPIs gain server-side support.
     const requests = await getAllLoadRequests();
 
     return res.json({
@@ -419,8 +439,8 @@ async function getAllLoadRequestsController(req, res) {
   } catch (err) {
     console.error('GET ALL LOAD REQUESTS ERROR', err);
 
-    return res.status(500).json({
-      error: 'Server error',
+    return res.status(err.statusCode === 400 ? 400 : 500).json({
+      error: err.statusCode === 400 ? err.message : 'Server error',
     });
   }
 }
@@ -582,6 +602,15 @@ async function payMongoWebhookController(req, res) {
         webhook.referenceNo,
         webhook.checkoutSessionId
       );
+
+      // Fail closed: signature alone does not prove that THIS checkout paid
+      // the amount we issued. Invalid events remain retryable for review.
+      validatePaidPaymentEvent({
+        webhook,
+        request: existingRequest,
+        livemode: json?.data?.attributes?.livemode,
+        secretKey: process.env.PAYMONGO_SECRET_KEY,
+      });
 
       const affected = await markPayMongoPaymentPaid({
         referenceNo: webhook.referenceNo,

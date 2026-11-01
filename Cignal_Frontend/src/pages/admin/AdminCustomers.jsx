@@ -21,7 +21,7 @@ import customerApi from '../../api/customerApi';
 import { subscriberLifecycle } from '../../utils/adminBusinessRules';
 import { rowsToSafeCsv } from '../../utils/safeCsv';
 
-const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 const ACTIVITY_FILTERS = ['All', 'Active', 'At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'];
 const EMPTY = {
   accountName: '',

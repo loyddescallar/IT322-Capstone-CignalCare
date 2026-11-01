@@ -10,28 +10,6 @@ const {
   buildTroubleshootingSessionContext,
 } = require('../services/chatbotKnowledgeService');
 
-const RATE_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 12;
-const requestWindows = new Map();
-
-function checkRateLimit(userId) {
-  const key = String(userId || 'anonymous');
-  const now = Date.now();
-  const current = requestWindows.get(key);
-
-  if (!current || now - current.startedAt >= RATE_WINDOW_MS) {
-    requestWindows.set(key, { startedAt: now, count: 1 });
-    return true;
-  }
-
-  if (current.count >= MAX_REQUESTS_PER_WINDOW) {
-    return false;
-  }
-
-  current.count += 1;
-  return true;
-}
-
 function sanitizeContext(context, limit = 8) {
   if (!Array.isArray(context)) return [];
 
@@ -99,6 +77,30 @@ function shouldIncludePersonalData(message, context = []) {
   return recordTerms.test(text) && ownershipOrStatusTerms.test(text);
 }
 
+// Offline support deliberately avoids fabricating customer-specific statuses or
+// receiver-specific instructions. The verified guides remain the source of truth.
+function buildOfflineSupportReply(message) {
+  const input = String(message || '').toLowerCase();
+  const prefix = '**Built-in support mode** (live AI is not enabled for this demo).\n\n';
+  if (/(my|ko|akin|status|latest|progress|update)/i.test(input) &&
+      /(ticket|technician|payment|load request)/i.test(input)) {
+    return prefix + 'I cannot verify your personal request status in offline mode. Please open My Tickets, Technician Requests, or Load History to see your actual records. I will not invent a status.';
+  }
+  if (/(no signal|walang signal|black screen|blank screen|no picture|e-?\d+|error)/i.test(input)) {
+    return prefix + 'For signal, picture, or error-code concerns, open **Troubleshooting** and select the correct receiver model and symptom. Follow only the verified steps shown there. If the problem remains, file a support ticket or request a technician.';
+  }
+  if (/(technician|repair|dish|alignment|cable|visit)/i.test(input)) {
+    return prefix + 'For an on-site concern, select **Request Technician**, enter your service address, contact number, and issue details, and review the request before submitting.';
+  }
+  if (/(ticket|report|problem|concern)/i.test(input)) {
+    return prefix + 'To report a concern, open **Report a Problem**, enter a short subject and description, then check **My Tickets** for the submitted record.';
+  }
+  if (/(load|reload|plan|subscription|payment|paymongo|price|channel)/i.test(input)) {
+    return prefix + 'For current prepaid plans, amounts, and request status, use **Load Request** or **Load History**. Offline mode cannot confirm a payment or invent a current plan price.';
+  }
+  return prefix + 'Kumusta! I can guide you to verified troubleshooting, problem reports, technician requests, and prepaid-load pages. Describe your issue (such as "no signal"), or select one of the options below.';
+}
+
 async function sendChatbotMessage(req, res) {
   const message = String(req.body?.message || '').trim();
 
@@ -112,9 +114,27 @@ async function sendChatbotMessage(req, res) {
     });
   }
 
-  if (!checkRateLimit(req.user?.id)) {
-    return res.status(429).json({
-      error: 'Too many chatbot requests. Please wait a moment and try again.',
+  // An academic demo must remain useful when the optional Gemini integration is
+  // deliberately disabled or its shared quota provider is not configured.
+  // Never claim that a deterministic reply is AI-generated or verified live data.
+  if (!req.aiAccess?.allowed) {
+    if (req.aiAccess?.reason === 'quota') {
+      return res.status(429).json({
+        error: 'AI limit reached. Please use built-in troubleshooting or try again later.',
+      });
+    }
+    const context = sanitizeContext(req.body?.context);
+    const session = sanitizeTroubleshootingSession(req.body?.troubleshootingSession);
+    const hints = buildChatbotUiHints(message, context, session);
+    const reply = buildOfflineSupportReply(message);
+    return res.json({
+      reply,
+      source: 'built-in-support',
+      quickReplies: hints.quickReplies.length
+        ? hints.quickReplies
+        : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions: hints.actions,
+      knowledge: null,
     });
   }
 
@@ -222,6 +242,18 @@ async function prepareSupportDraft(req, res) {
     return res.status(400).json({ error: 'Conversation or troubleshooting context is required' });
   }
 
+  if (!req.aiAccess?.allowed) {
+    return res.json({
+      draft: buildFallbackSupportDraft({
+        context,
+        target,
+        troubleshootingSessionText: verifiedSession.draftText,
+      }),
+      source: 'built-in-fallback',
+      requiresReview: true,
+    });
+  }
+
   try {
     const draft = await generateGeminiSupportDraft({
       context,
@@ -254,4 +286,5 @@ module.exports = {
   prepareSupportDraft,
   shouldIncludePersonalData,
   sanitizeTroubleshootingSession,
+  buildOfflineSupportReply,
 };

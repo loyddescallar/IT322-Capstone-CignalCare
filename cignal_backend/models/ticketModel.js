@@ -11,6 +11,10 @@ const TICKET_STATUSES = [
 let ticketWorkflowReady = false;
 
 async function ensureTicketWorkflowSchema() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'ticket_workflow');
+  }
   if (ticketWorkflowReady) return;
 
   const [columns] = await pool.query(`
@@ -80,6 +84,20 @@ async function getTicketsByUser(userId) {
   );
 
   return rows;
+}
+
+// Optional admin pagination. COUNT executes in DB and only one page is transferred.
+async function getTicketsPage({ limit, offset }) {
+  await ensureTicketWorkflowSchema();
+  const [counts] = await pool.query('SELECT COUNT(*) AS total FROM tickets');
+  const [rows] = await pool.query(`
+    SELECT t.*, u.accountName, u.accountNumber, u.location
+    FROM tickets t
+    LEFT JOIN users u ON u.id = t.user_id
+    ORDER BY t.created_at DESC, t.id DESC
+    LIMIT ? OFFSET ?
+  `, [limit, offset]);
+  return { tickets: rows, total: Number(counts?.[0]?.total || 0) };
 }
 
 async function getAllTickets() {
@@ -155,6 +173,7 @@ module.exports = {
   createTicket,
   getTicketsByUser,
   getAllTickets,
+  getTicketsPage,
   getTicketById,
   updateTicketStatus,
   archiveTicket,

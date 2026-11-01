@@ -4,6 +4,10 @@ const pool = require('../config/db');
 let schemaReady = false;
 
 async function ensureAdminSecuritySchema() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'admin_security');
+  }
   if (schemaReady) return;
 
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_phone VARCHAR(30) NULL, ADD COLUMN IF NOT EXISTS recovery_phone_verified_at TIMESTAMP NULL DEFAULT NULL`);

@@ -96,6 +96,10 @@ function decoratePlan(plan) {
 }
 
 async function ensurePlanColumns() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'prepaid_plans');
+  }
   if (planColumnsReady) return;
 
   await pool.query(`

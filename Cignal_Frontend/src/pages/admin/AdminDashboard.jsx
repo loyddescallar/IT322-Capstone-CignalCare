@@ -29,7 +29,7 @@ import {
 } from 'recharts';
 import analyticsApi from '../../api/analyticsApi';
 
-const LOCATIONS = ['', 'Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const LOCATIONS = ['', 'Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 const ISSUE_COLORS = ['#dc2626', '#f97316', '#f59e0b', '#2563eb', '#16a34a', '#7c3aed', '#64748b'];
 
 const peso = (value) =>
@@ -288,7 +288,7 @@ export default function AdminDashboard() {
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <CardTitle title="Support Requests Trend" />
-          <p className="mt-1 text-[11px] text-slate-400">Last 7 days · GMT+8</p>
+          <p className="mt-1 text-[11px] text-slate-400">Last 30 days · GMT+8</p>
           <div className="mt-3 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data?.trend || []} margin={{ top: 5, right: 6, left: -18, bottom: 0 }}>

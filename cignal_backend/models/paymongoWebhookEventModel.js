@@ -3,6 +3,10 @@ const pool = require("../config/db");
 let tableReady = false;
 
 async function ensurePayMongoWebhookEventTable() {
+  // C2: normal HTTP traffic may only VERIFY existing schema, never perform DDL or data repairs.
+  if (!require('../utils/schemaSafety').inMigrationContext()) {
+    return require('../utils/schemaSafety').assertSchema(pool, 'payment_webhooks');
+  }
   if (tableReady) return;
 
   await pool.query(`

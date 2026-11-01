@@ -26,7 +26,7 @@ import {
 } from 'recharts';
 import analyticsApi from '../../api/analyticsApi';
 
-const LOCATIONS = ['', 'Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+const LOCATIONS = ['', 'Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
 const TABS = [
   ['overview', 'Overview'],
   ['sales', 'Sales Analytics'],

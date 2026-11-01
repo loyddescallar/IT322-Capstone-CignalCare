@@ -1,8 +1,7 @@
 const pool = require('../config/db');
-const { getAllOutcomes } = require('../models/troubleshootOutcomeModel');
+const { getAnalyticsOutcomesReadOnly } = require('../models/troubleshootOutcomeModel');
 const {
-  getIncidentStats,
-  syncIncidentCandidates,
+  getIncidentStatsReadOnly,
   issueDescriptor,
   getIncidentDetectionPolicy,
 } = require('../models/incidentModel');
@@ -199,25 +198,35 @@ function buildSupportFunnel(rows) {
 
 async function getAdminAnalytics(req, res) {
   try {
-    await syncIncidentCandidates();
+    // SQL filters reduce transfer/memory; retain JS filtering for Manila-day
+    // semantics and the exact existing API response shape.
+    const rawDays = Number(req.query.days || 30);
+    const days = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : null;
+    const cutoff = days ? new Date(Date.now() - days * 86400000) : null;
+    const periodParams = cutoff ? [cutoff] : [];
+    const ticketPeriod = cutoff ? ' WHERE t.created_at >= ?' : '';
+    const techPeriod = cutoff ? ' WHERE tr.created_at >= ?' : '';
+    const salesPeriod = cutoff ? ' AND pt.created_at >= ?' : '';
 
     const [userResult, ticketResult, techResult, salesResult] = await Promise.all([
       pool.query(
         `SELECT id, accountName, accountNumber, location, status, created_at FROM users WHERE role='user'`
       ),
       pool.query(
-        `SELECT t.*,u.location,u.accountNumber,u.accountName FROM tickets t LEFT JOIN users u ON u.id=t.user_id ORDER BY t.created_at DESC`
+        `SELECT t.*,u.location,u.accountNumber,u.accountName FROM tickets t LEFT JOIN users u ON u.id=t.user_id${ticketPeriod} ORDER BY t.created_at DESC`, periodParams
       ),
       pool.query(
-        `SELECT tr.*,u.location FROM technician_requests tr LEFT JOIN users u ON u.id=tr.user_id ORDER BY tr.created_at DESC`
+        `SELECT tr.*,u.location FROM technician_requests tr LEFT JOIN users u ON u.id=tr.user_id${techPeriod} ORDER BY tr.created_at DESC`, periodParams
       ),
       pool.query(
-        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed' ORDER BY pt.created_at DESC`
+        `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed'${salesPeriod} ORDER BY pt.created_at DESC`, periodParams
       ),
     ]);
 
-    const outcomes = await getAllOutcomes();
-    const incidents = await getIncidentStats();
+    const [outcomes, incidents] = await Promise.all([
+      getAnalyticsOutcomesReadOnly(cutoff),
+      getIncidentStatsReadOnly(cutoff),
+    ]);
     const incidentDetectionPolicy = getIncidentDetectionPolicy();
     const customers = userResult[0];
     const allTickets = ticketResult[0];
@@ -225,8 +234,6 @@ async function getAdminAnalytics(req, res) {
     const allSales = salesResult[0];
 
     const locationFilter = String(req.query.location || '').trim();
-    const rawDays = Number(req.query.days || 30);
-    const days = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : null;
     const byLoc = (row) =>
       !locationFilter || normLoc(row.location) === normLoc(locationFilter);
 
@@ -282,7 +289,7 @@ async function getAdminAnalytics(req, res) {
     });
     const repeatUsers = Object.values(userTickets).filter((count) => count >= 2).length;
 
-    const locs = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery'];
+    const locs = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
     const locationMap = {};
     for (const loc of locs) {
       const subscribers = customers.filter(
@@ -319,29 +326,41 @@ async function getAdminAnalytics(req, res) {
     // Preserve the existing API field for older frontend consumers.
     const guidePerformance = boxIssueEffectiveness.slice(0, 10);
 
-    const trend = [];
-    for (let i = 6; i >= 0; i -= 1) {
+    // Generate chart points for the selected period rather than always returning
+    // seven days. Use maps so a 365-day view does not repeatedly rescan rows.
+    const trendDays = days ? Math.min(365, Math.max(1, Math.ceil(days))) : 7;
+    const trendByDay = new Map();
+    for (let i = trendDays - 1; i >= 0; i -= 1) {
       const date = new Date(Date.now() - i * 86400000);
       const key = manilaDayKey(date);
-      trend.push({
+      trendByDay.set(key, {
         date: key,
         label: date.toLocaleDateString('en-PH', {
           timeZone: 'Asia/Manila',
           month: 'short',
           day: 'numeric',
         }),
-        sales: Number(
-          sales
-            .filter((sale) => manilaDayKey(sale.created_at || sale.transaction_date) === key)
-            .reduce((sum, sale) => sum + Number(sale.amount || 0), 0)
-            .toFixed(2)
-        ),
-        support: tickets.filter((ticket) => manilaDayKey(ticket.created_at) === key).length,
-        resolved: resolved.filter(
-          (ticket) => manilaDayKey(ticket.updated_at || ticket.created_at) === key
-        ).length,
+        sales: 0,
+        support: 0,
+        resolved: 0,
       });
     }
+    for (const sale of sales) {
+      const point = trendByDay.get(manilaDayKey(sale.created_at || sale.transaction_date));
+      if (point) point.sales += Number(sale.amount || 0);
+    }
+    for (const ticket of tickets) {
+      const point = trendByDay.get(manilaDayKey(ticket.created_at));
+      if (point) point.support += 1;
+    }
+    for (const ticket of resolved) {
+      const point = trendByDay.get(manilaDayKey(ticket.updated_at || ticket.created_at));
+      if (point) point.resolved += 1;
+    }
+    const trend = [...trendByDay.values()].map((point) => ({
+      ...point,
+      sales: Number(point.sales.toFixed(2)),
+    }));
 
     const salesByPlan = {};
     sales.forEach((sale) => {

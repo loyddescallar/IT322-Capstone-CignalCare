@@ -148,6 +148,20 @@ export default function AdminIncidents() {
     }
   };
 
+  // Detection is an intentional admin POST, never an automatic GET side effect.
+  const runDetection = async () => {
+    setBusy('detect');
+    setError('');
+    try {
+      await incidentApi.detectCandidates();
+      await load();
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Unable to run detection.');
+    } finally {
+      setBusy('');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -190,7 +204,8 @@ export default function AdminIncidents() {
           </p>
         </div>
         <button
-          onClick={load}
+          onClick={runDetection}
+          disabled={busy === 'detect' || loading}
           className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto"
         >
           <RefreshCw size={14} />
