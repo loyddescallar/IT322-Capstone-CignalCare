@@ -23,7 +23,7 @@ async function recordServicePayment({ customer, payment, referenceNo, processedB
     }
     if (payment.paymentMethod === 'GCash') {
       const [duplicates] = await connection.query(
-        'SELECT reference_no FROM service_payments WHERE payment_method = ? AND external_reference = ? LIMIT 1',
+        'SELECT reference_no FROM service_payments WHERE payment_method = ? AND UPPER(external_reference) = ? LIMIT 1',
         ['GCash', payment.externalReference]
       );
       if (duplicates.length) {
@@ -62,6 +62,20 @@ async function recordServicePayment({ customer, payment, referenceNo, processedB
       if (existing[0] && existing[0].request_hash === fingerprint) {
         return { payment: existing[0], replayed: true };
       }
+      // A different payment can collide on the unique GCash reference, not
+      // the idempotency key. Return the relevant error rather than claiming
+      // the key was reused with different details.
+      if (payment.paymentMethod === 'GCash') {
+        const [gcashMatches] = await pool.query(
+          'SELECT reference_no FROM service_payments WHERE payment_method = ? AND UPPER(external_reference) = ? LIMIT 1',
+          ['GCash', payment.externalReference]
+        );
+        if (gcashMatches.length) {
+          const conflict = new Error('This GCash reference has already been recorded. Check Completed Sales.');
+          conflict.code = 'SERVICE_IDEMPOTENCY_CONFLICT';
+          throw conflict;
+        }
+      }
       throw idempotencyConflict();
     }
     throw error;
@@ -70,12 +84,14 @@ async function recordServicePayment({ customer, payment, referenceNo, processedB
   }
 }
 
-async function listServicePayments({ from, to, accountNumber, paymentMethod, serviceType, page, pageSize }) {
+async function listServicePayments({ from, to, accountNumber, accountSearch, paymentMethod, serviceType, page, pageSize }) {
   const terms = [];
   const values = [];
   if (from) { terms.push('transaction_date >= ?'); values.push(from); }
   if (to) { terms.push('transaction_date <= ?'); values.push(to); }
+  // Exact match for subscriber profiles; partial digit search for Completed Sales.
   if (accountNumber) { terms.push('account_number = ?'); values.push(accountNumber); }
+  if (accountSearch) { terms.push('account_number LIKE ?'); values.push(`%${accountSearch}%`); }
   if (paymentMethod && paymentMethod !== 'All') { terms.push('payment_method = ?'); values.push(paymentMethod); }
   if (serviceType && serviceType !== 'All') { terms.push('service_type = ?'); values.push(serviceType); }
   const where = terms.length ? 'WHERE ' + terms.join(' AND ') : '';

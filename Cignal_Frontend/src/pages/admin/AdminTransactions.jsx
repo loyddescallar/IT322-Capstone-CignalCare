@@ -89,6 +89,8 @@ export default function AdminTransactions() {
     let active = true;
     if (invalidRange) {
       setServiceTransactions([]); setServiceSummary({ transactions: 0, revenue: 0 });
+      setServicePagination({ total: 0, totalPages: 0 });
+      setServiceError('Select a valid start and end date for the custom range.');
       setServiceLoading(false);
       return () => { active = false; };
     }
@@ -96,11 +98,12 @@ export default function AdminTransactions() {
     // Service payments are collected manually; PayMongo only applies to prepaid loads.
     if (payment === 'PayMongo') {
       setServiceTransactions([]); setServiceSummary({ transactions: 0, revenue: 0 });
+      setServicePagination({ total: 0, totalPages: 0 });
       setServiceLoading(false);
       return () => { active = false; };
     }
     axiosClient.get('/service-payments', { params: {
-      from, to, paymentMethod: payment, accountNumber: debouncedSearch,
+      from, to, paymentMethod: payment, accountSearch: debouncedSearch,
       page: servicePage, pageSize: PAGE_SIZE,
     } }).then(({ data }) => {
       if (!active) return;
@@ -110,7 +113,8 @@ export default function AdminTransactions() {
     }).catch(e => {
       if (!active) return;
       setServiceTransactions([]); setServiceSummary({ transactions: 0, revenue: 0 });
-      setServiceError(e?.response?.status === 503 ? 'Apply FT-02 migration before loading service sales.' : 'Could not load service payments.');
+      setServicePagination({ total: 0, totalPages: 0 });
+      setServiceError(e?.response?.status === 503 ? 'Service payment database setup is required before loading history.' : 'Could not load service payments.');
     }).finally(() => { if (active) setServiceLoading(false); });
     return () => { active = false; };
   }, [from, to, payment, debouncedSearch, servicePage, invalidRange, refreshKey]);
@@ -147,7 +151,7 @@ export default function AdminTransactions() {
         let totalPages = 1;
         do {
           const result = await axiosClient.get('/service-payments', { params: {
-            from, to, paymentMethod: payment, accountNumber: search.trim(), page: servicePageCursor, pageSize: 100,
+            from, to, paymentMethod: payment, accountSearch: search.trim(), page: servicePageCursor, pageSize: 100,
           } });
           serviceRows.push(...(result.data?.transactions || []));
           totalPages = Number(result.data?.pagination?.totalPages || 0);
@@ -188,7 +192,7 @@ export default function AdminTransactions() {
             <select value={payment} onChange={e => { setPayment(e.target.value); setPage(1); setServicePage(1); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><option value="All">All Payments</option>{PAYMENT_METHODS.map(method => <option key={method}>{method}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-gray-600">Account Number
-            <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"><Search size={14} className="text-gray-400"/><input type="search" value={search} maxLength={100} onChange={e => { setSearch(e.target.value); setPage(1); setServicePage(1); }} placeholder="Search Account Number" className="w-full min-w-0 bg-transparent text-xs outline-none sm:w-48" /></div>
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"><Search size={14} className="text-gray-400"/><input type="search" inputMode="numeric" value={search} maxLength={9} onChange={e => { setSearch(e.target.value.replace(/\D/g, '')); setPage(1); setServicePage(1); }} placeholder="Search Account Number" className="w-full min-w-0 bg-transparent text-xs outline-none sm:w-48" /></div>
           </label>
         </div>
       </div>
@@ -228,7 +232,7 @@ export default function AdminTransactions() {
     </section>
     <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-        <div><h2 className="text-sm font-bold text-gray-800">Completed Service Payment Transactions (FT-02)</h2>
+        <div><h2 className="text-sm font-bold text-gray-800">Service Payment History</h2>
         <p className="mt-1 text-xs text-gray-500">{servicePagination.total || 0} collected payments in this filter. Service revenue is reported separately; no ₱40 load profit applies.</p></div>
         <div className="flex gap-2"><button type="button" disabled={serviceLoading || servicePage <= 1} onClick={() => setServicePage(v => Math.max(1, v-1))} className="rounded-lg border border-gray-200 px-3 py-2 text-xs disabled:opacity-40">Previous</button>
         <button type="button" disabled={serviceLoading || servicePage >= (servicePagination.totalPages || 0)} onClick={() => setServicePage(v => v+1)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs disabled:opacity-40">Next</button></div>

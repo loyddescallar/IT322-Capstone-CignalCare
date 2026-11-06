@@ -11,6 +11,16 @@ const ATTEMPT_KEY = 'cignalcare_service_payment_pending_v1';
 const createForm = () => ({ accountNumber: '', serviceType: TYPES[0], amount: '', paymentMethod: 'Cash',
   externalReference: '', transactionDate: manilaToday(), technicianRequestId: '', description: '' });
 
+// Explain the actual API failure instead of treating every error as an empty history.
+const historyErrorMessage = error => {
+  const status = error?.response?.status;
+  if (status === 404) return 'Service Payment Recording API is not available. Update server.js, restart the backend, and refresh this page.';
+  if (status === 503) return 'Service payment database setup is incomplete. Check the service_payments migration.';
+  if (status === 401 || status === 403) return 'Your administrator session is unavailable. Sign in again as an administrator.';
+  if (!status) return 'Cannot connect to the backend. Check that the server is running and try again.';
+  return error?.response?.data?.error || `Unable to load service payment history (HTTP ${status}).`;
+};
+
 export default function ServicePaymentTerminal({ customers = [], onPaymentRecorded }) {
   const [form, setForm] = useState(createForm);
   const [requests, setRequests] = useState([]);
@@ -26,7 +36,17 @@ export default function ServicePaymentTerminal({ customers = [], onPaymentRecord
   const pendingRef = useRef(null);
 
   const customer = useMemo(() => customers.find(c => String(c.accountNumber) === form.accountNumber.trim()), [customers, form.accountNumber]);
-  const update = (key, value) => { setForm(old => ({ ...old, [key]: value })); setError(''); setSuccess(''); };
+  const update = (key, value) => {
+    // The optional technician link belongs to a particular subscriber.
+    // Never carry the previous subscriber's request into a new payment.
+    setForm(old => ({ ...old, [key]: value,
+      ...(key === 'accountNumber' ? { technicianRequestId: '' } : {}),
+    }));
+    // Any edit after confirmation changes what the admin is attesting to.
+    // Require fresh confirmation of the final service and amount.
+    setPaymentConfirmed(false); setServiceCompleted(false);
+    setError(''); setSuccess('');
+  };
   const loadHistory = async () => {
     const { data } = await axiosClient.get('/service-payments', { params: { page: 1, pageSize: 15 } });
     setRecent(data?.transactions || []);
@@ -36,9 +56,7 @@ export default function ServicePaymentTerminal({ customers = [], onPaymentRecord
     let alive = true;
     axiosClient.get('/service-payments', { params: { page: 1, pageSize: 15 } })
       .then(({ data }) => { if (!alive) return; setRecent(data.transactions || []); setSummary(data.summary || { transactions: 0, revenue: 0 }); })
-      .catch(e => { if (alive) setError(e?.response?.status === 503
-        ? 'FT-02 database migration is required before recording service payments.'
-        : 'Unable to load service payment history.'); })
+      .catch(e => { if (alive) setError(historyErrorMessage(e)); })
       .finally(() => { if (alive) setLoadingHistory(false); });
     return () => { alive = false; };
   }, []);
@@ -46,13 +64,18 @@ export default function ServicePaymentTerminal({ customers = [], onPaymentRecord
     let alive = true;
     const number = form.accountNumber.trim();
     setRequests([]);
+    setLoadingRequests(false);
     if (!/^\d{1,9}$/.test(number)) return () => { alive = false; };
-    setLoadingRequests(true);
-    axiosClient.get('/service-payments/technician-requests', { params: { accountNumber: number } })
-      .then(({ data }) => { if (alive) setRequests(data?.requests || []); })
-      .catch(() => { if (alive) setRequests([]); })
-      .finally(() => { if (alive) setLoadingRequests(false); });
-    return () => { alive = false; };
+    // Avoid sending a request for every digit while the admin is typing.
+    const timer = setTimeout(() => {
+      if (!alive) return;
+      setLoadingRequests(true);
+      axiosClient.get('/service-payments/technician-requests', { params: { accountNumber: number } })
+        .then(({ data }) => { if (alive) setRequests(data?.requests || []); })
+        .catch(() => { if (alive) setRequests([]); })
+        .finally(() => { if (alive) setLoadingRequests(false); });
+    }, 300);
+    return () => { alive = false; clearTimeout(timer); };
   }, [form.accountNumber]);
 
   const formKey = JSON.stringify([form.accountNumber.trim(), form.serviceType, form.amount,
@@ -105,7 +128,7 @@ export default function ServicePaymentTerminal({ customers = [], onPaymentRecord
   return (
     <section className="space-y-4 rounded-xl border border-red-100 bg-white p-4 shadow-sm sm:p-5">
       <div>
-        <h2 className="text-base font-bold text-gray-800">FT-02 · Record Collected Service Payment</h2>
+        <h2 className="text-base font-bold text-gray-800">Service Payment Recording</h2>
         <p className="mt-1 text-xs leading-5 text-gray-500">Admin-only, manual recording for repairs and technician services. This does not charge GCash, update a technician request, or activate a prepaid plan.</p>
       </div>
       {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
@@ -150,12 +173,12 @@ export default function ServicePaymentTerminal({ customers = [], onPaymentRecord
         <div className="space-y-2 md:col-span-2">
           <label className="flex gap-2 text-xs text-gray-700"><input type="checkbox" checked={serviceCompleted} onChange={e => setServiceCompleted(e.target.checked)} /> I verify the service was actually completed.</label>
           <label className="flex gap-2 text-xs text-gray-700"><input type="checkbox" checked={paymentConfirmed} onChange={e => setPaymentConfirmed(e.target.checked)} /> I verify the stated amount was actually collected.</label>
-          <button type="submit" disabled={!canSubmit} className="w-full rounded-lg bg-[#cc0000] px-4 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">{processing ? 'Recording…' : `Record Received Service Payment${validAmount ? ` · ${peso(form.amount)}` : ''}`}</button>
+          <button type="submit" disabled={!canSubmit} className="w-full rounded-lg bg-[#cc0000] px-4 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">{processing ? 'Recording…' : `Record Service Payment${validAmount ? ` · ${peso(form.amount)}` : ''}`}</button>
           <p className="text-xs text-gray-500">Revenue only. Service profit is not calculated. Repeated submissions reuse the same request ID until confirmed.</p>
         </div>
       </form>
       <div className="border-t border-gray-100 pt-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold text-gray-700">Recent Recorded Service Sales</h3><p className="text-xs text-gray-500">{summary.transactions} completed service payments · {peso(summary.revenue)} collected</p></div><button type="button" onClick={() => loadHistory().catch(() => setError('Unable to refresh history.'))} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold">Refresh</button></div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold text-gray-700">Recent Service Payments</h3><p className="text-xs text-gray-500">{summary.transactions} completed service payments · {peso(summary.revenue)} collected</p></div><button type="button" onClick={() => loadHistory().then(() => setError('')).catch(e => setError(historyErrorMessage(e)))} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold">Refresh</button></div>
         <div className="overflow-auto"><table className="w-full min-w-[600px] text-left text-xs"><thead className="bg-gray-50"><tr>{['Date', 'Subscriber', 'Service', 'Payment', 'Collected', 'Reference'].map(x => <th key={x} className="px-3 py-2">{x}</th>)}</tr></thead><tbody>
           {loadingHistory ? <tr><td colSpan={6} className="p-4 text-gray-500">Loading service history…</td></tr> : recent.length ? recent.map(x => <tr key={x.id} className="border-t border-gray-100"><td className="px-3 py-2">{String(x.transaction_date || '').slice(0,10)}</td><td className="px-3 py-2">{x.account_name} · {x.account_number}</td><td className="px-3 py-2">{x.service_type}</td><td className="px-3 py-2">{x.payment_method}</td><td className="px-3 py-2 font-semibold">{peso(x.amount)}</td><td className="px-3 py-2 font-mono">{x.reference_no}</td></tr>) : <tr><td colSpan={6} className="p-4 text-center text-gray-500">No service payments recorded yet.</td></tr>}
         </tbody></table></div>
