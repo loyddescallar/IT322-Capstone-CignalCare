@@ -26,6 +26,14 @@ function manilaDayKey(value) {
   return new Date(date.getTime() + MANILA_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+function firstManilaDayKey(days, now = Date.now()) {
+  if (!days) return null;
+  const today = manilaDayKey(new Date(now));
+  const date = new Date(`${today}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - Math.max(0, Math.ceil(days) - 1));
+  return date.toISOString().slice(0, 10);
+}
+
 function normLoc(value) {
   const location = String(value || 'Unknown').trim();
   return /calaca/i.test(location) ? 'Calaca' : location || 'Unknown';
@@ -202,8 +210,12 @@ async function getAdminAnalytics(req, res) {
     // semantics and the exact existing API response shape.
     const rawDays = Number(req.query.days || 30);
     const days = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : null;
-    const cutoff = days ? new Date(Date.now() - days * 86400000) : null;
+    // Analytics periods represent whole Philippine calendar days, matching
+    // the chart labels and DATE-only service-payment transactions.
+    const firstDay = firstManilaDayKey(days);
+    const cutoff = firstDay ? new Date(`${firstDay}T00:00:00+08:00`) : null;
     const periodParams = cutoff ? [cutoff] : [];
+    const serviceParams = firstDay ? [firstDay] : [];
     const ticketPeriod = cutoff ? ' WHERE t.created_at >= ?' : '';
     const techPeriod = cutoff ? ' WHERE tr.created_at >= ?' : '';
     const salesPeriod = cutoff ? ' AND pt.created_at >= ?' : '';
@@ -223,7 +235,7 @@ async function getAdminAnalytics(req, res) {
         `SELECT pt.*,u.location,p.plan_name FROM prepaid_transactions pt LEFT JOIN users u ON u.id=pt.user_id LEFT JOIN prepaid_plans p ON p.id=pt.plan_id WHERE pt.status='completed'${salesPeriod} ORDER BY pt.created_at DESC`, periodParams
       ),
       pool.query(
-        `SELECT sp.*,u.location FROM service_payments sp LEFT JOIN users u ON u.id=sp.user_id${servicePeriod} ORDER BY sp.transaction_date DESC`, periodParams
+        `SELECT sp.*,u.location FROM service_payments sp LEFT JOIN users u ON u.id=sp.user_id${servicePeriod} ORDER BY sp.transaction_date DESC`, serviceParams
       ),
     ]);
 
@@ -255,7 +267,7 @@ async function getAdminAnalytics(req, res) {
       (sale) => byLoc(sale) && inRange(sale.created_at || sale.transaction_date, days)
     );
     const servicePayments = allServicePayments.filter(
-      (payment) => byLoc(payment) && inRange(payment.transaction_date, days)
+      (payment) => byLoc(payment) && (!firstDay || manilaDayKey(payment.transaction_date) >= firstDay)
     );
     const prepaidRevenue = Number(sales.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
     const serviceRevenue = Number(servicePayments.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));

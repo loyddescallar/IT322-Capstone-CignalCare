@@ -15,6 +15,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const incidentRoutes = require('./routes/incidentRoutes');
+const servicePaymentRoutes = require('./routes/servicePaymentRoutes');
 
 const {
   payMongoWebhookController,
@@ -124,6 +125,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/incidents', incidentRoutes);
+// Administrator-only manual collections for completed technician services.
+app.use('/api/service-payments', servicePaymentRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

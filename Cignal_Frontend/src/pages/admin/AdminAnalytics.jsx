@@ -339,7 +339,7 @@ export default function AdminAnalytics() {
             <Metric icon={Store} label="Collected Sales" value={peso(k.totalRevenue)} sub="Prepaid loads + service payments" tone="red" />
             <Metric icon={Store} label="Prepaid Revenue" value={peso(k.prepaidRevenue)} sub={`${k.prepaidTransactions || 0} prepaid loads`} tone="blue" />
             <Metric icon={Wrench} label="Service Revenue" value={peso(k.serviceRevenue)} sub={`${k.serviceTransactions || 0} service payments (revenue, not profit)`} tone="green" />
-            <Metric icon={ChartNoAxesCombined} label="Transactions" value={k.totalTransactions || 0} sub={`${k.posTransactions || 0} POS · ${k.onlineTransactions || 0} online`} tone="blue" />
+            <Metric icon={ChartNoAxesCombined} label="Transactions" value={k.totalTransactions || 0} sub={`${k.posTransactions || 0} POS · ${k.onlineTransactions || 0} online · ${k.serviceTransactions || 0} service`} tone="blue" />
             <Metric icon={MapPin} label="Locations" value={(data?.salesByLocation || []).length} sub="Locations with completed prepaid or service sales" tone="green" />
             <Metric icon={Store} label="Gross Profit" value={peso(k.grossProfit)} sub="₱40 per completed load" tone="amber" />
           </div>

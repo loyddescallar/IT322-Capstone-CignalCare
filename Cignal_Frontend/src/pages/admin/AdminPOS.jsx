@@ -223,7 +223,7 @@ export default function AdminPOS() {
       <SalesDateFilter period={period} setPeriod={setPeriod} from={fromDate} setFrom={setFromDate} to={toDate} setTo={setToDate} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[
-          { label: 'Total Collected Sales', value: loading ? '...' : `₱${(summary.sales + Number(serviceSummary.revenue || 0)).toLocaleString()}`, color: 'text-gray-800' },
+          { label: 'POS + Service Collections', value: loading ? '...' : `₱${(summary.sales + Number(serviceSummary.revenue || 0)).toLocaleString()}`, color: 'text-gray-800' },
           { label: 'Service Revenue', value: loading ? '...' : `₱${Number(serviceSummary.revenue || 0).toLocaleString()}`, color: 'text-purple-700' },
           { label: 'Gross Profit', value: loading ? '...' : `₱${summary.grossProfit.toLocaleString()}`, color: 'text-green-600' },
           { label: 'Transactions', value: loading ? '...' : summary.transactions + Number(serviceSummary.transactions || 0), color: 'text-blue-600' },

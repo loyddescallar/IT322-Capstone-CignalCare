@@ -49,16 +49,19 @@ async function getServicePayments(req, res) {
   const bounds = manilaDateBounds(from, to);
   if (!bounds) return res.status(400).json({ error: 'Invalid date range.' });
   const accountNumber = String(req.query.accountNumber || '').trim();
+  const accountSearch = String(req.query.accountSearch || '').trim();
   const paymentMethod = String(req.query.paymentMethod || 'All').trim();
   const serviceType = String(req.query.serviceType || 'All').trim();
   if ((accountNumber && !/^\d{1,9}$/.test(accountNumber)) ||
+      (accountSearch && !/^\d{1,9}$/.test(accountSearch)) ||
+      (accountNumber && accountSearch) ||
       (paymentMethod !== 'All' && !METHODS.includes(paymentMethod)) ||
       (serviceType !== 'All' && !SERVICE_TYPES.includes(serviceType))) {
     return res.status(400).json({ error: 'Invalid service sales filter.' });
   }
   const rawPage = req.query.page == null ? '1' : String(req.query.page);
   const rawSize = req.query.pageSize == null ? '25' : String(req.query.pageSize);
-  if (!/^\d{1,6}$/.test(rawPage) || !/^\d{1,3}$/.test(rawSize) || Number(rawSize) > 100 || Number(rawSize) < 1 || Number(rawPage) < 1) {
+  if (!/^\d{1,6}$/.test(rawPage) || !/^\d{1,3}$/.test(rawSize) || Number(rawSize) > 100 || Number(rawSize) < 1 || Number(rawPage) < 1 || Number(rawPage) > 1000000) {
     return res.status(400).json({ error: 'Invalid pagination.' });
   }
   const page = Number(rawPage), pageSize = Number(rawSize);
@@ -66,7 +69,7 @@ async function getServicePayments(req, res) {
     await ensureServiceSchema();
     return res.json(await listServicePayments({
       from: bounds.startDate, to: bounds.endDate,
-      accountNumber, paymentMethod, serviceType, page, pageSize,
+      accountNumber, accountSearch, paymentMethod, serviceType, page, pageSize,
     }));
   } catch (error) {
     console.error('SERVICE PAYMENT LIST ERROR:', error?.message);

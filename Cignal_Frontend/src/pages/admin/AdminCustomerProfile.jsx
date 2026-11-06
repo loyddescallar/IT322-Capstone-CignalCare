@@ -263,6 +263,7 @@ export default function AdminCustomerProfile() {
   const [transactions, setTransactions] = useState([]);
   const [servicePayments, setServicePayments] = useState([]);
   const [servicePaymentSummary, setServicePaymentSummary] = useState({ revenue: 0, transactions: 0 });
+  const [servicePaymentError, setServicePaymentError] = useState('');
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState('transactions');
@@ -274,6 +275,7 @@ export default function AdminCustomerProfile() {
 
   async function loadProfile() {
     setLoading(true);
+    setServicePaymentError('');
 
     try {
       const customerRes = await customerApi.getCustomerById(id);
@@ -289,7 +291,12 @@ export default function AdminCustomerProfile() {
           .get('/technicians/requests/admin')
           .catch(() => ({ data: { requests: [] } })),
         axiosClient.get('/load/admin').catch(() => ({ data: { history: [] } })),
-        axiosClient.get('/service-payments', { params: { accountNumber: String(loadedCustomer.accountNumber), page: 1, pageSize: 25 } }).catch(() => ({ data: { transactions: [], summary: { revenue: 0, transactions: 0 } } })),
+        axiosClient.get('/service-payments', { params: { accountNumber: String(loadedCustomer.accountNumber), page: 1, pageSize: 25 } }).catch(error => {
+          setServicePaymentError(error?.response?.status === 503
+            ? 'Service payment database setup is required.'
+            : 'Unable to load collected service payments. Retry before relying on this history.');
+          return { data: { transactions: [], summary: { revenue: 0, transactions: 0 } } };
+        }),
       ]);
 
       const allTickets = ticketRes.data?.tickets || [];
@@ -740,9 +747,10 @@ export default function AdminCustomerProfile() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-sm font-semibold text-slate-700">Collected Service Payments</h2>
-            <p className="mt-1 text-xs text-slate-500">FT-02 · {servicePaymentSummary.transactions} recorded payments · ₱{Number(servicePaymentSummary.revenue || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} service revenue (not profit)</p></div>
+          <div><h2 className="text-sm font-semibold text-slate-700">Service Payment History</h2>
+            <p className="mt-1 text-xs text-slate-500">{servicePaymentSummary.transactions} recorded payments · ₱{Number(servicePaymentSummary.revenue || 0).toLocaleString('en-PH', {minimumFractionDigits:2})} service revenue (not profit)</p></div>
         </div>
+        {servicePaymentError && <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><span>{servicePaymentError}</span><button type="button" className="font-semibold underline" onClick={loadProfile}>Retry</button></div>}
         <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs">
           <thead className="bg-slate-50"><tr>{['Date', 'Service', 'Amount Collected', 'Payment', 'Technician Request', 'Reference'].map(x => <th key={x} className="px-3 py-2">{x}</th>)}</tr></thead>
           <tbody>{servicePayments.length ? servicePayments.map(item => <tr key={item.id} className="border-t border-slate-100">

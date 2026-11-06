@@ -17,7 +17,10 @@ function normalizeServicePayment(body = {}) {
   const serviceType = String(body.serviceType || '').trim();
   const description = String(body.description || '').trim();
   const paymentMethod = String(body.paymentMethod || '').trim();
-  const externalReference = String(body.externalReference || '').trim();
+  // GCash reference codes are case-insensitive; normalize before fingerprinting
+  // and persistence so retries with different letter case remain idempotent.
+  const externalReferenceInput = String(body.externalReference || '').trim();
+  const externalReference = paymentMethod === 'GCash' ? externalReferenceInput.toUpperCase() : externalReferenceInput;
   const rawAmount = String(body.amount ?? '').trim();
   const transactionDate = String(body.transactionDate || '').trim();
   const requestIdRaw = body.technicianRequestId == null ? '' : String(body.technicianRequestId).trim();
