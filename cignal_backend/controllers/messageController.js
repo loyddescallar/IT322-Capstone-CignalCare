@@ -269,7 +269,7 @@ async function sendMessageController(
     if (senderRole === 'admin') {
       try {
         await require('../services/ticketDeliveryService').sendTicketAlert({
-          ticketId:ticket.id,eventKey:`reply:${new Date().toISOString().slice(0,10)}`,kind:'reply',
+          ticketId:ticket.id,eventKey:`reply:message:${result.insertId}`,kind:'reply',
         });
       } catch (alertError) {
         console.warn('TICKET CHAT ALERT WARNING:',alertError.message);

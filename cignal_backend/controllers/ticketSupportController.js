@@ -53,7 +53,7 @@ async function recordAdminCall(req,res) {
       : `Support provided an update on ticket #${ticket.id} following a contact attempt.`,
   }));
   await notifySafely('CALL OUTCOME ALERT',()=>sendTicketAlert({
-    ticketId:ticket.id,eventKey:`reply:${new Date().toISOString().slice(0,10)}`,kind:'reply',
+    ticketId:ticket.id,eventKey:`reply:call:${call.id}`,kind:'reply',
   }));
   return res.status(201).json({message:'Call outcome and subscriber message saved.',call});
  } catch(error) {

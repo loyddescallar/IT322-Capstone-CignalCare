@@ -23,4 +23,12 @@ CREATE TABLE IF NOT EXISTS ticket_support_deliveries (
  updated_at TIMESTAMP NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ticket_support_deliveries_ticket ON ticket_support_deliveries (ticket_id,created_at);
+-- Security: all three tables contain private customer contacts and/or call records.
+-- The existing Express backend accesses PostgreSQL directly. These tables must
+-- never be readable or writable through a public/anon Supabase Data API role.
+ALTER TABLE public.ticket_support_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ticket_support_calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ticket_support_deliveries ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.ticket_support_details, public.ticket_support_calls,
+  public.ticket_support_deliveries FROM PUBLIC, anon, authenticated;
 COMMIT;
