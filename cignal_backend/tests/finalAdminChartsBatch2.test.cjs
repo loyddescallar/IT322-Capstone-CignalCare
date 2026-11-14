@@ -23,8 +23,11 @@ function makeController() {
     if (sql.includes('FROM tickets')) return [tickets];
     if (sql.includes('FROM technician_requests')) return [[]];
     if (sql.includes('FROM prepaid_transactions')) return [sales];
+    // Analytics now also includes manual service collections, which are absent
+    // in this prepaid-only fixture. Return no collections, not a mock SQL error.
+    if (sql.includes('FROM service_payments')) return [[]];
     throw new Error('Unexpected SQL in analytics test');
-  }};
+  } };
   const code = fs.readFileSync(path.join(__dirname, '../controllers/analyticsController.js'), 'utf8');
   const sandbox = {
     module: { exports: {} }, console, Date, Set, Map,
@@ -39,13 +42,13 @@ function makeController() {
       throw new Error('Unexpected dependency: ' + name);
     },
   };
-  vm.runInNewContext(code, sandbox, {filename:'analyticsController.js'});
+  vm.runInNewContext(code, sandbox, { filename: 'analyticsController.js' });
   return sandbox.module.exports.getAdminAnalytics;
 }
 
 test('Batch 2 admin analytics charts honor 7, 30, 90 and 365 day selectors and agree with revenue KPIs', async () => {
   const getAdminAnalytics = makeController();
-  for (const [days, totalRevenue] of [[7,120], [30,200], [90,240], [365,240]]) {
+  for (const [days, totalRevenue] of [[7, 120], [30, 200], [90, 240], [365, 240]]) {
     let response;
     await getAdminAnalytics({ query: { days: String(days), location: 'Nasugbu' } }, {
       json: (data) => { response = data; return data; },
