@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import incidentApi from '../../api/incidentApi';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh';
 
 const PAGE_SIZE = 40;
 
@@ -238,6 +239,13 @@ export default function AdminIncidents() {
 
   const currentBoard = useRef(0);
   const currentHistory = useRef(0);
+  const lanePageSizes=useRef({candidate:PAGE_SIZE,confirmed:PAGE_SIZE,resolved:PAGE_SIZE,dismissed:PAGE_SIZE});
+  // Read-only refresh: do not trigger detection, close dialogs, or reset filters.
+  useVisibleRefresh(() => {
+    if (!loading && !busy && !moreLoading && !decision && !details) {
+      setRevision((previous) => previous + 1);
+    }
+  }, 30000);
 
   const dismissDecision = useCallback(() => {
     if (!busy) {
@@ -268,7 +276,7 @@ export default function AdminIncidents() {
           location,
           sort,
           offset: 0,
-          limit: PAGE_SIZE,
+          limit: Math.min(100, Math.max(PAGE_SIZE,lanePageSizes.current[key] || PAGE_SIZE)),
           ...(key === 'candidate'
             ? { includeLocations: '1' }
             : {}),
@@ -377,6 +385,7 @@ export default function AdminIncidents() {
         return;
       }
 
+      lanePageSizes.current[status]=Math.min(100,lane.items.length+(response.data?.incidents||[]).length);
       setBoard((previous) => ({
         ...previous,
         [status]: {

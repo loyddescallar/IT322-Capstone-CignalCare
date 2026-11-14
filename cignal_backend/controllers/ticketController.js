@@ -24,6 +24,15 @@ function canAccessTicket(req, ticket) {
 async function createTicketController(req, res) {
   try {
     const { category, subject } = req.body;
+    let supportDetails = null;
+    if (req.body?.supportDetails) {
+      try {
+        supportDetails = require('../utils/ticketSupportValidation')
+          .normalizeSupportDetails(req.body.supportDetails);
+      } catch (validationError) {
+        return res.status(validationError.statusCode || 400).json({error:validationError.message});
+      }
+    }
 
     if (!category || !subject) {
       return res.status(400).json({ error: 'category and subject are required' });
@@ -31,8 +40,9 @@ async function createTicketController(req, res) {
 
     const id = await createTicket({
       user_id: req.user.id,
-      category: category.trim(),
+      category: supportDetails ? supportDetails.legacyCategory : category.trim(),
       subject: subject.trim(),
+      supportDetails,
     });
 
     // The ticket is already saved. Incident linking is supplementary and must
@@ -58,6 +68,13 @@ async function createTicketController(req, res) {
       });
     });
 
+    if (supportDetails) {
+      await notifySafely('TICKET RECEIPT ALERT', () =>
+        require('../services/ticketDeliveryService').sendTicketAlert({
+          ticketId:id,eventKey:'receipt',kind:'receipt',
+        })
+      );
+    }
     return res.status(201).json({ message: 'Ticket created', id, incident: linkedIncident || null });
   } catch (err) {
     console.error('CREATE TICKET ERROR', err);
@@ -140,6 +157,13 @@ async function updateTicketStatusController(req, res) {
       })
     );
 
+    if (['Under Review','Resolved'].includes(status)) {
+      await notifySafely('TICKET STATUS ALERT', () =>
+        require('../services/ticketDeliveryService').sendTicketAlert({
+          ticketId:ticket.id,eventKey:`status:${status.toLowerCase().replace(/\s+/g,'_')}`,kind:'status',
+        })
+      );
+    }
     return res.json({ message: 'Status updated' });
   } catch (err) {
     console.error('UPDATE TICKET ERROR', err);

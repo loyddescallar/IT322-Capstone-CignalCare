@@ -36,6 +36,23 @@ function normalizeLocation(value) {
 }
 
 function issueDescriptor(ticket) {
+  // Explicit, validated ticket symptoms take priority over broad legacy labels.
+  // Individual hardware, remote-control and payment issues are not area outages.
+  const selected=String(ticket?.issue_code || '').trim();
+  if (selected) {
+    const codes={
+      no_signal:['no_signal','No Signal'],
+      weak_signal:['weak_signal','Weak / Pixelated Signal'],
+      intermittent_signal:['weak_signal','Weak / Pixelated Signal'],
+      pixelated_signal:['weak_signal','Weak / Pixelated Signal'],
+      rain_signal_loss:['weak_signal','Weak / Pixelated Signal'],
+      low_signal_quality:['weak_signal','Weak / Pixelated Signal'],
+      missing_channels:['missing_channels','Missing / No Channels'],
+      black_screen:['black_screen','Black Screen'],
+    };
+    const match=codes[selected];
+    return match ? {key:match[0],label:match[1]} : null;
+  }
   const text = `${ticket?.subject || ''} ${ticket?.category || ''}`.toLowerCase();
   const patterns = [
     ['no_signal', 'No Signal', /\bno\s+signal\b|signal\s+lost|walang\s+signal/i],
@@ -109,8 +126,9 @@ async function getRecentUnresolvedTickets(hours = INCIDENT_DETECTION_POLICY.wind
   await ensureIncidentSchema();
   const safeHours = Math.min(Math.max(Number(hours) || INCIDENT_DETECTION_POLICY.windowHours, 1), 72);
 
-  const [rows] = await pool.query(`SELECT t.*, u.accountName, u.accountNumber, u.location
+  const [rows] = await pool.query(`SELECT t.*, d.issue_code, u.accountName, u.accountNumber, u.location
     FROM tickets t JOIN users u ON u.id=t.user_id
+    LEFT JOIN ticket_support_details d ON d.ticket_id=t.id
     WHERE t.status NOT IN ('Resolved','Archived')
       AND t.created_at >= NOW() - INTERVAL '${safeHours} hours'
       AND COALESCE(u.status,'active')='active'
@@ -306,7 +324,8 @@ async function getActiveIncidentsForLocation(location) {
 
 async function linkMatchingRecords(incident) {
   const [tickets] = await pool.query(
-    `SELECT t.id,t.subject,t.category FROM tickets t JOIN users u ON u.id=t.user_id
+    `SELECT t.id,t.subject,t.category,d.issue_code FROM tickets t JOIN users u ON u.id=t.user_id
+     LEFT JOIN ticket_support_details d ON d.ticket_id=t.id
      WHERE t.incident_id IS NULL AND u.location=? AND t.status NOT IN ('Resolved','Archived')`,
     [incident.location]
   );

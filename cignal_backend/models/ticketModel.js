@@ -49,25 +49,29 @@ async function ensureTicketWorkflowSchema() {
 
 async function createTicket(data) {
   await ensureTicketWorkflowSchema();
-
-  const [result] = await pool.query(
-    `
-    INSERT INTO tickets (
-      user_id,
-      category,
-      subject,
-      status
-    )
-    VALUES (?, ?, ?, 'Submitted')
-    `,
-    [
-      data.user_id,
-      data.category,
-      data.subject,
-    ]
-  );
-
-  return result.insertId;
+  // Old callers keep their existing insert path. New support details are persisted
+  // atomically with the ticket so a failure cannot leave a half-created ticket.
+  if (!data.supportDetails) {
+    const [result] = await pool.query(`INSERT INTO tickets (user_id,category,subject,status)
+      VALUES (?,?,?,'Submitted')`,[data.user_id,data.category,data.subject]);
+    return result.insertId;
+  }
+  const supportModel = require('./ticketSupportModel');
+  await supportModel.assertSupportReady();
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [result] = await conn.query(`INSERT INTO tickets (user_id,category,subject,status)
+      VALUES (?,?,?,'Submitted')`,[data.user_id,data.category,data.subject]);
+    const id=result.insertId;
+    if (!id) throw new Error('Ticket insert returned no ID. Transaction rolled back.');
+    await supportModel.insertDetailsUsing(conn,id,data.supportDetails);
+    await conn.commit();
+    return id;
+  } catch(error) {
+    await conn.rollback();
+    throw error;
+  } finally {conn.release();}
 }
 
 async function getTicketsByUser(userId) {
