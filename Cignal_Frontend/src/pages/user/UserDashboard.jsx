@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UserLayout from '../../components/UserLayout';
 import axiosClient from '../../api/axiosClient';
+import useVisibleRefresh from '../../hooks/useVisibleRefresh';
 import { fallbackPlanList, normalizePlan } from '../../utils/planHelpers';
 import {
   CreditCardIcon, TvIcon, WifiIcon, StarIcon, FilmIcon,
@@ -46,6 +47,8 @@ export default function UserDashboard() {
   const [notifReload, setNotifReload]      = useState(0);
   const [notifOpen,     setNotifOpen]     = useState(false);
   const notifRef = useRef(null);
+  // In-app notification badge refreshes even when the subscriber remains on this page.
+  useVisibleRefresh(() => setNotifReload(n => n + 1), 30000);
   useOutsideClick(notifRef, ()=>setNotifOpen(false));
 
   // Fetch subscription status

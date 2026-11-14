@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import ticketApi from '../../api/ticketApi';
+import TicketCallSupport from '../../components/TicketCallSupport';
 import useAdaptiveMessagePolling from '../../hooks/useAdaptiveMessagePolling';
 import { sameChatMessages } from '../../utils/sameChatMessages.mjs';
 import ChatAttachment from '../../components/ChatAttachment';
@@ -463,6 +464,13 @@ export default function AdminTickets() {
                 </div>
               </div>
 
+              <TicketCallSupport key={selectedTicket.id} ticket={selectedTicket} onSaved={(call) => {
+                loadMessages(selectedTicket.id);
+                if (call?.markedResolved) {
+                  setSelected((previous)=>previous?{...previous,status:'Resolved'}:previous);
+                  setRefreshKey((value)=>value+1);
+                }
+              }}/>
               <div className="flex-1 space-y-2 overflow-y-auto bg-gray-50/50 p-3" style={{ maxHeight: '240px' }}>
                 {messages.length === 0 ? (
                   <p className="mt-6 text-center text-xs text-gray-400">No messages yet.</p>

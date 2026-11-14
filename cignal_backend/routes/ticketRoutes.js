@@ -6,6 +6,9 @@ const { authRequired, requireRole } = require('../middleware/auth');
 const uploadMessage = require('../middleware/uploadMessage');
 const { createAbuseRateLimit } = require('../middleware/abuseRateLimit');
 
+const {getAdminTicketSupport,recordAdminCall}=require('../controllers/ticketSupportController');
+router.get('/admin/:id/support', authRequired, requireRole('admin'),getAdminTicketSupport);
+router.post('/admin/:id/calls', authRequired, requireRole('admin'),recordAdminCall);
 router.get('/admin',        authRequired, requireRole('admin'), getAllTicketsController);
 router.patch('/admin/:id',  authRequired, requireRole('admin'), updateTicketStatusController);
 router.delete('/admin/:id', authRequired, requireRole('admin'), deleteTicketController);

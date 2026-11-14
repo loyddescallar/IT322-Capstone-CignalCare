@@ -2,6 +2,8 @@ import axiosClient from './axiosClient';
 
 const ticketApi = {
   createTicket: (ticket) => axiosClient.post('/tickets', ticket),
+  getAdminTicketSupport: (id, config = {}) => axiosClient.get(`/tickets/admin/${id}/support`, config),
+  recordTicketCall: (id, data) => axiosClient.post(`/tickets/admin/${id}/calls`, data),
   getMyTickets: () => axiosClient.get('/tickets/my'),
   getAdminTickets: (config = {}) => axiosClient.get('/tickets/admin', config),
   getTicket: (id) => axiosClient.get(`/tickets/${id}`),

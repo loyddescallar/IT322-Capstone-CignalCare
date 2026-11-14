@@ -264,6 +264,18 @@ async function sendMessageController(
       );
     }
 
+    // External ticket alerts are optional; an already-saved chat reply must
+    // remain successful if an SMS/email provider is unavailable.
+    if (senderRole === 'admin') {
+      try {
+        await require('../services/ticketDeliveryService').sendTicketAlert({
+          ticketId:ticket.id,eventKey:`reply:message:${result.insertId}`,kind:'reply',
+        });
+      } catch (alertError) {
+        console.warn('TICKET CHAT ALERT WARNING:',alertError.message);
+      }
+    }
+
     const [rows] =
       await pool.query(
         `
