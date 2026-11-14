@@ -159,11 +159,11 @@ function groupPotentialIncidents(tickets = []) {
 }
 
 async function findRecentIncident(issueKey, location) {
-  const hours = INCIDENT_DETECTION_POLICY.decisionCooldownHours;
+  // Open incidents remain open across detection windows until explicitly closed.
   const [rows] = await pool.query(`SELECT * FROM support_incidents
     WHERE issue_key=? AND location=? AND status IN ('candidate','confirmed')
-      AND created_at >= NOW() - INTERVAL '${hours} hours'
-    ORDER BY created_at DESC LIMIT 1`, [issueKey, location]);
+    ORDER BY CASE status WHEN 'confirmed' THEN 0 ELSE 1 END, created_at DESC
+    LIMIT 1`, [issueKey, location]);
   return rows[0] || null;
 }
 
@@ -241,25 +241,47 @@ async function syncIncidentCandidates(hours = INCIDENT_DETECTION_POLICY.windowHo
   return created;
 }
 
-async function listIncidents({ status = null, limit = 100 } = {}) {
-  await ensureIncidentSchema();
+function incidentFilters({ status = null, search = '', location = '' } = {}) {
+  const conditions = [];
   const params = [];
-  let where = '';
-
-  if (status) {
-    where = 'WHERE status=?';
-    params.push(status);
+  if (status) { conditions.push('status=?'); params.push(status); }
+  if (location) { conditions.push('location=?'); params.push(location); }
+  if (search) {
+    conditions.push('(LOWER(issue_label) LIKE ? OR LOWER(location) LIKE ?)');
+    const term = '%' + String(search).toLowerCase() + '%';
+    params.push(term, term);
   }
+  return { where: conditions.length ? 'WHERE ' + conditions.join(' AND ') : '', params };
+}
 
-  params.push(Number(limit));
+async function listIncidents({ status = null, search = '', location = '', sort = 'newest', limit = 100, offset = 0 } = {}) {
+  await ensureIncidentSchema();
+  const { where, params } = incidentFilters({ status, search, location });
+  const order = sort === 'oldest' ? 'ASC' : 'DESC';
+  const priority = status ? '' : "CASE status WHEN 'candidate' THEN 0 WHEN 'confirmed' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END,";
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 100));
+  const safeOffset = Math.max(0, Number(offset) || 0);
   const [rows] = await pool.query(
     `SELECT * FROM support_incidents ${where}
-     ORDER BY CASE status WHEN 'candidate' THEN 0 WHEN 'confirmed' THEN 1 ELSE 2 END,
-              created_at DESC
-     LIMIT ?`,
-    params
+     ORDER BY ${priority} created_at ${order}, id ${order} LIMIT ? OFFSET ?`,
+    [...params, safeLimit, safeOffset]
   );
   return rows;
+}
+
+async function countIncidents(filters = {}) {
+  await ensureIncidentSchema();
+  const { where, params } = incidentFilters(filters);
+  const [rows] = await pool.query(`SELECT COUNT(*) AS total FROM support_incidents ${where}`, params);
+  return Number(rows[0]?.total || 0);
+}
+
+async function listIncidentLocations() {
+  await ensureIncidentSchema();
+  const [rows] = await pool.query(
+    "SELECT DISTINCT location FROM support_incidents WHERE location IS NOT NULL AND TRIM(location) <> '' ORDER BY location"
+  );
+  return rows.map((row) => row.location);
 }
 
 async function getIncidentById(id) {
@@ -315,40 +337,38 @@ async function linkMatchingRecords(incident) {
 }
 
 async function confirmIncident(id, adminId, notes = null) {
+  // Only the first candidate -> confirmed transition may trigger notifications.
+  const [result] = await pool.query(
+    `UPDATE support_incidents SET status='confirmed', confirmed_at=NOW(), confirmed_by=?,
+     notes=COALESCE(?,notes), updated_at=NOW() WHERE id=? AND status='candidate'`,
+    [adminId, notes || null, id]
+  );
   const incident = await getIncidentById(id);
   if (!incident) return null;
-  if (['dismissed', 'resolved'].includes(incident.status)) return incident;
-
-  await pool.query(
-    `UPDATE support_incidents
-     SET status='confirmed', confirmed_at=NOW(), confirmed_by=?, notes=?, updated_at=NOW()
-     WHERE id=?`,
-    [adminId, notes || incident.notes || null, id]
-  );
-
-  const updated = await getIncidentById(id);
-  await linkMatchingRecords(updated);
-  return updated;
+  const changed = Number(result.affectedRows || 0) === 1;
+  if (changed) {
+    try { await linkMatchingRecords(incident); }
+    catch (error) { console.error('LINK INCIDENT RECORDS ERROR:', error); }
+  }
+  return { incident, changed };
 }
 
 async function dismissIncident(id, notes = null) {
-  await pool.query(
-    `UPDATE support_incidents
-     SET status='dismissed', dismissed_at=NOW(), notes=?, updated_at=NOW()
-     WHERE id=? AND status='candidate'`,
-    [notes || null, id]
+  const [result] = await pool.query(
+    `UPDATE support_incidents SET status='dismissed', dismissed_at=NOW(), notes=?, updated_at=NOW()
+     WHERE id=? AND status='candidate'`, [notes, id]
   );
-  return getIncidentById(id);
+  const incident = await getIncidentById(id);
+  return incident ? { incident, changed: Number(result.affectedRows || 0) === 1 } : null;
 }
 
 async function resolveIncident(id, notes = null) {
-  await pool.query(
-    `UPDATE support_incidents
-     SET status='resolved', resolved_at=NOW(), notes=COALESCE(?,notes), updated_at=NOW()
-     WHERE id=? AND status='confirmed'`,
-    [notes || null, id]
+  const [result] = await pool.query(
+    `UPDATE support_incidents SET status='resolved', resolved_at=NOW(), notes=COALESCE(?,notes),
+     updated_at=NOW() WHERE id=? AND status='confirmed'`, [notes || null, id]
   );
-  return getIncidentById(id);
+  const incident = await getIncidentById(id);
+  return incident ? { incident, changed: Number(result.affectedRows || 0) === 1 } : null;
 }
 
 async function findActiveIncidentForText(location, text) {
@@ -413,6 +433,8 @@ module.exports = {
   issueDescriptor,
   syncIncidentCandidates,
   listIncidents,
+  countIncidents,
+  listIncidentLocations,
   getIncidentById,
   getActiveIncidentsForLocation,
   confirmIncident,
