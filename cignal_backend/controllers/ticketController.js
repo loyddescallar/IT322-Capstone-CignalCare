@@ -49,7 +49,10 @@ async function createTicketController(req, res) {
     // never turn a successful INSERT into a misleading HTTP 500 (retry/duplicate).
     let linkedIncident = null;
     try {
-      linkedIncident = await linkTicketIfActive(id, req.user.location, `${category} ${subject}`);
+      // Avoid attaching a Remote/Payment ticket to an unrelated No Signal outage
+      // merely because its editable subject happens to mention 'No Signal'.
+      linkedIncident = await linkTicketIfActive(id, req.user.location,
+        supportDetails ? { issue_code: supportDetails.issueCode } : `${category} ${subject}`);
     } catch (incidentError) {
       console.warn('TICKET INCIDENT LINK WARNING:', incidentError?.message || incidentError);
     }

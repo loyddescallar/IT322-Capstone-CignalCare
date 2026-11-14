@@ -12,7 +12,14 @@ async function getAdminTicketSupport(req,res) {
   const [support,calls,reply]=await Promise.all([
    getTicketSupport(ticket.id),getCallHistory(ticket.id),getAwaitingReply(ticket.id),
   ]);
-  return res.json({support,calls,reply,templates:OUTCOMES});
+  // Never expose account-recovery credentials/phone metadata as part of a
+  // ticket support response. The UI needs only ticket-scoped contact details.
+  const safeSupport=support ? Object.fromEntries([
+   'ticket_id','status','report_group','issue_code','issue_label',
+   'diagnostics','receiver_model','receiver_code','contact_phone',
+   'alternative_phone','contact_email','preferred_contact',
+  ].map(key=>[key,support[key]])) : null;
+  return res.json({support:safeSupport,calls,reply,templates:OUTCOMES});
  } catch(error) {
   console.error('TICKET SUPPORT DETAILS ERROR:',error);
   return res.status(error.code==='SCHEMA_NOT_READY'?503:500).json({error:'Ticket contact records are unavailable. Verify the ticket-support migration.'});

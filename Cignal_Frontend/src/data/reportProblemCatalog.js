@@ -67,16 +67,68 @@ export function questionsFor(groupId, issueCode) {
   return [q('started','When did the problem start?',['Today','Yesterday','Earlier','Not sure'])];
 }
 
+// Prefer the actual symptom in a drafted ticket over a broad legacy category.
 export function findGroupFromPrefill(category = '', subject = '') {
   const c = String(category).toLowerCase();
   const s = String(subject).toLowerCase();
-  if (/signal|connection/.test(c) || /signal|pixelat/.test(s)) return 'signal';
-  if (/channel/.test(c) || /channel/.test(s)) return 'channels';
-  if (/bill|load|payment/.test(c) || /load|payment|reload/.test(s)) return 'prepaid';
+  if (/no[ -]?signal|weak[ -]?signal|intermittent[ -]?signal|pixelat|signal lost|walang signal|low signal|rain.*signal/.test(s)) return 'signal';
+  if (/missing channels?|channel not available|black[ /-]?screen|blue screen|frozen picture|no audio|distorted audio/.test(s)) return 'channels';
+  if (/remote|hdmi|rca|tv input|tv source/.test(s)) return 'remote';
+  if (/load not reflected|load not activated|subscription expired|loading transaction|payment concern|payment not recorded|incorrect load/.test(s)) return 'prepaid';
+  if (/receiver|smart card|set.?top box|box (not turning|keeps restarting|freezes)/.test(s)) return 'receiver';
+  if (/dish|installation|relocation|damaged cable|equipment inspection/.test(s)) return 'installation';
+  if (/signal|connection/.test(c)) return 'signal';
+  if (/channel/.test(c)) return 'channels';
+  if (/bill|load|payment/.test(c)) return 'prepaid';
   if (/technician|installation/.test(c)) return 'installation';
-  if (/remote|hdmi/.test(s)) return 'remote';
-  if (/technical|receiver|box|smart.?card/.test(c + ' ' + s)) return 'receiver';
+  if (/technical|receiver|box|smart.?card/.test(c)) return 'receiver';
   return 'other';
 }
+
+// Prefilled CignalBot/troubleshooting tickets should select the specific issue
+// identified by their subject, rather than always the category's first item.
+export function findIssueFromPrefill(groupId, subject = '') {
+  const group = getGroup(groupId);
+  const value = String(subject).trim().toLowerCase();
+  const rules = [
+    ['intermittent_signal', /intermittent signal|signal (comes and goes|keeps dropping)/],
+    ['pixelated_signal', /pixelat/],
+    ['rain_signal_loss', /signal.*(rain|storm)|rain.*signal/],
+    ['low_signal_quality', /low signal quality/],
+    ['weak_signal', /weak signal|mahina.*signal/],
+    ['no_signal', /no[ -]?signal|signal lost|walang signal/],
+    ['missing_channels', /missing channels?|no channels?/],
+    ['channel_unavailable', /channel not available/],
+    ['black_screen', /black[ /-]?screen|blue screen|blank screen/],
+    ['frozen_picture', /frozen picture|picture freezes/],
+    ['no_audio', /no audio|no sound/],
+    ['distorted_audio', /distorted audio/],
+    ['receiver_no_power', /receiver not turning|box not turning|receiver won.t turn on/],
+    ['receiver_restart', /receiver.*restart|box keeps restarting/],
+    ['receiver_freezes', /receiver freezes|box freezes/],
+    ['receiver_error', /receiver error|error code|\be(?:1|2|4|6|11|14)\b/],
+    ['smart_card', /smart card/],
+    ['remote_not_working', /remote.*not working|remote control issue/],
+    ['remote_buttons', /remote buttons|buttons not responding/],
+    ['hdmi_rca', /hdmi|rca/],
+    ['wrong_input', /tv input|tv source/],
+    ['load_not_reflected', /load not reflected/],
+    ['channels_not_activated', /channels? not activated/],
+    ['incorrect_load', /incorrect load/],
+    ['subscription_expired', /subscription expired/],
+    ['payment_concern', /payment concern|payment not recorded/],
+    ['dish_alignment', /dish alignment/],
+    ['damaged_cable', /damaged cable|loose cable/],
+    ['dish_relocation', /dish relocation/],
+    ['installation_issue', /installation problem/],
+    ['equipment_inspection', /equipment inspection/],
+  ];
+  const permitted = new Set(group.issues.map(([code]) => code));
+  const specific = rules.find(([code,re]) => permitted.has(code) && re.test(value));
+  if (specific) return specific[0];
+  const exact = group.issues.find(([,label]) => label.toLowerCase()===value);
+  return exact?.[0] || group.issues[0][0];
+}
+
 export function getGroup(id) { return REPORT_GROUPS.find(g => g.id === id) || REPORT_GROUPS[0]; }
 export function getIssue(group, issueCode) { return group.issues.find(([code]) => code === issueCode) || group.issues[0]; }

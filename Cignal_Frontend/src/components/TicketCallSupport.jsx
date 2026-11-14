@@ -41,7 +41,9 @@ export default function TicketCallSupport({ticket,onSaved}) {
  useVisibleRefresh(()=>load(),30000,Boolean(data) && !saving);
  const chooseOutcome=value=>{
    setOutcome(value);setMessage(OUTCOMES.find(x=>x[0]===value)?.[2]||'');
-   setMarkResolved(false);setSaved(false);
+   // Selecting a resolved call is explicit confirmation that this ticket
+   // should close when the admin clicks Confirm & Send.
+   setMarkResolved(value==='resolved');setSaved(false);
  };
  const submit=async(e)=>{
    e.preventDefault();setError('');setSaved(false);setSaving(true);
@@ -99,10 +101,20 @@ export default function TicketCallSupport({ticket,onSaved}) {
           Also mark this ticket Resolved after saving the call and sending the message.
         </label>}
         {error && <p role="alert" className="rounded bg-red-50 p-2 text-xs text-red-700">{error}</p>}
-        {saved && <p role="status" className="flex items-center gap-1 text-xs text-green-700"><CheckCircle2 size={13}/>Call record and subscriber message saved.</p>}
-        <button type="submit" disabled={saving || isClosed || !phone || !message.trim()} className="w-full rounded-lg bg-[#cc0000] px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50">
-          {saving?'Saving...':'Confirm & Send Follow-up'}
+        {saved && <div role="status" className="space-y-2 rounded-lg border border-green-100 bg-green-50 p-2 text-xs text-green-700">
+          <p className="flex items-center gap-1"><CheckCircle2 size={13}/>Call record and subscriber message saved.</p>
+          {!isClosed && <button type="button" className="font-semibold underline" onClick={()=>{
+            setSaved(false);setRequestKey(newCallKey());setNotes('');setCallbackAt('');
+            setOutcome('technician');setMessage(OUTCOMES[1][2]);setMarkResolved(false);
+          }}>Record another call</button>}
+        </div>}
+        <button type="submit" disabled={saving || saved || isClosed || (outcome==='resolved' && !markResolved) || !phone || !message.trim()} className="w-full rounded-lg bg-[#cc0000] px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+          {saving?'Saving...':saved?'Follow-up Recorded':'Confirm & Send Follow-up'}
         </button>
+        {saved && outcome==='technician' && !isClosed &&
+          <a href="/admin/technicians" className="block rounded-lg border border-blue-200 px-3 py-2 text-center text-xs font-semibold text-blue-700 hover:bg-blue-50">
+            Review Technician Requests (no visit is booked automatically)
+          </a>}
       </form>
       {data.calls?.length>0 && <details className="rounded-lg border border-slate-200 p-2 text-xs">
         <summary className="flex cursor-pointer items-center gap-1 font-semibold text-slate-700"><ClipboardList size={13}/>Previous Call Records ({data.calls.length})</summary>

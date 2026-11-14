@@ -398,7 +398,10 @@ async function findActiveIncidentForText(location, text) {
      ORDER BY confirmed_at DESC`,
     [normalizeLocation(location)]
   );
-  const descriptor = issueDescriptor({ subject: text, category: text });
+  // Structured reports must be linked using their validated issue code, not
+  // an editable subject which may mention a different (or negated) symptom.
+  const descriptor = issueDescriptor(text && typeof text === 'object'
+    ? text : { subject: text, category: text });
   return descriptor
     ? rows.find((row) => row.issue_key === descriptor.key) || null
     : null;

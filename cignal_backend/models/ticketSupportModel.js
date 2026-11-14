@@ -76,6 +76,7 @@ async function recordCallOutcome({ticketId, adminId, outcome, phone, notes, mess
   const selectedMessage=String(message || OUTCOMES[outcome]).trim();
   if (!selectedMessage || selectedMessage.length > 2000) {const err=new Error('Subscriber message must be between 1 and 2000 characters.');err.statusCode=400;throw err;}
   if (markResolved && outcome!=='resolved') {const err=new Error('Only an Issue Resolved call outcome may close a ticket.');err.statusCode=400;throw err;}
+  if (outcome==='resolved' && !markResolved) {const err=new Error('Confirm ticket resolution before sending an Issue Resolved follow-up.');err.statusCode=400;throw err;}
   const conn=await pool.getConnection();
   const id=crypto.randomUUID();
   try {

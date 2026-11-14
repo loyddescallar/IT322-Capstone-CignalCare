@@ -5,7 +5,7 @@ import UserPageShell from '../../components/UserPageShell';
 import ticketApi from '../../api/ticketApi';
 import { validateChatAttachment } from '../../utils/chatUtils';
 import { REPORT_GROUPS, RECEIVER_MODELS, RECEIVER_CODES, CONTACT_METHODS,
-  questionsFor, findGroupFromPrefill, getGroup, getIssue } from '../../data/reportProblemCatalog';
+  questionsFor, findGroupFromPrefill, findIssueFromPrefill, getGroup, getIssue } from '../../data/reportProblemCatalog';
 
 const selectStyle='w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#cc0000] focus:ring-4 focus:ring-red-100';
 const inputStyle='w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#cc0000] focus:ring-4 focus:ring-red-100';
@@ -20,7 +20,7 @@ export default function UserReportProblem() {
   const user=useMemo(storedUser,[]);
   const initialGroup=findGroupFromPrefill(prefill.prefillCategory,prefill.prefillSubject);
   const [groupId,setGroupId]=useState(initialGroup);
-  const [issueCode,setIssueCode]=useState(()=>getGroup(initialGroup).issues[0][0]);
+  const [issueCode,setIssueCode]=useState(()=>findIssueFromPrefill(initialGroup,prefill.prefillSubject));
   const [subject,setSubject]=useState(prefill.prefillSubject || getGroup(initialGroup).issues[0][1]);
   const [description,setDescription]=useState(prefill.prefillIssueDescription || prefill.prefillDescription || '');
   const [answers,setAnswers]=useState({});
