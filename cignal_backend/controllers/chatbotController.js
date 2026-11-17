@@ -9,6 +9,10 @@ const {
   buildChatbotUiHints,
   buildTroubleshootingSessionContext,
 } = require('../services/chatbotKnowledgeService');
+const {
+  getChatbotPageKnowledge,
+  isPageGuidanceQuestion,
+} = require('../services/chatbotPageKnowledge');
 
 function sanitizeContext(context, limit = 8) {
   if (!Array.isArray(context)) return [];
@@ -126,7 +130,10 @@ async function sendChatbotMessage(req, res) {
     const context = sanitizeContext(req.body?.context);
     const session = sanitizeTroubleshootingSession(req.body?.troubleshootingSession);
     const hints = buildChatbotUiHints(message, context, session);
-    const reply = buildOfflineSupportReply(message);
+    const pageHelp = getChatbotPageKnowledge(req.body?.page);
+    const reply = pageHelp && isPageGuidanceQuestion(message)
+      ? `**${pageHelp.title}**\n\n${pageHelp.guidance}`
+      : buildOfflineSupportReply(message);
     return res.json({
       reply,
       source: 'built-in-support',
@@ -143,6 +150,7 @@ async function sendChatbotMessage(req, res) {
     req.body?.troubleshootingSession
   );
   const includePersonalData = shouldIncludePersonalData(message, context);
+  const pageHelp = getChatbotPageKnowledge(req.body?.page);
 
   try {
     let knowledgeText = '';
@@ -172,7 +180,7 @@ async function sendChatbotMessage(req, res) {
     const result = await generateGeminiReply({
       message,
       context,
-      knowledgeText,
+      knowledgeText: [knowledgeText, pageHelp?.context || ''].filter(Boolean).join('\n\n'),
     });
 
     const hints = buildChatbotUiHints(message, context, troubleshootingSession);

@@ -30,6 +30,10 @@ test('Chatbot stays usable as built-in support when Gemini is deliberately disab
   let aiCalls = 0;
   const ctrl = harness('controllers/chatbotController.js', {
     '../services/geminiService': { getGeminiModel: () => 'test', generateGeminiReply: async () => { aiCalls++; } },
+    '../services/chatbotPageKnowledge': {
+      getChatbotPageKnowledge: () => null,
+      isPageGuidanceQuestion: () => false,
+    },
     '../services/chatbotKnowledgeService': {
       getChatbotKnowledge: async () => { throw new Error('Should not require DB in offline mode'); },
       buildChatbotUiHints: () => ({ actions: [{ path: '/troubleshoot' }], quickReplies: [] }),
@@ -49,6 +53,10 @@ test('Chatbot stays usable as built-in support when Gemini is deliberately disab
 test('Disabled mode does not override AI quota HTTP 429', async () => {
   const ctrl = harness('controllers/chatbotController.js', {
     '../services/geminiService': {},
+    '../services/chatbotPageKnowledge': {
+      getChatbotPageKnowledge: () => null,
+      isPageGuidanceQuestion: () => false,
+    },
     '../services/chatbotKnowledgeService': { buildChatbotUiHints: () => ({actions: [], quickReplies: []}) },
   });
   const res = response();

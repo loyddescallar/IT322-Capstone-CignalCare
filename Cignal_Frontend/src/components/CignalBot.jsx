@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getBotPageGuide } from '../data/botPageGuide';
 import {
   Bot,
   ChevronDown,
@@ -207,6 +208,7 @@ function readActiveTroubleshootingSession(pathname = '') {
 export default function CignalBot() {
   const navigate = useNavigate();
   const location = useLocation();
+  const pageGuide = getBotPageGuide(location.pathname);
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState(INIT);
@@ -263,6 +265,7 @@ export default function CignalBot() {
         message: cleanText,
         context: conversationContext,
         troubleshootingSession,
+        page: location.pathname,
       });
 
       setMessages((previous) => [
@@ -368,7 +371,7 @@ export default function CignalBot() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold leading-tight">CignalBot</p>
-              <p className="text-xs text-red-200">Verified support + Gemini AI</p>
+              <p className="text-xs text-red-100">Help for {pageGuide.title}</p>
             </div>
             <button onClick={resetChat} className="rounded-lg p-1 hover:bg-white/20" title="Reset chat">
               <RotateCcw size={13} />
@@ -403,9 +406,9 @@ export default function CignalBot() {
                       </div>
                     </div>
 
-                    {message.quickReplies?.length > 0 && (
+                    {(message.id === 1 ? pageGuide.quickReplies : message.quickReplies)?.length > 0 && (
                       <div className="ml-9 mt-1.5 flex flex-wrap gap-1.5">
-                        {message.quickReplies.map((reply, index) => (
+                        {(message.id === 1 ? pageGuide.quickReplies : message.quickReplies).map((reply, index) => (
                           <button
                             key={index}
                             onClick={() => sendMessage(reply)}
@@ -463,7 +466,7 @@ export default function CignalBot() {
               </div>
 
               <div className="flex flex-shrink-0 flex-wrap gap-1.5 border-t border-gray-100 bg-white px-3 py-2">
-                {['No Signal', 'Load', 'Ticket', 'Technician'].map((reply) => (
+                {pageGuide.quickReplies.map((reply) => (
                   <button
                     key={reply}
                     onClick={() => sendMessage(reply)}
