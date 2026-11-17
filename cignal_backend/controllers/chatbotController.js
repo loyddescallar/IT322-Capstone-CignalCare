@@ -13,6 +13,11 @@ const {
   getChatbotPageKnowledge,
   isPageGuidanceQuestion,
 } = require('../services/chatbotPageKnowledge');
+const {
+  getGuidedSupportReply,
+  buildVerifiedPersonalStatusReply,
+  isPrivateStatusQuestion,
+} = require('../services/chatbotGuidedSupport');
 
 function sanitizeContext(context, limit = 8) {
   if (!Array.isArray(context)) return [];
@@ -131,16 +136,45 @@ async function sendChatbotMessage(req, res) {
     const session = sanitizeTroubleshootingSession(req.body?.troubleshootingSession);
     const hints = buildChatbotUiHints(message, context, session);
     const pageHelp = getChatbotPageKnowledge(req.body?.page);
-    const reply = pageHelp && isPageGuidanceQuestion(message)
+    const verifiedSession = buildTroubleshootingSessionContext(session);
+    const guided = getGuidedSupportReply({
+      message, context,
+      verifiedSession: { ...verifiedSession, completedStepIds: session?.completedStepIds || [] },
+    });
+    let personalStatus = null;
+    // Read-only, owner-scoped status lookup. This never invokes Gemini or writes
+    // records, and falls back safely if the database is temporarily unavailable.
+    if (req.user?.id && isPrivateStatusQuestion(message, context)) {
+      try {
+        const verified = await getChatbotKnowledge({
+          userId: req.user.id, includePersonalData: true,
+          message, context, troubleshootingSession: session,
+        });
+        personalStatus = buildVerifiedPersonalStatusReply({
+          message, context,
+          personalSupport: verified?.personalSupport,
+          requestedIds: verified?.requestedIds,
+        });
+      } catch (error) {
+        console.warn('CIGNALBOT OFFLINE STATUS LOOKUP UNAVAILABLE:', error?.message);
+      }
+    }
+    const reply = personalStatus || (pageHelp && isPageGuidanceQuestion(message)
       ? `**${pageHelp.title}**\n\n${pageHelp.guidance}`
-      : buildOfflineSupportReply(message);
+      : guided?.reply || buildOfflineSupportReply(message));
+    const actions = [...hints.actions];
+    for (const action of guided?.actions || []) {
+      if (!actions.some(item => item.path === action.path)) actions.push(action);
+    }
     return res.json({
       reply,
-      source: 'built-in-support',
-      quickReplies: hints.quickReplies.length
-        ? hints.quickReplies
-        : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
-      actions: hints.actions,
+      source: personalStatus ? 'built-in-support+verified-personal-data' : 'built-in-support',
+      quickReplies: guided?.quickReplies?.length
+        ? guided.quickReplies
+        : hints.quickReplies.length
+          ? hints.quickReplies
+          : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions,
       knowledge: null,
     });
   }
@@ -151,6 +185,13 @@ async function sendChatbotMessage(req, res) {
   );
   const includePersonalData = shouldIncludePersonalData(message, context);
   const pageHelp = getChatbotPageKnowledge(req.body?.page);
+  const guided = getGuidedSupportReply({
+    message, context,
+    verifiedSession: {
+      ...buildTroubleshootingSessionContext(troubleshootingSession),
+      completedStepIds: troubleshootingSession?.completedStepIds || [],
+    },
+  });
 
   try {
     let knowledgeText = '';
@@ -180,10 +221,16 @@ async function sendChatbotMessage(req, res) {
     const result = await generateGeminiReply({
       message,
       context,
-      knowledgeText: [knowledgeText, pageHelp?.context || ''].filter(Boolean).join('\n\n'),
+      knowledgeText: [knowledgeText, pageHelp?.context || '',
+        guided?.reply ? `NON-AUTHORITATIVE GUIDED SUPPORT SUGGESTION (not proof of device condition):\n${guided.reply}` : '',
+      ].filter(Boolean).join('\n\n'),
     });
 
     const hints = buildChatbotUiHints(message, context, troubleshootingSession);
+    const actions = [...hints.actions];
+    for (const action of guided?.actions || []) {
+      if (!actions.some(item => item.path === action.path)) actions.push(action);
+    }
 
     return res.json({
       reply: result.reply,
@@ -192,8 +239,8 @@ async function sendChatbotMessage(req, res) {
         : knowledgeText
           ? 'gemini+system-data'
           : 'gemini',
-      quickReplies: hints.quickReplies,
-      actions: hints.actions,
+      quickReplies: guided?.quickReplies?.length ? guided.quickReplies : hints.quickReplies,
+      actions,
       knowledge: knowledgeMeta,
     });
   } catch (error) {

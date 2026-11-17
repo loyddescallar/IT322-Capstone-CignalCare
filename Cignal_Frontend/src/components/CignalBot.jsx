@@ -30,7 +30,7 @@ function renderInline(text) {
     );
 }
 
-function renderText(text) {
+function renderText(text, fromUser = false) {
   return String(text || '')
     .split('\n')
     .map((rawLine, index) => {
@@ -43,7 +43,7 @@ function renderText(text) {
         return (
           <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-left text-[13px] leading-5">
             <span className="min-w-0 font-semibold">{renderInline(cells[0] || '')}</span>
-            <span className="text-right text-gray-500">{renderInline(cells.slice(1).join(' · '))}</span>
+            <span className={`text-right ${fromUser ? 'text-white/90' : 'text-gray-500'}`}>{renderInline(cells.slice(1).join(' · '))}</span>
           </div>
         );
       }
@@ -52,7 +52,7 @@ function renderText(text) {
       if (arrowMatch) {
         return (
           <div key={index} className="flex items-start gap-2 text-left text-[13px] leading-5">
-            <span className="mt-[1px] shrink-0 font-bold text-[#cc0000]">→</span>
+            <span className={`mt-[1px] shrink-0 font-bold ${fromUser ? 'text-white' : 'text-[#cc0000]'}`}>→</span>
             <span className="min-w-0 break-words">{renderInline(arrowMatch[1])}</span>
           </div>
         );
@@ -62,7 +62,7 @@ function renderText(text) {
       if (bulletMatch) {
         return (
           <div key={index} className="flex items-start gap-2 text-left text-[13px] leading-5">
-            <span className="mt-[1px] shrink-0 font-bold text-[#cc0000]">•</span>
+            <span className={`mt-[1px] shrink-0 font-bold ${fromUser ? 'text-white' : 'text-[#cc0000]'}`}>•</span>
             <span className="min-w-0 break-words">{renderInline(bulletMatch[1])}</span>
           </div>
         );
@@ -72,7 +72,7 @@ function renderText(text) {
       if (numberMatch) {
         return (
           <div key={index} className="flex items-start gap-2 text-left text-[13px] leading-5">
-            <span className="w-4 shrink-0 font-bold text-[#cc0000]">{numberMatch[1]}.</span>
+            <span className={`w-4 shrink-0 font-bold ${fromUser ? 'text-white' : 'text-[#cc0000]'}`}>{numberMatch[1]}.</span>
             <span className="min-w-0 break-words">{renderInline(numberMatch[2])}</span>
           </div>
         );
@@ -81,14 +81,14 @@ function renderText(text) {
       const headingMatch = line.match(/^#{1,3}\s+(.+)$/);
       if (headingMatch) {
         return (
-          <p key={index} className="text-left text-[13px] font-bold leading-5 text-gray-900">
+          <p key={index} className={`text-left text-[13px] font-bold leading-5 ${fromUser ? 'text-white' : 'text-gray-900'}`}>
             {renderInline(headingMatch[1])}
           </p>
         );
       }
 
       return (
-        <p key={index} className="break-words text-left text-[13px] leading-5 text-gray-800 sm:text-sm sm:leading-[1.55]">
+        <p key={index} className={`break-words text-left text-[13px] leading-5 sm:text-sm sm:leading-[1.55] ${fromUser ? 'text-white' : 'text-gray-800'}`}>
           {renderInline(line)}
         </p>
       );
@@ -107,7 +107,7 @@ const INIT = [
   {
     id: 1,
     from: 'bot',
-    text: 'Kumusta! Ako si **CignalBot** 🤖, ang AI support assistant ng CignalCare+.\n\nPaano kita matutulungan ngayon?',
+    text: 'Kumusta! Ako si **CignalBot** 🤖, ang support assistant ng CignalCare+.\n\nPaano kita matutulungan ngayon?',
     quickReplies: ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
   },
 ];
@@ -205,17 +205,47 @@ function readActiveTroubleshootingSession(pathname = '') {
   }
 }
 
+// Ephemeral, account-scoped conversation continuity across SPA route changes.
+// No browser storage, JWT, or customer data is persisted by this cache.
+let conversationCache = { identity: null, messages: null };
+function chatIdentity() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const token = localStorage.getItem('token') || '';
+    if (!user?.id || !token || user.role !== 'user') return null;
+    let hash = 2166136261;
+    for (let i = 0; i < token.length; i += 1) {
+      hash ^= token.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${user.id}:${hash >>> 0}`;
+  } catch { return null; }
+}
+function readConversation() {
+  const identity = chatIdentity();
+  if (!identity || identity !== conversationCache.identity) return INIT;
+  return conversationCache.messages || INIT;
+}
+function rememberConversation(messages) {
+  const identity = chatIdentity();
+  conversationCache = identity
+    ? { identity, messages: messages.slice(-30) }
+    : { identity: null, messages: null };
+}
+
 export default function CignalBot() {
   const navigate = useNavigate();
   const location = useLocation();
   const pageGuide = getBotPageGuide(location.pathname);
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
-  const [messages, setMessages] = useState(INIT);
+  const [messages, setMessages] = useState(readConversation);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const [preparingAction, setPreparingAction] = useState('');
   const bottomRef = useRef(null);
+
+  useEffect(() => { rememberConversation(messages); }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -362,8 +392,8 @@ export default function CignalBot() {
     <div className="fixed bottom-3 right-3 z-50 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:bottom-5 sm:right-5">
       {open && (
         <div
-          className="flex w-[calc(100vw-1.5rem)] max-w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-[360px]"
-          style={{ height: minimized ? 'auto' : 'min(420px, calc(100dvh - 7rem))' }}
+          className="flex w-[calc(100vw-1.5rem)] max-w-[540px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-[540px]"
+          style={{ height: minimized ? 'auto' : 'min(630px, calc(100dvh - 7rem))' }}
         >
           <div className="flex flex-shrink-0 items-center gap-2 bg-gradient-to-r from-[#880000] to-[#cc0000] px-4 py-3 text-white">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/20">
@@ -398,11 +428,11 @@ export default function CignalBot() {
                       <div
                         className={`max-w-[88%] rounded-xl px-3 py-2 text-left text-[13px] leading-5 sm:text-sm ${
                           message.from === 'user'
-                            ? 'rounded-br-sm bg-[#cc0000] text-white'
+                            ? 'rounded-br-sm bg-gradient-to-br from-[#a80000] to-[#cc0000] text-white shadow-sm'
                             : 'rounded-bl-sm border border-gray-200 bg-white text-gray-800 shadow-sm'
                         }`}
                       >
-                        {renderText(message.text)}
+                        {renderText(message.text, message.from === 'user')}
                       </div>
                     </div>
 
@@ -486,7 +516,7 @@ export default function CignalBot() {
                   onKeyDown={(event) => event.key === 'Enter' && sendMessage(input)}
                   placeholder="Ilagay ang mensahe..."
                   disabled={typing || Boolean(preparingAction)}
-                  className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#cc0000] disabled:bg-gray-50"
+                  className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-[#cc0000] disabled:bg-gray-50"
                 />
                 <button
                   onClick={() => sendMessage(input)}
