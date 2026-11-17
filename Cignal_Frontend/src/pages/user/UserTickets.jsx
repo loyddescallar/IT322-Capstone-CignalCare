@@ -158,32 +158,48 @@ export default function UserTickets() {
         {/* KPI Status Cards */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {ACTIVE_STATUSES.map((status) => (
-            <div
+            <button
+              type="button"
               key={status}
+              aria-pressed={statusFilter === status}
               onClick={() => setStatus(statusFilter === status ? 'All' : status)}
-              className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+              className={`min-h-[92px] cursor-pointer rounded-xl border bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#cc0000] sm:p-4 ${
                 statusFilter === status ? 'border-[#cc0000] ring-1 ring-red-100' : 'border-gray-100'
               }`}
             >
               <div className="mb-1 flex items-center gap-2">{STATUS_ICON[status]}<p className="text-xs text-gray-500">{status}</p></div>
               <p className={`text-2xl font-bold ${STATUS_COLOR[status]}`}>{counts[status] || 0}</p>
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <select value={statusFilter} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 outline-none focus:border-[#cc0000]">
-            <option value="All">Active Tickets</option>
-            {STATUSES.map((status) => <option key={status}>{status}</option>)}
-          </select>
-
-          <select value={sortOrder} onChange={(event) => setSort(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 outline-none focus:border-[#cc0000]">
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-          </select>
-
-          <span className="text-xs text-gray-400">{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
+        {/* Clickable KPI cards handle status selection; keep only useful tools here. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" aria-pressed={statusFilter === 'All'} onClick={() => setStatus('All')}
+              className={`min-h-10 rounded-lg px-3 py-2 text-sm font-semibold transition ${statusFilter === 'All' ? 'bg-[#cc0000] text-white' : 'border border-gray-200 bg-white text-slate-700 hover:border-red-200'}`}>
+              All Active
+            </button>
+            <button type="button" aria-pressed={statusFilter === 'Archived'} onClick={() => setStatus('Archived')}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${statusFilter === 'Archived' ? 'bg-slate-800 text-white' : 'border border-gray-200 bg-white text-slate-700 hover:border-gray-300'}`}>
+              <Archive size={15} aria-hidden="true" /> Archived ({counts.Archived || 0})
+            </button>
+            {statusFilter !== 'All' && statusFilter !== 'Archived' && (
+              <button type="button" onClick={() => setStatus('All')} className="min-h-10 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-[#a60000] hover:bg-red-100"
+                title="Clear selected status filter" aria-label={`Clear ${statusFilter} filter`}>
+                {statusFilter} ×
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <span className="mr-auto text-xs text-gray-500 sm:mr-2" aria-live="polite">{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
+            <label htmlFor="my-tickets-sort" className="text-xs font-medium text-slate-600">Sort</label>
+            <select id="my-tickets-sort" value={sortOrder} onChange={(event) => setSort(event.target.value)}
+              className="min-h-10 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#cc0000]">
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+          </div>
         </div>
 
         {/* Ticket List */}
@@ -193,8 +209,8 @@ export default function UserTickets() {
           ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-gray-100 bg-white p-8 text-center text-gray-400">
               <Ticket size={32} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No tickets found.</p>
-              <button onClick={() => navigate('/user/report-problem')} className="mt-3 text-xs font-semibold text-[#cc0000] hover:underline">File your first ticket →</button>
+              <p className="text-sm">{statusFilter === 'Archived' ? 'No archived tickets yet.' : statusFilter === 'All' ? 'No active tickets yet.' : `No ${statusFilter.toLowerCase()} tickets found.`}</p>
+              {statusFilter === 'All' && <button type="button" onClick={() => navigate('/user/report-problem')} className="mt-3 min-h-10 text-sm font-semibold text-[#cc0000] hover:underline">File your first ticket →</button>}
             </div>
           ) : filtered.map((ticket) => {
             const status = displayStatus(ticket.status);
@@ -203,8 +219,17 @@ export default function UserTickets() {
             return (
               <div
                 key={ticket.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open support ticket #${ticket.id}: ${ticket.subject}`}
                 onClick={() => handleTicketClick(ticket)}
-                className="group flex cursor-pointer flex-col items-stretch justify-between gap-3 rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md sm:flex-row sm:items-center"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleTicketClick(ticket);
+                  }
+                }}
+                className="group flex cursor-pointer flex-col items-stretch justify-between gap-3 rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#cc0000] sm:flex-row sm:items-center"
               >
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-2">

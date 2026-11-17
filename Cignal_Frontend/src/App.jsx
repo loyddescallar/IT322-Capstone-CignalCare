@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import SessionTimeoutGuard from './components/SessionTimeoutGuard';
 
 // Admin
 const AdminWorkspace = lazy(() => import('./pages/admin/AdminWorkspace'));
@@ -84,7 +85,9 @@ const userRoute = (element) => <RoleRoute role="user">{element}</RoleRoute>;
 
 export default function App() {
   return (
-    <Suspense fallback={<div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center p-6 text-sm text-gray-500">Loading page…</div>}>
+    <>
+      <SessionTimeoutGuard />
+      <Suspense fallback={<div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center p-6 text-sm text-gray-500">Loading page…</div>}>
       <Routes>
       {/* Auth */}
       <Route path="/login" element={<Login />} />
@@ -136,6 +139,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </>
   );
 }
