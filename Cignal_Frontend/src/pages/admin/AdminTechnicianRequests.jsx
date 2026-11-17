@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X, Wrench, Calendar, Phone, MapPin, Image, ExternalLink } from 'lucide-react';
 import axiosClient from '../../api/axiosClient';
 import customerApi from '../../api/customerApi';
+import { matchesAdminLocation, technicianLocationKpis } from '../../utils/adminKpiLocation';
 
 const STATUSES=['Submitted','Under Review','Scheduled','Completed','Cancelled'];
 const LOCATIONS=['Balayan','Calaca','Lian','Calatagan','Nasugbu','Lemery','Tuy'];
@@ -16,21 +17,33 @@ function sourceLabel(source) {
 export default function AdminTechnicianRequests() {
   const navigate=useNavigate();
   const [requests,setRequests]=useState([]); const [loading,setLoading]=useState(true);
-  const [search,setSearch]=useState(''); const [statusF,setStatusF]=useState('All'); const [locF,setLocF]=useState('All');
+  const [search,setSearch]=useState(''); const [kpiFilter,setKpiFilter]=useState('Total'); const [locF,setLocF]=useState('All');
   const [selected,setSelected]=useState(null); const [techName,setTechName]=useState(''); const [adminNote,setAdminNote]=useState(''); const [newStatus,setNewStatus]=useState(''); const [saving,setSaving]=useState(false);
   const [photoModal,setPhotoModal]=useState(null);
 
   const load=async()=>{ setLoading(true); try{const r=await axiosClient.get('/technicians/requests/admin'); setRequests(r.data?.requests||[]);}catch(e){console.error(e);}finally{setLoading(false);} };
   useEffect(()=>{load();},[]);
 
-  const filtered=useMemo(()=>{ const q=search.toLowerCase(); return requests.filter(r=>statusF==='All'||r.status===statusF).filter(r=>locF==='All'||r.location===locF).filter(r=>[
+  const filtered=useMemo(()=>{ const q=search.toLowerCase(); return requests.filter(r => kpiFilter === 'Total' ||
+    (kpiFilter === 'From Load Check' ? r.source === 'load_request_signal_check' :
+      (kpiFilter === 'Submitted' ? ['Submitted','Pending'].includes(r.status) : r.status === kpiFilter)))
+    .filter(r=>matchesAdminLocation(r.location,locF)).filter(r=>[
     r.issueDescription,
     r.accountNumber,
     r.contactName,
     r.source,
     r.screen_issue,
-  ].join(' ').toLowerCase().includes(q)); },[requests,search,statusF,locF]);
-  const kpis=[{label:'Total',value:requests.length,dot:'bg-slate-400',color:'text-slate-800'},{label:'Submitted',value:requests.filter(r=>['Submitted','Pending'].includes(r.status)).length,dot:'bg-red-500',color:'text-red-600'},{label:'Under Review',value:requests.filter(r=>r.status==='Under Review').length,dot:'bg-amber-400',color:'text-amber-600'},{label:'Scheduled',value:requests.filter(r=>r.status==='Scheduled').length,dot:'bg-blue-500',color:'text-blue-600'},{label:'Completed',value:requests.filter(r=>r.status==='Completed').length,dot:'bg-green-500',color:'text-green-600'},{label:'From Load Check',value:requests.filter(r=>r.source==='load_request_signal_check').length,dot:'bg-red-500',color:'text-red-600'}];
+  ].join(' ').toLowerCase().includes(q)); },[requests,search,kpiFilter,locF]);
+  const locationKpis=useMemo(()=>technicianLocationKpis(requests, locF),[requests,locF]);
+  const kpis=[
+    {label:'Total',value:locationKpis.Total,dot:'bg-slate-400',color:'text-slate-800'},
+    {label:'Submitted',value:locationKpis.Submitted,dot:'bg-red-500',color:'text-red-600'},
+    {label:'Under Review',value:locationKpis['Under Review'],dot:'bg-amber-400',color:'text-amber-600'},
+    {label:'Scheduled',value:locationKpis.Scheduled,dot:'bg-blue-500',color:'text-blue-600'},
+    {label:'Completed',value:locationKpis.Completed,dot:'bg-green-500',color:'text-green-600'},
+    {label:'Cancelled',value:locationKpis.Cancelled,dot:'bg-slate-500',color:'text-slate-600'},
+    {label:'From Load Check',value:locationKpis['From Load Check'],dot:'bg-purple-500',color:'text-purple-600'},
+  ];
   const openModal=r=>{setSelected(r);setNewStatus(r.status === 'Pending' ? 'Submitted' : r.status);setTechName(r.technician_name||'');setAdminNote(r.admin_note||'');};
   const handleSave=async()=>{ setSaving(true); try{await axiosClient.patch('/technicians/requests/admin/'+selected.id,{status:newStatus,technician_name:techName||null,admin_note:adminNote||null}); setRequests(prev=>prev.map(r=>r.id===selected.id?{...r,status:newStatus,technician_name:techName,admin_note:adminNote}:r)); setSelected(null);}catch(e){console.error(e);}finally{setSaving(false);} };
   const navigateToCustomer=async(accountNumber)=>{ try{const r=await customerApi.getCustomerLookup(accountNumber); if(r.data?.user?.id)navigate('/admin/customers/'+r.data.user.id);}catch(e){console.error(e);} };
@@ -38,13 +51,17 @@ export default function AdminTechnicianRequests() {
   return (
     <div className="space-y-4">
       <div><h1 className="text-lg font-bold text-gray-800">Technician Requests</h1><p className="text-xs text-gray-500 mt-0.5">Field service and repair requests from subscribers</p></div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{kpis.map(s=><div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"><div className="flex items-center gap-2 mb-2"><div className={`w-2 h-2 rounded-full ${s.dot}`}/><p className="text-xs text-gray-500">{s.label}</p></div><p className={`text-2xl font-bold ${s.color}`}>{loading?'...':s.value}</p></div>)}</div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+        {kpis.map(s=><button type="button" key={s.label} aria-pressed={kpiFilter===s.label} onClick={()=>setKpiFilter(prev=>prev===s.label?'Total':s.label)} className={`w-full rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600 ${kpiFilter===s.label?'border-[#cc0000] ring-2 ring-red-100':'border-gray-100'}`}>
+          <div className="mb-2 flex items-center gap-2"><div className={`h-2 w-2 rounded-full ${s.dot}`}/><p className="text-xs text-gray-500">{s.label}</p></div>
+          <p className={`text-2xl font-bold ${s.color}`}>{loading?'...':s.value}</p>
+        </button>)}
+      </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <div className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:max-w-xs sm:flex-1"><Search size={14} className="text-gray-400"/><input type="text" placeholder="Search issue, account, contact..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-transparent text-xs text-gray-600 placeholder-gray-400 outline-none w-full"/></div>
           <div className="flex gap-1.5 flex-wrap">{['All',...LOCATIONS].map(loc=><button key={loc} onClick={()=>setLocF(loc)} className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${locF===loc?'bg-[#cc0000] text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{loc}</button>)}</div>
-          <div className="flex gap-1.5 flex-wrap">{['All',...STATUSES].map(s=><button key={s} onClick={()=>setStatusF(s)} className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${statusF===s?'bg-slate-700 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s}</button>)}</div>
-          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} requests</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filtered.length} requests · {kpiFilter}</span>
         </div>
         <div className="overflow-x-auto"><table className="min-w-[1040px] w-full text-xs">
           <thead><tr className="border-b border-gray-100 bg-gray-50">{['#','Issue','Source','Account No.','Contact','Location','Preferred Date','Photo','Technician','Status','Actions'].map(h=><th key={h} className="text-left py-2.5 px-3 text-gray-500 font-semibold uppercase tracking-wide" style={{fontSize:'10px'}}>{h}</th>)}</tr></thead>

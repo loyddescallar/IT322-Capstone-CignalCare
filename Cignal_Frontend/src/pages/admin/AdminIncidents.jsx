@@ -7,7 +7,6 @@ import {
   Eye,
   MapPin,
   RefreshCw,
-  Search,
   Siren,
   X,
 } from 'lucide-react';
@@ -219,9 +218,9 @@ export default function AdminIncidents() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
-  const [input, setInput] = useState('');
-  const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
+  const [activeLane, setActiveLane] = useState('all');
+  const [dismissedCount, setDismissedCount] = useState(null);
   const [sort, setSort] = useState('newest');
   const [mobile, setMobile] = useState('candidate');
   const [revision, setRevision] = useState(0);
@@ -254,14 +253,6 @@ export default function AdminIncidents() {
   }, [busy]);
 
   useEffect(() => {
-    const id = setTimeout(() => {
-      setSearch(input.trim());
-    }, 300);
-
-    return () => clearTimeout(id);
-  }, [input]);
-
-  useEffect(() => {
     const version = ++currentBoard.current;
     let cancelled = false;
 
@@ -272,7 +263,6 @@ export default function AdminIncidents() {
       COLUMNS.map(({ key }) =>
         incidentApi.getAdminIncidents({
           status: key,
-          search,
           location,
           sort,
           offset: 0,
@@ -315,7 +305,7 @@ export default function AdminIncidents() {
     return () => {
       cancelled = true;
     };
-  }, [search, location, sort, revision]);
+  }, [location, sort, revision]);
 
   useEffect(() => {
     if (!historyOpen) {
@@ -331,7 +321,6 @@ export default function AdminIncidents() {
     incidentApi
       .getAdminIncidents({
         status: 'dismissed',
-        search,
         location,
         sort,
         limit: PAGE_SIZE,
@@ -359,7 +348,16 @@ export default function AdminIncidents() {
     return () => {
       cancelled = true;
     };
-  }, [historyOpen, search, location, sort, revision]);
+  }, [historyOpen, location, sort, revision]);
+
+  // Summary is fetched independently of the dismissed-history modal.
+  useEffect(() => {
+    let active = true;
+    incidentApi.getAdminIncidents({ status: 'dismissed', location, sort, limit: 1, offset: 0 })
+      .then(({ data }) => { if (active) setDismissedCount(Number(data?.total || 0)); })
+      .catch(() => { if (active) setDismissedCount(null); });
+    return () => { active = false; };
+  }, [location, sort, revision]);
 
   const loadMore = async (status) => {
     const lane = board[status];
@@ -374,7 +372,6 @@ export default function AdminIncidents() {
     try {
       const response = await incidentApi.getAdminIncidents({
         status,
-        search,
         location,
         sort,
         limit: PAGE_SIZE,
@@ -424,7 +421,6 @@ export default function AdminIncidents() {
     try {
       const response = await incidentApi.getAdminIncidents({
         status: 'dismissed',
-        search,
         location,
         sort,
         limit: PAGE_SIZE,
@@ -573,26 +569,6 @@ export default function AdminIncidents() {
 
       {/* FILTERS */}
       <div className="flex flex-wrap items-center gap-2">
-        <label className="relative min-w-44 flex-1">
-          <span className="sr-only">
-            Search incidents
-          </span>
-
-          <Search
-            size={16}
-            className="absolute left-3 top-3 text-slate-400"
-          />
-
-          <input
-            type="search"
-            value={input}
-            maxLength={100}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder="Search incidents"
-            className="min-h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm"
-          />
-        </label>
-
         <label>
           <span className="sr-only">
             Filter location
@@ -635,13 +611,6 @@ export default function AdminIncidents() {
           </select>
         </label>
 
-        <button
-          onClick={() => setHistoryOpen(true)}
-          className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
-        >
-          <Archive size={15} />
-          Dismissed History
-        </button>
       </div>
 
       {/* DETECTION POLICY */}
@@ -653,31 +622,32 @@ export default function AdminIncidents() {
         </p>
       )}
 
-      {/* MOBILE COLUMN SELECTOR */}
-      <div className="grid grid-cols-3 gap-2 lg:hidden">
-        {COLUMNS.map(({ key, title }) => (
-          <button
-            key={key}
-            onClick={() => setMobile(key)}
-            className={
-              'rounded-lg border p-2 text-xs font-semibold ' +
-              (mobile === key
-                ? 'border-slate-500 bg-white'
-                : 'border-slate-200 bg-slate-100 text-slate-500')
-            }
-          >
-            {title}
-
-            <span className="ml-1 tabular-nums">
-              {board[key].total}
-            </span>
+      {/* KPI STATUS NAVIGATION */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {COLUMNS.map(({ key, title, Icon, color }) => (
+          <button key={key} type="button" aria-pressed={activeLane === key}
+            onClick={() => { setActiveLane(prev => prev === key ? 'all' : key); setMobile(key); }}
+            className={`rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600 ${activeLane===key?'border-red-600 ring-2 ring-red-100':'border-slate-200'}`}>
+            <div className={`flex items-center gap-2 text-xs font-semibold ${color}`}><Icon size={16}/>{title}</div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-slate-800">{loading?'…':board[key].total}</p>
           </button>
         ))}
+        <button type="button" onClick={() => setHistoryOpen(true)} aria-label="View dismissed incident history"
+          className={`rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600 ${historyOpen?'border-red-600 ring-2 ring-red-100':'border-slate-200'}`}>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600"><Archive size={16}/>Dismissed</div>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-slate-800">{dismissedCount ?? '—'}</p>
+        </button>
       </div>
+      {activeLane !== 'all' && (
+        <button type="button" onClick={() => { setActiveLane('all'); setMobile('candidate'); }}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-red-200">
+          View all incident lanes
+        </button>
+      )}
 
       {/* KANBAN BOARD */}
-      <div className="grid gap-3 lg:grid-cols-3">
-        {COLUMNS.map(({
+      <div className={`grid gap-3 ${activeLane === 'all' ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+        {COLUMNS.filter(({ key }) => activeLane === 'all' || activeLane === key).map(({
           key,
           title,
           Icon,
@@ -690,7 +660,7 @@ export default function AdminIncidents() {
             className={
               'min-w-0 overflow-hidden rounded-xl border bg-slate-50 lg:flex lg:h-[min(64dvh,690px)] lg:min-h-[340px] lg:flex-col ' +
               border +
-              (mobile === key
+              (activeLane === key || (activeLane === 'all' && mobile === key)
                 ? ' flex h-[60dvh] min-h-[340px] flex-col'
                 : ' hidden')
             }

@@ -18,11 +18,12 @@ import {
   Download,
 } from 'lucide-react';
 import customerApi from '../../api/customerApi';
-import { subscriberLifecycle } from '../../utils/adminBusinessRules';
+import { manilaDayKey, subscriberLifecycle } from '../../utils/adminBusinessRules';
+import { matchesAdminLocation, subscriberLocationKpis } from '../../utils/adminKpiLocation';
 import { rowsToSafeCsv } from '../../utils/safeCsv';
 
 const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
-const ACTIVITY_FILTERS = ['All', 'Active', 'At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'];
+const ACTIVITY_FILTERS = ['Active', 'At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'];
 const EMPTY = {
   accountName: '',
   accountNumber: '',
@@ -115,15 +116,21 @@ function validateCustomerForm(form, enforceIdentifiers = true) {
   return '';
 }
 
-function StatCard({ label, value, color, icon }) {
+function StatCard({ label, value, color, icon, active, onClick }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <button
+      type="button"
+      aria-label={`Filter subscribers: ${label}`}
+      aria-pressed={active}
+      onClick={onClick}
+      className={`w-full rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600 ${active ? 'border-[#cc0000] ring-2 ring-red-100' : 'border-gray-100'}`}
+    >
       <div className="mb-2 flex items-center gap-2">
         {icon}
         <p className="text-xs leading-tight text-gray-500">{label}</p>
       </div>
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
-    </div>
+    </button>
   );
 }
 
@@ -157,6 +164,7 @@ export default function AdminCustomers() {
   const [search, setSearch] = useState('');
   const [locTab, setLocTab] = useState('All');
   const [activityTab, setActivityTab] = useState('All');
+  const [selectedKpi, setSelectedKpi] = useState(null);
   const [recordStatus, setRecordStatus] = useState('active');
   const [mode, setMode] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -175,7 +183,7 @@ export default function AdminCustomers() {
     setLoading(true);
     try {
       const [customerRes, statsRes] = await Promise.all([
-        customerApi.getCustomers(status),
+        customerApi.getCustomers('all'),
         customerApi.getStats(),
       ]);
 
@@ -189,8 +197,22 @@ export default function AdminCustomers() {
   };
 
   useEffect(() => {
-    loadData(recordStatus);
-  }, [recordStatus]);
+    loadData('all');
+  }, []);
+
+  // A selected KPI is the single status filter. Clicking again restores current subscribers.
+  const chooseKpi = (label) => {
+    const next = selectedKpi === label ? null : label;
+    setSelectedKpi(next);
+    setRecordStatus(next === 'Archived' ? 'archived' :
+      next === 'Total Subscribers' || next === 'New This Month' ? 'all' : 'active');
+    setActivityTab(ACTIVITY_FILTERS.includes(next) ? next : 'All');
+  };
+
+  // Independent backend global counts remain authoritative when All Locations is selected.
+  // For a location, recompute the same definitions from ALL subscriber records.
+  const locationStats = useMemo(() => locTab === 'All'
+    ? stats : subscriberLocationKpis(customers, locTab), [customers, locTab, stats]);
 
   const displayedCustomers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -199,26 +221,35 @@ export default function AdminCustomers() {
       const location = normalizeLocation(customer.location);
       const activity = getActivityStatus(customer.lastLoadDate);
 
-      const matchesLocation = locTab === 'All' || location === locTab;
+      const archived = String(customer.status || '').toLowerCase() === 'archived';
+      const matchesRecordStatus = recordStatus === 'all' ||
+        (recordStatus === 'archived' ? archived : !archived);
+      const matchesLocation = matchesAdminLocation(customer.location, locTab);
       const matchesActivity =
-        recordStatus === 'archived' || activityTab === 'All' || activity === activityTab;
+        activityTab === 'All' || activity === activityTab;
+      // Match the backend Manila-calendar KPI for all accounts, including archived.
+      const matchesMonth = selectedKpi !== 'New This Month' ||
+        manilaDayKey(customer.created_at)?.slice(0, 7) === manilaDayKey(new Date()).slice(0, 7);
       const matchesSearch =
         !query ||
         String(customer.accountNumber || '').toLowerCase().includes(query) ||
         String(customer.ccaNumber || '').toLowerCase().includes(query);
 
-      return matchesLocation && matchesActivity && matchesSearch;
+      return matchesRecordStatus && matchesLocation && matchesActivity && matchesMonth && matchesSearch;
     });
-  }, [customers, search, locTab, activityTab, recordStatus]);
+  }, [customers, search, locTab, activityTab, recordStatus, selectedKpi]);
 
+  // Location badges reflect the same current/archived/all population as the table.
   const locationCounts = useMemo(() => {
+    const scope = customers.filter((customer) => {
+      const archived = String(customer.status || '').toLowerCase() === 'archived';
+      return recordStatus === 'all' || (recordStatus === 'archived' ? archived : !archived);
+    });
     return LOCATIONS.reduce((acc, location) => {
-      acc[location] = customers.filter(
-        (customer) => normalizeLocation(customer.location) === location
-      ).length;
+      acc[location] = scope.filter((customer) => matchesAdminLocation(customer.location, location)).length;
       return acc;
     }, {});
-  }, [customers]);
+  }, [customers, recordStatus]);
 
   const openModal = (nextMode, customer = null) => {
     setMode(nextMode);
@@ -404,43 +435,43 @@ export default function AdminCustomers() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="Total Subscribers"
-          value={loading ? '...' : stats.allCustomers ?? 0}
+          label="Total Subscribers" active={selectedKpi === 'Total Subscribers'} onClick={() => chooseKpi('Total Subscribers')}
+          value={loading ? '...' : locationStats.allCustomers ?? 0}
           color="text-gray-800"
           icon={<Users size={15} className="text-gray-400" />}
         />
         <StatCard
-          label="New This Month"
-          value={loading ? '...' : stats.thisMonth ?? 0}
+          label="New This Month" active={selectedKpi === 'New This Month'} onClick={() => chooseKpi('New This Month')}
+          value={loading ? '...' : locationStats.thisMonth ?? 0}
           color="text-blue-600"
           icon={<Users size={15} className="text-blue-400" />}
         />
         <StatCard
-          label="Active"
-          value={loading ? '...' : stats.activeCount ?? 0}
+          label="Active" active={selectedKpi === 'Active'} onClick={() => chooseKpi('Active')}
+          value={loading ? '...' : locationStats.activeCount ?? 0}
           color="text-green-600"
           icon={<CheckCircle2 size={15} className="text-green-500" />}
         />
         <StatCard
-          label="At Risk"
-          value={loading ? '...' : stats.atRiskCount ?? 0}
+          label="At Risk" active={selectedKpi === 'At Risk'} onClick={() => chooseKpi('At Risk')}
+          value={loading ? '...' : locationStats.atRiskCount ?? 0}
           color="text-amber-600"
           icon={<AlertTriangle size={15} className="text-amber-500" />}
         />
         <StatCard
-          label="Inactive"
-          value={loading ? '...' : stats.inactiveCount ?? 0}
+          label="Inactive" active={selectedKpi === 'Inactive'} onClick={() => chooseKpi('Inactive')}
+          value={loading ? '...' : locationStats.inactiveCount ?? 0}
           color="text-gray-500"
           icon={<XCircle size={15} className="text-gray-400" />}
         />
         <StatCard
-          label="Archived"
-          value={loading ? '...' : stats.archivedCount ?? 0}
+          label="Archived" active={selectedKpi === 'Archived'} onClick={() => chooseKpi('Archived')}
+          value={loading ? '...' : locationStats.archivedCount ?? 0}
           color="text-red-600"
           icon={<Archive size={15} className="text-red-500" />}
         />
-        <StatCard label="Archive Eligible" value={loading ? '...' : stats.archiveEligibleCount ?? 0} color="text-orange-600" icon={<Archive size={15} className="text-orange-500" />} />
-        <StatCard label="No Load Yet" value={loading ? '...' : stats.neverLoadedCount ?? 0} color="text-slate-600" icon={<XCircle size={15} className="text-slate-400" />} />
+        <StatCard label="Archive Eligible" active={selectedKpi === 'Archive Eligible'} onClick={() => chooseKpi('Archive Eligible')} value={loading ? '...' : locationStats.archiveEligibleCount ?? 0} color="text-orange-600" icon={<Archive size={15} className="text-orange-500" />} />
+        <StatCard label="No Load Yet" active={selectedKpi === 'No Load Yet'} onClick={() => chooseKpi('No Load Yet')} value={loading ? '...' : locationStats.neverLoadedCount ?? 0} color="text-slate-600" icon={<XCircle size={15} className="text-slate-400" />} />
       </div>
 
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -456,28 +487,8 @@ export default function AdminCustomers() {
             />
           </div>
 
-          <div className="flex max-w-full overflow-x-auto rounded-xl bg-gray-100 p-1">
-            <button
-              type="button"
-              onClick={() => setRecordStatus('active')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                recordStatus === 'active' ? 'bg-[#cc0000] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Current Subscribers
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecordStatus('archived')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                recordStatus === 'archived' ? 'bg-[#cc0000] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Archived ({stats.archivedCount ?? 0})
-            </button>
-          </div>
-
           <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">
+            View: {selectedKpi || 'Current Subscribers'} ·
             Showing {displayedCustomers.length} of {customers.length}
           </span>
         </div>
@@ -505,24 +516,6 @@ export default function AdminCustomers() {
             ))}
           </div>
 
-          {recordStatus !== 'archived' && (
-            <div className="flex flex-wrap gap-1.5 border-l border-gray-100 pl-2">
-              {ACTIVITY_FILTERS.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setActivityTab(status)}
-                  className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                    activityTab === status
-                      ? 'bg-gray-800 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -560,7 +553,7 @@ export default function AdminCustomers() {
               ) : displayedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-10 text-center text-gray-400">
-                    No {recordStatus === 'archived' ? 'archived' : 'current'} subscribers found.
+                    No subscribers found for the selected KPI and location.
                   </td>
                 </tr>
               ) : (
@@ -622,7 +615,7 @@ export default function AdminCustomers() {
                             View
                           </SmallActionButton>
 
-                          {recordStatus !== 'archived' ? (
+                          {status !== 'Archived' ? (
                             <>
                               <SmallActionButton
                                 title="Edit customer"
