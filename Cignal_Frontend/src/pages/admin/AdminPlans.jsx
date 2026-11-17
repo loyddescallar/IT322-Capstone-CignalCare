@@ -69,7 +69,7 @@ export default function AdminPlans() {
     const q = search.toLowerCase();
 
     return plans
-      .filter((plan) => statusFilter === 'All' || plan.status === statusFilter)
+      .filter((plan) => statusFilter === 'with-channels' ? (plan.channelData?.length || 0) > 0 : statusFilter === 'All' || plan.status === statusFilter)
       .filter((plan) =>
         [plan.plan_name, plan.plan_code, plan.amount, plan.benefits_text]
           .join(' ')
@@ -81,6 +81,7 @@ export default function AdminPlans() {
   const activeCount = plans.filter((plan) => plan.status === 'active').length;
   const inactiveCount = plans.filter((plan) => plan.status !== 'active').length;
   const totalChannels = plans.reduce((sum, plan) => sum + (plan.channelData?.length || 0), 0);
+  const plansWithChannels = plans.filter((plan) => (plan.channelData?.length || 0) > 0).length;
 
   function openAddModal() {
     setMode('add');
@@ -210,15 +211,19 @@ export default function AdminPlans() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Plans', value: plans.length, color: 'text-gray-800' },
-          { label: 'Active Plans', value: activeCount, color: 'text-green-600' },
-          { label: 'Inactive Plans', value: inactiveCount, color: 'text-gray-400' },
-          { label: 'Channel Entries', value: totalChannels, color: 'text-[#cc0000]' },
+          { label: 'Total Plans', value: plans.length, color: 'text-gray-800', filter: 'All' },
+          { label: 'Active Plans', value: activeCount, color: 'text-green-600', filter: 'active' },
+          { label: 'Inactive Plans', value: inactiveCount, color: 'text-gray-400', filter: 'inactive' },
+          { label: 'Plans With Channels', value: plansWithChannels, color: 'text-[#cc0000]', filter: 'with-channels', hint: `${totalChannels} channel entries` },
         ].map((item) => (
-          <div key={item.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+          <button key={item.label} type="button" aria-pressed={statusFilter === item.filter}
+            onClick={() => setStatusFilter(prev => prev === item.filter ? 'All' : item.filter)}
+            title={item.filter === 'with-channels' ? 'Show plans with one or more listed channels' : `Show ${item.label.toLowerCase()}`}
+            className={`w-full rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600 ${statusFilter === item.filter ? 'border-[#cc0000] ring-2 ring-red-100' : 'border-gray-100'}`}>
             <p className="mb-2 text-xs text-gray-500">{item.label}</p>
             <p className={`text-2xl font-bold ${item.color}`}>{loading ? '...' : item.value}</p>
-          </div>
+            {item.hint && <p className="mt-1 text-xs text-gray-400">{item.hint}</p>}
+          </button>
         ))}
       </div>
 
@@ -235,24 +240,7 @@ export default function AdminPlans() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {['All', 'active', 'inactive'].map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setStatusFilter(status)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
-                  statusFilter === status
-                    ? 'bg-[#cc0000] text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {status === 'All' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filteredPlans.length} plans</span>
+          <span className="w-full text-xs text-gray-400 sm:ml-auto sm:w-auto">{filteredPlans.length} plans{statusFilter === 'with-channels' ? ' with listed channels' : ''}</span>
         </div>
 
         {loading ? (

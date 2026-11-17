@@ -269,10 +269,13 @@ export default function AdminTickets() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {STATUSES.map((status) => (
-          <div
+          <button
             key={status}
+            type="button"
+            aria-label={`Filter tickets: ${status}`}
+            aria-pressed={statusFilter === status}
             onClick={() => { setPage(1); setStatus(statusFilter === status ? 'All' : status); }}
-            className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+            className={`w-full rounded-xl border bg-white p-4 text-left shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600 transition-all hover:-translate-y-0.5 hover:shadow-md ${
               statusFilter === status ? 'border-[#cc0000] ring-1 ring-red-100' : 'border-gray-100'
             }`}
           >
@@ -282,7 +285,7 @@ export default function AdminTickets() {
             </div>
             <p className={`text-2xl font-bold ${statusColor[status]}`}>{counts[status] || 0}</p>
             {locTab !== 'All' && <p className="mt-0.5 text-gray-400" style={{ fontSize: '10px' }}>{locTab} only</p>}
-          </div>
+          </button>
         ))}
       </div>
 
@@ -323,21 +326,6 @@ export default function AdminTickets() {
                 onChange={(event) => { setPage(1); setSearch(event.target.value); }}
                 className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder-gray-400"
               />
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {['All', ...STATUSES].map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => { setPage(1); setStatus(status); }}
-                  className={`rounded-md px-2.5 py-1.5 text-xs transition-colors ${
-                    statusFilter === status ? 'bg-[#cc0000] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
             </div>
 
             <select
