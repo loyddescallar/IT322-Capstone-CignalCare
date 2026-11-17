@@ -51,11 +51,12 @@ function getGeminiThinkingLevel(model = getGeminiModel()) {
 }
 
 function getGeminiTimeoutMs() {
-  const configured = Number(process.env.GEMINI_TIMEOUT_MS || 30000);
+  // Leave room for safe fallback before Axios's 30-second timeout.
+  const configured = Number(process.env.GEMINI_TIMEOUT_MS || 12000);
 
-  if (!Number.isFinite(configured)) return 30000;
+  if (!Number.isFinite(configured)) return 12000;
 
-  return Math.min(Math.max(Math.round(configured), 3000), 30000);
+  return Math.min(Math.max(Math.round(configured), 3000), 20000);
 }
 
 async function getGeminiClient() {

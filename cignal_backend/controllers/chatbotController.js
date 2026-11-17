@@ -123,6 +123,20 @@ async function sendChatbotMessage(req, res) {
     });
   }
 
+  // Page navigation uses verified public guidance: no Gemini or DB wait.
+  // Keep quota denials intact, even for navigation-only messages.
+  const pageHelpForQuestion = getChatbotPageKnowledge(req.body?.page);
+  if (req.aiAccess?.reason !== 'quota' && pageHelpForQuestion && isPageGuidanceQuestion(message)) {
+    const hints = buildChatbotUiHints(message, [], null);
+    return res.json({
+      reply: `**${pageHelpForQuestion.title}**\n\n${pageHelpForQuestion.guidance}`,
+      source: 'built-in-support',
+      quickReplies: hints.quickReplies.length ? hints.quickReplies : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions: hints.actions,
+      knowledge: null,
+    });
+  }
+
   // An academic demo must remain useful when the optional Gemini integration is
   // deliberately disabled or its shared quota provider is not configured.
   // Never claim that a deterministic reply is AI-generated or verified live data.
@@ -245,32 +259,30 @@ async function sendChatbotMessage(req, res) {
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode || 0);
-
-    if (error.code === 'GEMINI_NOT_CONFIGURED') {
-      return res.status(503).json({
-        error: 'AI assistance is not configured',
-      });
-    }
-
-    if (error.code === 'GEMINI_TIMEOUT') {
-      return res.status(504).json({
-        error: 'AI assistance took too long to respond',
-      });
-    }
-
     if (status === 429) {
       return res.status(429).json({
         error: 'AI assistance is temporarily busy. Please try again shortly.',
       });
     }
 
-    console.error('GEMINI CHATBOT ERROR:', {
-      message: error?.message,
+    console.warn('CIGNALBOT AI FALLBACK:', {
+      code: String(error?.code || 'UNAVAILABLE').slice(0, 40),
       model: getGeminiModel(),
     });
-
-    return res.status(503).json({
-      error: 'AI assistance is temporarily unavailable',
+    const hints = buildChatbotUiHints(message, context, troubleshootingSession);
+    const actions = [...hints.actions];
+    for (const action of guided?.actions || []) {
+      if (!actions.some(item => item.path === action.path)) actions.push(action);
+    }
+    // Do not invent paid transactions, statuses or receiver conditions on AI failure.
+    return res.json({
+      reply: guided?.reply || buildOfflineSupportReply(message),
+      source: 'built-in-support+ai-fallback',
+      quickReplies: guided?.quickReplies?.length ? guided.quickReplies
+        : hints.quickReplies.length ? hints.quickReplies
+          : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions,
+      knowledge: null,
     });
   }
 }

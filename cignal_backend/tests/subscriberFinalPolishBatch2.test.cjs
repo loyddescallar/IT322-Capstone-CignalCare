@@ -199,3 +199,43 @@ test('B+C: no ticket or provider mutation paths are created by new backend servi
   assert.doesNotMatch(module,/\b(?:pool|fetch|axios|INSERT|UPDATE|DELETE|PAYMENT_SECRET)\s*\(/);
   assert.doesNotMatch(module,/stripe|paymongo\.create|adminRevoke/i);
 });
+
+
+test('B+C regression: page guidance bypasses Gemini and DB when enabled', async () => {
+  let providerCalls=0, dbCalls=0;
+  const mocks=knowledgeMocks(null);
+  mocks['../services/geminiService'].generateGeminiReply=async()=>{providerCalls++; throw new Error('No AI allowed for page help');};
+  mocks['../services/chatbotKnowledgeService'].getChatbotKnowledge=async()=>{dbCalls++; throw new Error('No DB for page help');};
+  const controller=controllerWithMocks(mocks), res=response();
+  await controller.sendChatbotMessage({body:{message:'What can I do on this page?',page:'/user/tickets'},user:{id:8},aiAccess:{allowed:true,reason:'verified-free'}},res);
+  assert.equal(res.statusCode,200);
+  assert.match(res.body.reply,/Past Tickets/);
+  assert.equal(res.body.source,'built-in-support');
+  assert.equal(providerCalls,0);
+  assert.equal(dbCalls,0);
+});
+
+test('B+C regression: Gemini failure returns verified guided fallback not 504', async () => {
+  const mocks=knowledgeMocks({text:'',personalSupport:null,needs:{},requestedIds:{}});
+  mocks['../services/geminiService'].generateGeminiReply=async()=>{const e=new Error('timed out');e.code='GEMINI_TIMEOUT';throw e;};
+  const controller=controllerWithMocks(mocks), res=response();
+  await controller.sendChatbotMessage({body:{message:'Walang signal yung TV',page:'/user-dashboard'},user:{id:8},aiAccess:{allowed:true,reason:'verified-free'}},res);
+  assert.equal(res.statusCode,200);
+  assert.equal(res.body.source,'built-in-support+ai-fallback');
+  assert.match(res.body.reply,/receiver model/i);
+  assert.ok(res.body.actions.some(a=>a.path==='/troubleshoot'));
+});
+
+test('B+C regression: Gemini timeout is shorter than Axios client timeout', () => {
+  const service=require('../services/geminiService');
+  const previous=process.env.GEMINI_TIMEOUT_MS;
+  try {
+    delete process.env.GEMINI_TIMEOUT_MS;
+    assert.equal(service.getGeminiTimeoutMs(),12000);
+    process.env.GEMINI_TIMEOUT_MS='30000';
+    assert.equal(service.getGeminiTimeoutMs(),20000);
+  } finally {
+    if (previous === undefined) delete process.env.GEMINI_TIMEOUT_MS;
+    else process.env.GEMINI_TIMEOUT_MS=previous;
+  }
+});
