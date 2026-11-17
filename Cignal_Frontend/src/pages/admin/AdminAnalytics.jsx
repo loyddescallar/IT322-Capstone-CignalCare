@@ -104,6 +104,8 @@ export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
+  const [excelExporting, setExcelExporting] = useState(false);
+  const [excelError, setExcelError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -208,6 +210,30 @@ export default function AdminAnalytics() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const exportExcel = async () => {
+    if (excelExporting || loading || !data || analyticsError) return;
+    setExcelExporting(true);
+    setExcelError('');
+    try {
+      const response = await analyticsApi.getAdminAnalyticsExcel({days,location:location || undefined});
+      const excelBlob = new Blob([response.data], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      if (excelBlob.size < 1000) throw new Error('Empty Excel file returned.');
+      const url = URL.createObjectURL(excelBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `CignalCare_Premium_Analytics_${days}d_${location || 'AllLocations'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('EXCEL ANALYTICS EXPORT ERROR:', error);
+      setExcelError('Unable to generate the Excel report. Retry after checking the backend connection.');
+    } finally {
+      setExcelExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4 pb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -227,7 +253,10 @@ export default function AdminAnalytics() {
             {LOCATIONS.filter(Boolean).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <button onClick={exportCsv} disabled={loading || !data || Boolean(analyticsError)} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#d60000] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#b90000] sm:w-auto">
-            <Download size={14} /> Export Report
+            <Download size={14} /> Export CSV
+          </button>
+          <button onClick={exportExcel} disabled={loading || !data || Boolean(analyticsError) || excelExporting} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#cc0000] bg-white px-4 py-2 text-xs font-bold text-[#cc0000] shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+            <Download size={14} /> {excelExporting ? 'Preparing Excel...' : 'Export Excel Dashboard'}
           </button>
         </div>
       </div>
@@ -244,6 +273,7 @@ export default function AdminAnalytics() {
         ))}
       </div>
 
+      {excelError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{excelError}</div>}
       {analyticsError && <div role="alert" className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"><span>{analyticsError}</span><button className="font-semibold underline" onClick={() => setRetryKey(n => n + 1)}>Retry</button></div>}
       {loading && <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">Loading analytics...</div>}
 

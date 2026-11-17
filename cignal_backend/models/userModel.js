@@ -199,7 +199,7 @@ async function getCustomerStats() {
   const stats = {
     allCustomers: users.length, total: users.length, thisMonth: 0,
     activeCount: 0, atRiskCount: 0, inactiveCount: 0,
-    archivedCount: 0, neverLoadedCount: 0, archiveEligibleCount: 0,
+    archivedCount: 0, neverLoadedCount: 0,
   };
   const thisMonth = dayKey(new Date()).slice(0, 7);
   for (const subscriber of users) {
@@ -211,7 +211,7 @@ async function getCustomerStats() {
     const state = subscriberLifecycle(subscriber.lastLoadDate);
     const field = {
       Active: 'activeCount', 'At Risk': 'atRiskCount', Inactive: 'inactiveCount',
-      'No Load Yet': 'neverLoadedCount', 'Archive Eligible': 'archiveEligibleCount',
+      'No Load Yet': 'neverLoadedCount',
     }[state];
     stats[field] += 1;
   }

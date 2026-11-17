@@ -170,18 +170,15 @@ function computeSmartRisk(lastLoadDate, activeTickets, openTechReqs, archived) {
   const reasons = [];
   const status = getActivityStatus(lastLoadDate);
 
-  if (status === 'Archive Eligible') {
+  if (status === 'At Risk') {
     risk += 45;
-    reasons.push('120+ days since last completed reload; eligible for manual archival');
+    reasons.push('120+ days since last completed reload; verify receiver and signal before reloading');
   } else if (status === 'No Load Yet') {
     risk += 25;
     reasons.push('no completed reload on record');
   } else if (status === 'Inactive') {
-    risk += 40;
-    reasons.push('90–119 days since last completed reload');
-  } else if (status === 'At Risk') {
     risk += 25;
-    reasons.push('60–89 days since last completed reload');
+    reasons.push('60–119 days since last completed reload');
   }
 
   if (activeTickets > 0) {
@@ -249,7 +246,6 @@ const activityStyles = {
     badge: 'bg-slate-100 text-slate-600 border-slate-200',
     dot: 'bg-slate-400',
   },
-  'Archive Eligible': { badge: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
   'No Load Yet': { badge: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
 };
 

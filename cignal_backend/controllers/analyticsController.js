@@ -464,7 +464,7 @@ async function getAdminAnalytics(req, res) {
       });
     }
 
-    return res.json({
+    const reportPayload = {
       filters: { days, location: locationFilter || null },
       kpis: {
         salesToday: Number(
@@ -522,7 +522,24 @@ async function getAdminAnalytics(req, res) {
       incidents: incidentRows,
       incidentDetectionPolicy,
       insights,
-    });
+    };
+    if (req.query.format === 'xlsx') {
+      // Use the same analytics snapshot as JSON, plus current per-account reload history
+      // for activity cohorts. This SELECT-only addition never writes customer data.
+      // Lazy-load export dependencies to keep normal JSON analytics lightweight
+      // and compatible with the existing controller's isolated unit tests.
+      const { getAllUsers } = require('../models/userModel');
+      const { buildPremiumExcelReport } = require('../services/premiumExcelReport');
+      const subscriberRows = await getAllUsers('all');
+      const workbook = await buildPremiumExcelReport(reportPayload, subscriberRows);
+      const date = manilaDayKey(new Date());
+      const loc = String(locationFilter || 'AllLocations').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="CignalCare_Premium_Analytics_${days}d_${loc}_${date}.xlsx"`);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(workbook);
+    }
+    return res.json(reportPayload);
   } catch (error) {
     console.error('ADMIN ANALYTICS ERROR:', error);
     return res.status(500).json({ error: 'Unable to load business analytics.' });

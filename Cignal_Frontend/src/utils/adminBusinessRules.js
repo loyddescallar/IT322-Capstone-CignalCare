@@ -59,7 +59,6 @@ export function subscriberLifecycle(lastLoadDate, now = new Date()) {
   const days = daysSinceLoad(lastLoadDate, now);
   if (days == null) return 'No Load Yet';
   if (days < 60) return 'Active';
-  if (days < 90) return 'At Risk';
   if (days < 120) return 'Inactive';
-  return 'Archive Eligible';
+  return 'At Risk';
 }

@@ -175,6 +175,8 @@ export default function UserLoadRequest() {
   const [plansLoadError, setPlansLoadError] = useState(false);
   const [step, setStep] = useState(1);
   const [channelOneWorking, setChannelOneWorking] = useState(null);
+  const [riskCheckRequired, setRiskCheckRequired] = useState(null);
+  const [equipmentConfirmed, setEquipmentConfirmed] = useState(false);
   const [screenFile, setScreenFile] = useState(null);
   const [selectedScreen, setSelectedScreen] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(readPendingPlan);
@@ -188,6 +190,17 @@ export default function UserLoadRequest() {
   const [copied, setCopied] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    axiosClient.get('/load/my-reload-safety')
+      .then(({ data }) => { if (mounted) setRiskCheckRequired(data?.requiresEquipmentCheck === true); })
+      .catch(() => {
+        // Fail safe: require equipment confirmation if the status cannot be verified.
+        if (mounted) setRiskCheckRequired(null);
+      });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     const payment = searchParams.get('payment');
@@ -299,6 +312,10 @@ export default function UserLoadRequest() {
   };
 
   const goToPlanSelection = () => {
+    if (riskCheckRequired !== false && (!equipmentConfirmed || channelOneWorking !== true)) {
+      setMessage({ type: 'error', title: 'Equipment check required', body: 'Confirm the receiver and TV/signal are working before requesting a load after 120+ days.' });
+      return;
+    }
     resetMessage();
     setStep(2);
   };
@@ -320,6 +337,10 @@ export default function UserLoadRequest() {
   };
 
   const handlePayMongo = async () => {
+    if (riskCheckRequired !== false && (!equipmentConfirmed || channelOneWorking !== true)) {
+      setMessage({ type: 'error', title: 'Equipment check required', body: 'Please verify the receiver before proceeding to payment.' });
+      return;
+    }
     if (!selectedPlan) {
       setMessage({ type: 'error', title: 'Select a plan', body: 'Please choose a Cignal prepaid plan first.' });
       return;
@@ -339,6 +360,7 @@ export default function UserLoadRequest() {
         amount: selectedPlan.amount,
         screen_photo: screenBase64,
         diagnostic_result: channelOneWorking === false ? selectedScreen : 'channel_1_ok',
+        equipment_check_confirmed: equipmentConfirmed,
         location: user.location || 'Balayan',
       });
 
@@ -361,6 +383,10 @@ export default function UserLoadRequest() {
   };
 
   const handleManualSubmit = async () => {
+    if (riskCheckRequired !== false && (!equipmentConfirmed || channelOneWorking !== true)) {
+      setMessage({ type: 'error', title: 'Equipment check required', body: 'Please verify the receiver before submitting payment proof.' });
+      return;
+    }
     if (!selectedPlan || !manualMethod || !referenceNo.trim() || !receiptFile) {
       setMessage({ type: 'error', title: 'Missing proof', body: 'Please upload the receipt and enter the reference number.' });
       return;
@@ -386,6 +412,7 @@ export default function UserLoadRequest() {
         receipt_photo: receiptBase64,
         screen_photo: screenBase64,
         diagnostic_result: channelOneWorking === false ? selectedScreen : 'channel_1_ok',
+        equipment_check_confirmed: equipmentConfirmed,
         location: user.location || 'Balayan',
       });
 
@@ -458,6 +485,16 @@ export default function UserLoadRequest() {
                 </div>
               </div>
 
+              {riskCheckRequired !== false && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
+                  <h3 className="text-sm font-bold text-amber-900">{riskCheckRequired ? 'At Risk — 120+ days without a reload' : 'Confirm receiver condition before payment'}</h3>
+                  <p className="mt-1 text-xs leading-5 text-amber-800">Before paying, check the receiver powers on, the cable connections and TV/signal status. If there is no picture or a hardware error, request troubleshooting or a technician instead.</p>
+                  <label className="mt-3 flex items-start gap-2 text-xs font-semibold text-amber-900">
+                    <input type="checkbox" checked={equipmentConfirmed} onChange={(event) => setEquipmentConfirmed(event.target.checked)} disabled={channelOneWorking !== true} className="mt-0.5 h-4 w-4 accent-[#cc0000]" />
+                    I checked the receiver and confirmed the equipment is working.
+                  </label>
+                </div>
+              )}
               {channelOneWorking === true && (
                 <div className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex gap-3"><AlertTriangle className="mt-0.5 flex-shrink-0 text-amber-600" size={20} /><div><h3 className="font-bold text-amber-800">Confirm the account and plan before payment</h3><p className="mt-1 text-sm leading-6 text-amber-700">Processed prepaid loads are non-refundable, so verify the selected account and amount carefully.</p></div></div>

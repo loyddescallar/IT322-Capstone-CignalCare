@@ -73,6 +73,8 @@ export default function AdminSecurity() {
   const [contactCode, setContactCode] = useState('');
   const [contactCodeSent, setContactCodeSent] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [profileImage, setProfileImage] = useState('');
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -94,6 +96,53 @@ export default function AdminSecurity() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    let imageUrl = null;
+    authApi.adminGetProfilePhoto().then((response) => {
+      imageUrl = URL.createObjectURL(response.data);
+      if (mounted) setProfileImage(imageUrl);
+    }).catch(() => { /* Initials are shown if no photo is configured. */ });
+    return () => { mounted = false; if (imageUrl) URL.revokeObjectURL(imageUrl); };
+  }, []);
+
+  const updateProfilePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 1024 * 1024) {
+      setError('Use a JPG, PNG or WEBP image up to 1 MB.');
+      return;
+    }
+    setPhotoBusy(true); setError(''); setMessage('');
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Unable to read the selected photo.'));
+        reader.readAsDataURL(file);
+      });
+      await authApi.adminSaveProfilePhoto(dataUrl);
+      setProfileImage(dataUrl);
+      window.dispatchEvent(new Event('cignalcare:admin-photo-changed'));
+      setMessage('Your administrator profile photo is saved to your account.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to save profile photo. Confirm the profile-photo database migration has been applied.');
+    } finally { setPhotoBusy(false); }
+  };
+
+  const removeProfilePhoto = async () => {
+    setPhotoBusy(true); setError(''); setMessage('');
+    try {
+      await authApi.adminDeleteProfilePhoto();
+      setProfileImage('');
+      window.dispatchEvent(new Event('cignalcare:admin-photo-changed'));
+      setMessage('Profile photo removed. Your initials will be shown instead.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to remove profile photo.');
+    } finally { setPhotoBusy(false); }
+  };
 
   const credentials = () => ({ currentPassword, totpCode });
 
@@ -178,6 +227,24 @@ export default function AdminSecurity() {
 
   return (
     <div className="space-y-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-red-100 bg-red-600 text-2xl font-bold text-white">
+          {profileImage ? <img src={profileImage} alt="My administrator profile" className="h-full w-full object-cover" /> : String(security?.username || 'AD').slice(0, 2).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-gray-900">My Administrator Profile</h2>
+          <p className="mt-1 text-sm font-semibold text-gray-700">{security?.username || 'Administrator'}</p>
+          <p className="mt-1 text-xs text-gray-500">Only your authenticated administrator account can see or change this photo. It also appears in your sidebar across devices.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <label className={`cursor-pointer rounded-xl bg-[#cc0000] px-4 py-2.5 text-xs font-bold text-white ${photoBusy ? 'pointer-events-none opacity-50' : ''}`}>
+              {photoBusy ? 'Saving...' : profileImage ? 'Change Photo' : 'Upload My Photo'}
+              <input type="file" accept="image/jpeg,image/png,image/webp" disabled={photoBusy} onChange={updateProfilePhoto} className="sr-only" />
+            </label>
+            {profileImage && <button type="button" disabled={photoBusy} onClick={removeProfilePhoto} className="rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Remove Photo</button>}
+            <span className="text-xs text-gray-400">JPG, PNG or WEBP · Max 1 MB</span>
+          </div>
+        </div>
+      </section>
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

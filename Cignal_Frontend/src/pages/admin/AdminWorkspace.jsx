@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { getAllLoadRequests } from '../../api/loadRequestApi';
 import notificationApi from '../../api/notificationApi';
+import authApi from '../../api/authApi';
 
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
 const AdminCustomers = lazy(() => import('./AdminCustomers'));
@@ -286,6 +287,39 @@ export default function AdminWorkspace() {
   );
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [adminIdentity, setAdminIdentity] = useState({ username: '', photo: '' });
+  useEffect(() => {
+    let mounted = true;
+    let objectUrl = null;
+    let revision = 0;
+    const loadIdentity = async () => {
+      const current = ++revision;
+      try {
+        const response = await authApi.adminSecurityInfo();
+        if (!mounted || current !== revision) return;
+        const username = String(response.data?.security?.username || '').trim();
+        let nextUrl = null;
+        try {
+          const photoResponse = await authApi.adminGetProfilePhoto();
+          if (mounted && current === revision) nextUrl = URL.createObjectURL(photoResponse.data);
+        } catch (_error) { /* New accounts may not have photos. */ }
+        if (!mounted || current !== revision) { if (nextUrl) URL.revokeObjectURL(nextUrl); return; }
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = nextUrl;
+        setAdminIdentity({ username, photo: nextUrl || '' });
+      } catch (_error) {
+        // Never show a different user's image or demo name on failed identity lookup.
+        if (mounted && current === revision) setAdminIdentity({ username: '', photo: '' });
+      }
+    };
+    loadIdentity();
+    window.addEventListener('cignalcare:admin-photo-changed', loadIdentity);
+    return () => {
+      mounted = false;
+      window.removeEventListener('cignalcare:admin-photo-changed', loadIdentity);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, []);
   const [notifOpen, setNotifOpen] = useState(false);
   const [newLoadCount, setNewLoadCount] = useState(0);
   const [notifList, setNotifList] = useState([]);
@@ -393,8 +427,7 @@ export default function AdminWorkspace() {
     }
   };
 
-  const adminUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
-  const adminName = adminUser.accountName || 'Admin';
+  const adminName = adminIdentity.username || 'Administrator';
 
   const adminInitials = adminName
     .split(' ')
@@ -464,10 +497,9 @@ export default function AdminWorkspace() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center gap-2 bg-[#cc0000] px-4 py-4">
-          <Satellite className="text-white" size={22} />
-
-          <div className="flex flex-col leading-tight">
+        <div className="flex items-center gap-2 bg-[#cc0000] px-3 py-3">
+          <img src="/images/CignalLogo4.png" alt="CignalCare+" className="h-12 w-12 shrink-0 rounded-lg object-contain" />
+          <div className="flex min-w-0 flex-col leading-tight">
             <span className="text-sm font-bold tracking-wide text-white">
               CignalCare+
             </span>
@@ -485,15 +517,15 @@ export default function AdminWorkspace() {
         </div>
 
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#cc0000] text-sm font-semibold text-white">
-            {adminInitials}
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-red-500/60 bg-[#cc0000] text-sm font-semibold text-white">
+            {adminIdentity.photo ? <img src={adminIdentity.photo} alt="Signed-in administrator profile" className="h-full w-full object-cover" /> : adminInitials}
           </div>
 
-          <div>
-            <p className="text-sm font-semibold text-white">{adminName}</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white" title={adminName}>{adminName}</p>
             <div className="mt-0.5 flex items-center gap-1">
               <ShieldCheck size={10} className="text-[#cc0000]" />
-              <p className="text-xs text-gray-400">Super Administrator</p>
+              <p className="text-xs text-gray-400">Administrator</p>
             </div>
           </div>
         </div>

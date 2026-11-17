@@ -9,9 +9,9 @@ const reference = new Date('2026-10-19T04:00:00+08:00');
 
 test('PH-local lifecycle transitions match on backend and frontend', () => {
   for (const [day, expected] of [
-    [0, 'Active'], [59, 'Active'], [60, 'At Risk'], [89, 'At Risk'],
-    [90, 'Inactive'], [119, 'Inactive'], [120, 'Archive Eligible'],
-    [140, 'Archive Eligible'],
+    [0, 'Active'], [59, 'Active'], [60, 'Inactive'], [89, 'Inactive'],
+    [90, 'Inactive'], [119, 'Inactive'], [120, 'At Risk'],
+    [140, 'At Risk'],
   ]) {
     const value = new Date(reference.getTime() - day * 86400000);
     assert.equal(backend.subscriberLifecycle(value, reference), expected);
