@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, CalendarDays, CheckCircle2, ChevronRight, Clock, Flag, Ticket, UserRound, Wrench, AlertTriangle } from 'lucide-react';
+import { Archive, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock, Flag, History, Ticket, UserRound, Wrench, AlertTriangle } from 'lucide-react';
 import UserPageShell from '../../components/UserPageShell';
 import RequestTimeline from '../../components/RequestTimeline';
 import ticketApi from '../../api/ticketApi';
@@ -91,6 +91,7 @@ export default function UserTickets() {
   const [techReqs, setTechReqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatus] = useState('All');
+  const [pastOpen, setPastOpen] = useState(false);
   const [sortOrder, setSort] = useState('newest');
   const [readSet, setReadSet] = useState(getReadSet());
 
@@ -119,7 +120,7 @@ export default function UserTickets() {
   const filtered = useMemo(() => {
     const scoped = tickets.filter((ticket) => {
       const status = displayStatus(ticket.status);
-      if (statusFilter === 'All') return status !== 'Archived';
+      if (statusFilter === 'All') return !['Resolved', 'Archived'].includes(status);
       return status === statusFilter;
     });
 
@@ -127,6 +128,16 @@ export default function UserTickets() {
       ? [...scoped].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       : [...scoped].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   }, [tickets, statusFilter, sortOrder]);
+
+  const pastTickets = useMemo(() => {
+    const history = tickets.filter((ticket) => ['Resolved', 'Archived'].includes(displayStatus(ticket.status)));
+    return [...history].sort((a, b) => sortOrder === 'newest'
+      ? new Date(b.created_at) - new Date(a.created_at)
+      : new Date(a.created_at) - new Date(b.created_at));
+  }, [tickets, sortOrder]);
+  const visiblePastTickets = statusFilter === 'Resolved'
+    ? pastTickets.filter((ticket) => displayStatus(ticket.status) === 'Resolved')
+    : pastTickets;
 
   const counts = useMemo(
     () => STATUSES.reduce((acc, status) => {
@@ -162,7 +173,16 @@ export default function UserTickets() {
               type="button"
               key={status}
               aria-pressed={statusFilter === status}
-              onClick={() => setStatus(statusFilter === status ? 'All' : status)}
+              onClick={() => {
+                if (status === 'Resolved') {
+                  const selected = statusFilter !== 'Resolved';
+                  setStatus(selected ? 'Resolved' : 'All');
+                  setPastOpen(selected);
+                } else {
+                  setStatus(statusFilter === status ? 'All' : status);
+                  setPastOpen(false);
+                }
+              }}
               className={`min-h-[92px] cursor-pointer rounded-xl border bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#cc0000] sm:p-4 ${
                 statusFilter === status ? 'border-[#cc0000] ring-1 ring-red-100' : 'border-gray-100'
               }`}
@@ -176,15 +196,11 @@ export default function UserTickets() {
         {/* Clickable KPI cards handle status selection; keep only useful tools here. */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" aria-pressed={statusFilter === 'All'} onClick={() => setStatus('All')}
+            <button type="button" aria-pressed={statusFilter === 'All'} onClick={() => { setStatus('All'); setPastOpen(false); }}
               className={`min-h-10 rounded-lg px-3 py-2 text-sm font-semibold transition ${statusFilter === 'All' ? 'bg-[#cc0000] text-white' : 'border border-gray-200 bg-white text-slate-700 hover:border-red-200'}`}>
               All Active
             </button>
-            <button type="button" aria-pressed={statusFilter === 'Archived'} onClick={() => setStatus('Archived')}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${statusFilter === 'Archived' ? 'bg-slate-800 text-white' : 'border border-gray-200 bg-white text-slate-700 hover:border-gray-300'}`}>
-              <Archive size={15} aria-hidden="true" /> Archived ({counts.Archived || 0})
-            </button>
-            {statusFilter !== 'All' && statusFilter !== 'Archived' && (
+            {statusFilter !== 'All' && statusFilter !== 'Resolved' && (
               <button type="button" onClick={() => setStatus('All')} className="min-h-10 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-[#a60000] hover:bg-red-100"
                 title="Clear selected status filter" aria-label={`Clear ${statusFilter} filter`}>
                 {statusFilter} ×
@@ -202,14 +218,17 @@ export default function UserTickets() {
           </div>
         </div>
 
-        {/* Ticket List */}
+        {/* Current tickets only; resolved and archived records remain reachable below. */}
+        {statusFilter === 'Resolved' ? (
+          <p className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800" role="status">Resolved tickets are shown in Past Tickets below.</p>
+        ) : (
         <div className="space-y-2">
           {loading ? (
             <div className="py-8 text-center text-sm text-gray-400">Loading...</div>
           ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-gray-100 bg-white p-8 text-center text-gray-400">
               <Ticket size={32} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">{statusFilter === 'Archived' ? 'No archived tickets yet.' : statusFilter === 'All' ? 'No active tickets yet.' : `No ${statusFilter.toLowerCase()} tickets found.`}</p>
+              <p className="text-sm">{statusFilter === 'All' ? 'No active tickets yet.' : `No ${statusFilter.toLowerCase()} tickets found.`}</p>
               {statusFilter === 'All' && <button type="button" onClick={() => navigate('/user/report-problem')} className="mt-3 min-h-10 text-sm font-semibold text-[#cc0000] hover:underline">File your first ticket →</button>}
             </div>
           ) : filtered.map((ticket) => {
@@ -252,6 +271,50 @@ export default function UserTickets() {
             );
           })}
         </div>
+        )}
+
+        {/* Resolved and archived history is available without a technical Archived filter. */}
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" aria-label="Past Tickets">
+          <button type="button" aria-expanded={pastOpen} aria-controls="past-tickets-list"
+            onClick={() => {
+              if (pastOpen && statusFilter === 'Resolved') setStatus('All');
+              setPastOpen(!pastOpen);
+            }}
+            className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#cc0000] sm:px-5">
+            <span className="flex min-w-0 items-center gap-2.5 text-sm font-bold text-gray-800 sm:text-base">
+              <History size={19} className="shrink-0 text-gray-600" aria-hidden="true" />
+              Past Tickets
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{pastTickets.length}</span>
+            </span>
+            <ChevronDown size={18} aria-hidden="true" className={`shrink-0 text-gray-500 transition-transform ${pastOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {pastOpen && (
+            <div id="past-tickets-list" className="space-y-2 border-t border-gray-100 bg-gray-50/60 p-3 sm:p-4">
+              {loading ? (
+                <p className="p-4 text-center text-sm text-gray-500">Loading past tickets...</p>
+              ) : visiblePastTickets.length === 0 ? (
+                <p className="p-4 text-center text-sm text-gray-500">No past tickets found.</p>
+              ) : visiblePastTickets.map((ticket) => {
+                const status = displayStatus(ticket.status);
+                return (
+                  <button key={`past-${ticket.id}`} type="button" onClick={() => handleTicketClick(ticket)}
+                    aria-label={`Open past support ticket #${ticket.id}: ${ticket.subject || 'Support concern'}`}
+                    className="flex min-h-16 w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left transition-colors hover:border-red-200 hover:bg-red-50/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#cc0000] sm:items-center sm:p-4">
+                    <span className="min-w-0 flex-1">
+                      <span className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-gray-500">#{ticket.id}</span>
+                        <span className={`rounded px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[status] || 'bg-gray-100 text-gray-600'}`}>{status}</span>
+                      </span>
+                      <span className="block truncate text-sm font-semibold text-gray-800">{ticket.subject || 'Support concern'}</span>
+                      <span className="mt-1 block text-xs text-gray-500">{timeAgo(ticket.created_at)}</span>
+                    </span>
+                    <ChevronRight size={18} className="mt-3 shrink-0 text-gray-400 sm:mt-0" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* Technician Requests Section */}
         <div>

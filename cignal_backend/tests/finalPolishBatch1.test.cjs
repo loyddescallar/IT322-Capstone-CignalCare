@@ -34,6 +34,11 @@ test('Chatbot stays usable as built-in support when Gemini is deliberately disab
       getChatbotPageKnowledge: () => null,
       isPageGuidanceQuestion: () => false,
     },
+    '../services/chatbotGuidedSupport': {
+      getGuidedSupportReply: () => null,
+      buildVerifiedPersonalStatusReply: () => null,
+      isPrivateStatusQuestion: () => false,
+    },
     '../services/chatbotKnowledgeService': {
       getChatbotKnowledge: async () => { throw new Error('Should not require DB in offline mode'); },
       buildChatbotUiHints: () => ({ actions: [{ path: '/troubleshoot' }], quickReplies: [] }),
@@ -56,6 +61,11 @@ test('Disabled mode does not override AI quota HTTP 429', async () => {
     '../services/chatbotPageKnowledge': {
       getChatbotPageKnowledge: () => null,
       isPageGuidanceQuestion: () => false,
+    },
+    '../services/chatbotGuidedSupport': {
+      getGuidedSupportReply: () => null,
+      buildVerifiedPersonalStatusReply: () => null,
+      isPrivateStatusQuestion: () => false,
     },
     '../services/chatbotKnowledgeService': { buildChatbotUiHints: () => ({actions: [], quickReplies: []}) },
   });

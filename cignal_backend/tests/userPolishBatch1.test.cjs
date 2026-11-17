@@ -69,14 +69,16 @@ test('guard is mounted globally and human activity excludes background API polli
   assert.doesNotMatch(guard, /fetch\(|axios\(|setInterval\(.*saveLastHumanActivity/);
 });
 
-test('subscriber ticket page uses accessible KPI filters, has Archived, and no duplicate status dropdown', () => {
+test('subscriber ticket page uses accessible KPI filters, keeps past records and has no duplicate status dropdown', () => {
   const tickets = read('Cignal_Frontend/src/pages/user/UserTickets.jsx');
   assert.match(tickets, /aria-pressed=\{statusFilter === status\}/);
-  assert.match(tickets, /setStatus\('Archived'\)/);
+  assert.match(tickets, /Past Tickets/);
+  assert.match(tickets, /aria-expanded=\{pastOpen\}/);
+  assert.doesNotMatch(tickets, /setStatus\('Archived'\)/);
   assert.match(tickets, /id="my-tickets-sort"/);
   assert.doesNotMatch(tickets, /<select value=\{statusFilter\}/);
   assert.match(tickets, /onKeyDown=\{\(event\) =>/);
-  assert.match(tickets, /No archived tickets yet/);
+  assert.match(tickets, /No past tickets found/);
 });
 
 test('CignalBot uses page-aware quick suggestions and sends current page to backend', () => {

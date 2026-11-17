@@ -13,6 +13,11 @@ const {
   getChatbotPageKnowledge,
   isPageGuidanceQuestion,
 } = require('../services/chatbotPageKnowledge');
+const {
+  getGuidedSupportReply,
+  buildVerifiedPersonalStatusReply,
+  isPrivateStatusQuestion,
+} = require('../services/chatbotGuidedSupport');
 
 function sanitizeContext(context, limit = 8) {
   if (!Array.isArray(context)) return [];
@@ -118,6 +123,20 @@ async function sendChatbotMessage(req, res) {
     });
   }
 
+  // Page navigation uses verified public guidance: no Gemini or DB wait.
+  // Keep quota denials intact, even for navigation-only messages.
+  const pageHelpForQuestion = getChatbotPageKnowledge(req.body?.page);
+  if (req.aiAccess?.reason !== 'quota' && pageHelpForQuestion && isPageGuidanceQuestion(message)) {
+    const hints = buildChatbotUiHints(message, [], null);
+    return res.json({
+      reply: `**${pageHelpForQuestion.title}**\n\n${pageHelpForQuestion.guidance}`,
+      source: 'built-in-support',
+      quickReplies: hints.quickReplies.length ? hints.quickReplies : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions: hints.actions,
+      knowledge: null,
+    });
+  }
+
   // An academic demo must remain useful when the optional Gemini integration is
   // deliberately disabled or its shared quota provider is not configured.
   // Never claim that a deterministic reply is AI-generated or verified live data.
@@ -131,16 +150,45 @@ async function sendChatbotMessage(req, res) {
     const session = sanitizeTroubleshootingSession(req.body?.troubleshootingSession);
     const hints = buildChatbotUiHints(message, context, session);
     const pageHelp = getChatbotPageKnowledge(req.body?.page);
-    const reply = pageHelp && isPageGuidanceQuestion(message)
+    const verifiedSession = buildTroubleshootingSessionContext(session);
+    const guided = getGuidedSupportReply({
+      message, context,
+      verifiedSession: { ...verifiedSession, completedStepIds: session?.completedStepIds || [] },
+    });
+    let personalStatus = null;
+    // Read-only, owner-scoped status lookup. This never invokes Gemini or writes
+    // records, and falls back safely if the database is temporarily unavailable.
+    if (req.user?.id && isPrivateStatusQuestion(message, context)) {
+      try {
+        const verified = await getChatbotKnowledge({
+          userId: req.user.id, includePersonalData: true,
+          message, context, troubleshootingSession: session,
+        });
+        personalStatus = buildVerifiedPersonalStatusReply({
+          message, context,
+          personalSupport: verified?.personalSupport,
+          requestedIds: verified?.requestedIds,
+        });
+      } catch (error) {
+        console.warn('CIGNALBOT OFFLINE STATUS LOOKUP UNAVAILABLE:', error?.message);
+      }
+    }
+    const reply = personalStatus || (pageHelp && isPageGuidanceQuestion(message)
       ? `**${pageHelp.title}**\n\n${pageHelp.guidance}`
-      : buildOfflineSupportReply(message);
+      : guided?.reply || buildOfflineSupportReply(message));
+    const actions = [...hints.actions];
+    for (const action of guided?.actions || []) {
+      if (!actions.some(item => item.path === action.path)) actions.push(action);
+    }
     return res.json({
       reply,
-      source: 'built-in-support',
-      quickReplies: hints.quickReplies.length
-        ? hints.quickReplies
-        : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
-      actions: hints.actions,
+      source: personalStatus ? 'built-in-support+verified-personal-data' : 'built-in-support',
+      quickReplies: guided?.quickReplies?.length
+        ? guided.quickReplies
+        : hints.quickReplies.length
+          ? hints.quickReplies
+          : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions,
       knowledge: null,
     });
   }
@@ -151,6 +199,13 @@ async function sendChatbotMessage(req, res) {
   );
   const includePersonalData = shouldIncludePersonalData(message, context);
   const pageHelp = getChatbotPageKnowledge(req.body?.page);
+  const guided = getGuidedSupportReply({
+    message, context,
+    verifiedSession: {
+      ...buildTroubleshootingSessionContext(troubleshootingSession),
+      completedStepIds: troubleshootingSession?.completedStepIds || [],
+    },
+  });
 
   try {
     let knowledgeText = '';
@@ -180,10 +235,16 @@ async function sendChatbotMessage(req, res) {
     const result = await generateGeminiReply({
       message,
       context,
-      knowledgeText: [knowledgeText, pageHelp?.context || ''].filter(Boolean).join('\n\n'),
+      knowledgeText: [knowledgeText, pageHelp?.context || '',
+        guided?.reply ? `NON-AUTHORITATIVE GUIDED SUPPORT SUGGESTION (not proof of device condition):\n${guided.reply}` : '',
+      ].filter(Boolean).join('\n\n'),
     });
 
     const hints = buildChatbotUiHints(message, context, troubleshootingSession);
+    const actions = [...hints.actions];
+    for (const action of guided?.actions || []) {
+      if (!actions.some(item => item.path === action.path)) actions.push(action);
+    }
 
     return res.json({
       reply: result.reply,
@@ -192,38 +253,36 @@ async function sendChatbotMessage(req, res) {
         : knowledgeText
           ? 'gemini+system-data'
           : 'gemini',
-      quickReplies: hints.quickReplies,
-      actions: hints.actions,
+      quickReplies: guided?.quickReplies?.length ? guided.quickReplies : hints.quickReplies,
+      actions,
       knowledge: knowledgeMeta,
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode || 0);
-
-    if (error.code === 'GEMINI_NOT_CONFIGURED') {
-      return res.status(503).json({
-        error: 'AI assistance is not configured',
-      });
-    }
-
-    if (error.code === 'GEMINI_TIMEOUT') {
-      return res.status(504).json({
-        error: 'AI assistance took too long to respond',
-      });
-    }
-
     if (status === 429) {
       return res.status(429).json({
         error: 'AI assistance is temporarily busy. Please try again shortly.',
       });
     }
 
-    console.error('GEMINI CHATBOT ERROR:', {
-      message: error?.message,
+    console.warn('CIGNALBOT AI FALLBACK:', {
+      code: String(error?.code || 'UNAVAILABLE').slice(0, 40),
       model: getGeminiModel(),
     });
-
-    return res.status(503).json({
-      error: 'AI assistance is temporarily unavailable',
+    const hints = buildChatbotUiHints(message, context, troubleshootingSession);
+    const actions = [...hints.actions];
+    for (const action of guided?.actions || []) {
+      if (!actions.some(item => item.path === action.path)) actions.push(action);
+    }
+    // Do not invent paid transactions, statuses or receiver conditions on AI failure.
+    return res.json({
+      reply: guided?.reply || buildOfflineSupportReply(message),
+      source: 'built-in-support+ai-fallback',
+      quickReplies: guided?.quickReplies?.length ? guided.quickReplies
+        : hints.quickReplies.length ? hints.quickReplies
+          : ['No Signal', 'Load/Reload', 'File a Ticket', 'Request Technician'],
+      actions,
+      knowledge: null,
     });
   }
 }
