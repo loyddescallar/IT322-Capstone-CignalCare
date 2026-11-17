@@ -14,7 +14,7 @@ export function matchesAdminLocation(recordLocation, chosenLocation) {
 
 const EMPTY_SUBSCRIBER_KPIS = {
   allCustomers: 0, thisMonth: 0, activeCount: 0, atRiskCount: 0,
-  inactiveCount: 0, archivedCount: 0, archiveEligibleCount: 0, neverLoadedCount: 0,
+  inactiveCount: 0, archivedCount: 0, neverLoadedCount: 0,
 };
 
 // Match backend getCustomerStats() definitions, but scope to selected location.
@@ -34,7 +34,6 @@ export function subscriberLocationKpis(customers, location, now = new Date()) {
       Active: 'activeCount',
       'At Risk': 'atRiskCount',
       Inactive: 'inactiveCount',
-      'Archive Eligible': 'archiveEligibleCount',
       'No Load Yet': 'neverLoadedCount',
     }[lifecycle];
     if (field) counts[field] += 1;

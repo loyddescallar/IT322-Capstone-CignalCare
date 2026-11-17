@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const { FIXED_LOAD_VALIDITY_DAYS } = require("../utils/loadValidity");
 const { posReferenceFromKey } = require("../utils/posIdempotency");
+const { isAtRisk } = require("../utils/atRiskReload");
 const { getPublicPrepaidAccount } = require("../models/userModel");
 
 const {
@@ -248,6 +249,10 @@ async function addLoad(req, res) {
       });
     }
 
+    if (isAtRisk(customer.lastLoadDate) && req.body.equipmentCheckConfirmed !== true) {
+      return res.status(422).json({ error: 'Receiver and signal check must be confirmed before reloading a subscriber inactive for 120+ days.' });
+    }
+
     const result = await processPosLoad({
       user_id: customer.id,
       accountNumber:
@@ -329,6 +334,19 @@ async function addLoad(req, res) {
     return res.status(500).json({
       error: "Server error",
     });
+  }
+}
+
+// Read-only: the same completed-transaction source used by the POS and load-request guards.
+async function getMyReloadSafety(req, res) {
+  try {
+    const customer = await findByAccountIdOrCca(String(req.user.accountNumber || ''));
+    if (!customer || Number(customer.id) !== Number(req.user.id)) {
+      return res.status(404).json({ error: 'Subscriber account unavailable.' });
+    }
+    return res.json({ requiresEquipmentCheck: isAtRisk(customer.lastLoadDate), lastLoadDate: customer.lastLoadDate || null });
+  } catch (error) {
+    return res.status(500).json({ error: 'Unable to verify reload safety.' });
   }
 }
 
@@ -760,6 +778,7 @@ async function updateLoadStatusController(
 module.exports = {
   addLoad,
   getMyPrepaidStatus,
+  getMyReloadSafety,
   getMyLoadHistory,
   getAllLoadHistoryController,
   getPrepaidTransactionsController,

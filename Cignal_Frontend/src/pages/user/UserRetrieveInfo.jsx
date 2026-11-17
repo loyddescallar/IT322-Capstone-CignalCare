@@ -10,7 +10,7 @@ function displayTicketStatus(status){ const legacy={Open:'Submitted','In Progres
 
 function formatDate(d) { if(!d) return '—'; return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}); }
 function timeAgo(d) { if(!d) return '—'; const diff=(Date.now()-new Date(d).getTime())/1000; if(diff<60)return 'just now'; if(diff<3600)return Math.floor(diff/60)+'m ago'; if(diff<86400)return Math.floor(diff/3600)+'h ago'; return Math.floor(diff/86400)+'d ago'; }
-function getActivityStatus(lastLoadDate) { if(!lastLoadDate)return 'Inactive'; const days=(Date.now()-new Date(lastLoadDate).getTime())/86400000; if(days<=30)return 'Active'; if(days<=60)return 'At Risk'; return 'Inactive'; }
+function getActivityStatus(lastLoadDate) { return subscriberLifecycle(lastLoadDate); }
 
 export default function UserRetrieveInfo() {
   const [query,setQuery]     = useState('');

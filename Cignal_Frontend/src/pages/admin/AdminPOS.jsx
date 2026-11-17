@@ -29,6 +29,7 @@ export default function AdminPOS() {
   const [payMethod, setPayMethod] = useState('Cash');
   const [cashTendered, setCash] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
+  const [equipmentConfirmed, setEquipmentConfirmed] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState('');
@@ -104,6 +105,7 @@ export default function AdminPOS() {
       (item) => item.accountNumber === query || item.ccaNumber === query
     );
     setFound(subscriber || null);
+    setEquipmentConfirmed(false);
     setNotFound(!subscriber);
     setPlan(null);
     setPaymentReference('');
@@ -123,6 +125,10 @@ export default function AdminPOS() {
 
   const handleProcess = async () => {
     if (!found || !plan || processing) return;
+    if (subscriberLifecycle(found.lastLoadDate) === 'At Risk' && !equipmentConfirmed) {
+      setError('This subscriber has not reloaded for at least 120 days. Check that the receiver and signal work, then confirm the equipment check before payment.');
+      return;
+    }
 
     if (
       payMethod === 'Cash' &&
@@ -166,6 +172,7 @@ export default function AdminPOS() {
         planId: plan.id,
         loadAmount: plan.amount,
         paymentMethod: payMethod,
+        equipmentCheckConfirmed: equipmentConfirmed,
         description: `POS Load — ${plan.plan_name} via ${payMethod}${referenceNote}`,
       }, { headers: { 'Idempotency-Key': attempt.key } });
 
@@ -177,6 +184,7 @@ export default function AdminPOS() {
         amount: plan.amount,
       });
       setFound(null);
+      setEquipmentConfirmed(false);
       setPlan(null);
       setCcaQ('');
       setNotFound(false);
@@ -207,7 +215,8 @@ export default function AdminPOS() {
     }
   };
 
-  const canProcess = Boolean(found && plan) && !processing && (
+  const canProcess = Boolean(found && plan) && !processing &&
+    (subscriberLifecycle(found?.lastLoadDate) !== 'At Risk' || equipmentConfirmed) && (
     payMethod === 'Cash'
       ? Boolean(cashTendered) && Number(cashTendered) >= Number(plan.amount)
       : Boolean(paymentReference.trim())
@@ -279,6 +288,7 @@ export default function AdminPOS() {
                   setCcaQ(event.target.value);
                   setNotFound(false);
                   setFound(null);
+                  setEquipmentConfirmed(false);
                 }}
                 placeholder="Account No. or CCA No."
                 className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-[#cc0000]"
@@ -286,12 +296,20 @@ export default function AdminPOS() {
               <button type="submit" className="w-full rounded-xl bg-[#cc0000] px-4 py-2.5 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto">Search</button>
             </form>
             {notFound && <p className="mt-1.5 text-xs text-red-600">No subscriber found for “{ccaQ}”.</p>}
-            {found && ['At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'].includes(subscriberLifecycle(found.lastLoadDate)) && (
+            {found && ['At Risk', 'Inactive', 'No Load Yet'].includes(subscriberLifecycle(found.lastLoadDate)) && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" role="status">
                 {subscriberLifecycle(found.lastLoadDate) === 'No Load Yet'
                   ? 'This subscriber has no completed reload on record. Verify the account details before processing.'
-                  : `Subscriber is ${subscriberLifecycle(found.lastLoadDate)}. Verify the account details before accepting payment.`}
+                  : subscriberLifecycle(found.lastLoadDate) === 'At Risk'
+                    ? 'At Risk: No completed load for 120+ days. Verify the receiver powers on, connections are secure, and TV/signal status is working BEFORE accepting payment.'
+                    : `Subscriber is ${subscriberLifecycle(found.lastLoadDate)}. Verify the account details before accepting payment.`}
               </div>
+            )}
+            {found && subscriberLifecycle(found.lastLoadDate) === 'At Risk' && (
+              <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                <input type="checkbox" checked={equipmentConfirmed} onChange={(event) => setEquipmentConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[#cc0000]" />
+                <span>I have checked the receiver, power, cables and TV/signal status. The equipment is working and the subscriber may proceed with a reload.</span>
+              </label>
             )}
             {found && (
               <div className="mt-2 rounded-xl border border-green-100 bg-green-50 px-3 py-2">

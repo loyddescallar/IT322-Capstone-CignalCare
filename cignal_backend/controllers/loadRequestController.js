@@ -17,6 +17,7 @@ const {
 } = require('../models/loadRequestModel');
 
 const { findByAccountIdOrCca } = require('../models/userModel');
+const { equipmentCheckRequired } = require('../utils/atRiskReload');
 const { createCheckoutSession } = require('../utils/paymongoClient');
 const { uploadImageMaybe, isUploadStorageError } = require('../utils/cloudinaryUpload');
 const { isAdmin, ownsAccount } = require('../utils/ownership');
@@ -129,6 +130,7 @@ async function createLoadRequestController(req, res) {
       receipt_photo,
       screen_photo,
       diagnostic_result,
+      equipment_check_confirmed,
       location,
     } = req.body;
 
@@ -174,6 +176,10 @@ async function createLoadRequestController(req, res) {
       return res.status(403).json({
         error: 'Forbidden',
       });
+    }
+
+    if (equipmentCheckRequired(customer.lastLoadDate, equipment_check_confirmed, diagnostic_result)) {
+      return res.status(422).json({ error: 'This account has not reloaded for 120+ days. Confirm that the receiver and TV signal work before payment or request submission.' });
     }
 
     const selectedPlan = await getActivePlanForRequest({
@@ -260,6 +266,7 @@ async function createPayMongoCheckoutController(req, res) {
       amount,
       screen_photo,
       diagnostic_result,
+      equipment_check_confirmed,
       location,
     } = req.body;
 
@@ -292,6 +299,10 @@ async function createPayMongoCheckoutController(req, res) {
       return res.status(403).json({
         error: 'Forbidden',
       });
+    }
+
+    if (equipmentCheckRequired(customer.lastLoadDate, equipment_check_confirmed, diagnostic_result)) {
+      return res.status(422).json({ error: 'This account has not reloaded for 120+ days. Confirm that the receiver and TV signal work before payment or request submission.' });
     }
 
     const selectedPlan = await getActivePlanForRequest({

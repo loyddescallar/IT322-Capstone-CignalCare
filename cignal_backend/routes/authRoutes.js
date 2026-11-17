@@ -42,6 +42,7 @@ const {
 } = require('../controllers/authController');
 const { authRequired, requireRole } = require('../middleware/auth');
 const adminAuthRateLimit = require('../middleware/adminAuthRateLimit');
+const { getProfilePhoto, saveProfilePhoto, deleteProfilePhoto } = require('../controllers/adminProfilePhotoController');
 const {
   customerLoginRateLimit,
   passwordChangeRateLimit,
@@ -98,6 +99,9 @@ router.post('/admin/recovery/complete', adminAuthRateLimit, adminRecoveryComplet
 
 // Authenticated admin security center
 router.get('/admin/security', authRequired, requireRole('admin'), adminSecurityInfo);
+router.get('/admin/profile/photo', authRequired, requireRole('admin'), getProfilePhoto);
+router.put('/admin/profile/photo', authRequired, requireRole('admin'), saveProfilePhoto);
+router.delete('/admin/profile/photo', authRequired, requireRole('admin'), deleteProfilePhoto);
 router.post('/admin/security/change-password', authRequired, requireRole('admin'), adminChangePassword);
 router.post('/admin/security/recovery-codes', authRequired, requireRole('admin'), adminRegenerateRecoveryCodes);
 router.post('/admin/security/revoke-sessions', authRequired, requireRole('admin'), adminRevokeSessions);

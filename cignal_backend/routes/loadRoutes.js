@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   addLoad,
   getMyPrepaidStatus,
+  getMyReloadSafety,
   getMyLoadHistory,
   getAllLoadHistoryController,
   getPrepaidTransactionsController,
@@ -24,6 +25,7 @@ router.get('/prepaid-transactions', authRequired, requireRole('admin'), getPrepa
 router.get('/prepaid-transactions/paged', authRequired, requireRole('admin'), getPagedPrepaidTransactionsController);
 router.post('/', authRequired, requireRole('admin'), addLoad);
 router.get('/my-prepaid-status', authRequired, requireRole('user'), getMyPrepaidStatus);
+router.get('/my-reload-safety', authRequired, requireRole('user'), getMyReloadSafety);
 router.get('/my', authRequired, getMyLoadHistory);
 router.get('/admin', authRequired, requireRole('admin'), getAllLoadHistoryController);
 router.patch('/admin/:id', authRequired, requireRole('admin'), updateLoadStatusController);

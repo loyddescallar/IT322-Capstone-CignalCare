@@ -23,7 +23,7 @@ import { matchesAdminLocation, subscriberLocationKpis } from '../../utils/adminK
 import { rowsToSafeCsv } from '../../utils/safeCsv';
 
 const LOCATIONS = ['Balayan', 'Calaca', 'Lian', 'Calatagan', 'Nasugbu', 'Lemery', 'Tuy'];
-const ACTIVITY_FILTERS = ['Active', 'At Risk', 'Inactive', 'Archive Eligible', 'No Load Yet'];
+const ACTIVITY_FILTERS = ['Active', 'At Risk', 'Inactive', 'No Load Yet'];
 const EMPTY = {
   accountName: '',
   accountNumber: '',
@@ -58,10 +58,6 @@ const actStyle = {
   'No Load Yet': {
     badge: 'bg-slate-100 text-slate-700', dot: 'bg-slate-400',
     icon: <XCircle size={10} className="text-slate-500" />,
-  },
-  'Archive Eligible': {
-    badge: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500',
-    icon: <Archive size={10} className="text-orange-600" />,
   },
 };
 
@@ -470,7 +466,6 @@ export default function AdminCustomers() {
           color="text-red-600"
           icon={<Archive size={15} className="text-red-500" />}
         />
-        <StatCard label="Archive Eligible" active={selectedKpi === 'Archive Eligible'} onClick={() => chooseKpi('Archive Eligible')} value={loading ? '...' : locationStats.archiveEligibleCount ?? 0} color="text-orange-600" icon={<Archive size={15} className="text-orange-500" />} />
         <StatCard label="No Load Yet" active={selectedKpi === 'No Load Yet'} onClick={() => chooseKpi('No Load Yet')} value={loading ? '...' : locationStats.neverLoadedCount ?? 0} color="text-slate-600" icon={<XCircle size={15} className="text-slate-400" />} />
       </div>
 
@@ -892,7 +887,6 @@ export default function AdminCustomers() {
               <p className="text-xs leading-relaxed text-gray-600">
                 Archive <span className="font-semibold">{selected.accountName}</span> ({selected.accountNumber})?
                 This will hide the subscriber from current lists while preserving records.
-                {getCustomerStatus(selected) === 'Archive Eligible' && ' This account has passed 120 days since its last completed reload.'}
               </p>
               <div className="mt-4 flex gap-2">
                 <button
