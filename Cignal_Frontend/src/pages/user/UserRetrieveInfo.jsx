@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, Copy, Check, ChevronDown, ChevronUp, User, Tv, CreditCard, Wrench, Ticket, FileSearch, AlertTriangle } from 'lucide-react';
 import UserPageShell from '../../components/UserPageShell';
+import { subscriberLifecycle } from '../../utils/adminBusinessRules';
 import axiosClient from '../../api/axiosClient';
 
 const STATUS_BADGE = { Received:'bg-blue-100 text-blue-700', 'Under Review':'bg-amber-100 text-amber-700', Attending:'bg-purple-100 text-purple-700', Completed:'bg-green-100 text-green-700', Rejected:'bg-red-100 text-red-700' };
@@ -18,6 +19,8 @@ export default function UserRetrieveInfo() {
   const [extraData,setExtra] = useState({});
   const [loading,setLoading] = useState(false);
   const [notFound,setNotFound] = useState(false);
+  const [searchError,setSearchError] = useState('');
+  const [historyWarning,setHistoryWarning] = useState('');
   const [copied,setCopied]   = useState('');
   const [open,setOpen]       = useState({ account:true, status:true, load:true, loadReqs:false, tech:false, tickets:false });
 
@@ -25,29 +28,57 @@ export default function UserRetrieveInfo() {
   const toggle=key=>setOpen(p=>({...p,[key]:!p[key]}));
 
   const handleSearch=async e=>{
-    e.preventDefault(); if(!query.trim())return;
-    setLoading(true);setNotFound(false);setResult(null);setExtra({});
+    e.preventDefault();
+    const searchKey=query.trim();
+    setNotFound(false);setSearchError('');setHistoryWarning('');
+    setResult(null);setExtra({});
+    if (!/^\d{1,11}$/.test(searchKey)) {
+      setSearchError('Enter a valid Account Number or CCA Number (digits only, up to 11 digits).');
+      return;
+    }
+    setLoading(true);
     try {
-      const r=await axiosClient.get('/customers/'+query.trim());
+      // Server checks the authenticated subscriber owns this record.
+      const r=await axiosClient.get('/customers/'+encodeURIComponent(searchKey));
       const c=r.data?.user||r.data;
+      if (!c?.accountNumber || !c?.id) throw new Error('CCA_INQUIRY_INVALID_RESPONSE');
       setResult(c);
-      // Fetch extra data using the user's accountNumber
-      if(c?.accountNumber){
-        const [lrRes,techRes,ticketRes,loadRes]=await Promise.allSettled([
-          axiosClient.get('/load-requests/my').catch(()=>({data:{requests:[]}})),
-          axiosClient.get('/technicians/requests/my').catch(()=>({data:{requests:[]}})),
-          axiosClient.get('/tickets/my').catch(()=>({data:{tickets:[]}})),
-          axiosClient.get('/load/my').catch(()=>({data:{history:[]}})),
-        ]);
-        const allLoadReqs=(lrRes.status==='fulfilled'?lrRes.value.data?.requests||[]:[]).filter((request) => String(request.account_number || '') === String(c.accountNumber || ''));
-        setExtra({
-          loadRequests: allLoadReqs,
-          techRequests: techRes.status==='fulfilled'?techRes.value.data?.requests||[]:[], 
-          tickets:      ticketRes.status==='fulfilled'?ticketRes.value.data?.tickets||[]:[], 
-          loadHistory:  loadRes.status==='fulfilled'?loadRes.value.data?.history||[]:[], 
-        });
+
+      // A failed supplementary endpoint must not hide a successful account lookup.
+      const [lrRes,techRes,ticketRes,loadRes]=await Promise.allSettled([
+        axiosClient.get('/load-requests/my'),
+        axiosClient.get('/technicians/requests/my'),
+        axiosClient.get('/tickets/my'),
+        axiosClient.get('/load/my'),
+      ]);
+      const failed=[
+        [lrRes,'load requests'],
+        [techRes,'technician requests'],
+        [ticketRes,'support tickets'],
+        [loadRes,'load history'],
+      ].filter(([response])=>response.status==='rejected').map(([,label])=>label);
+      if (failed.length) {
+        setHistoryWarning('Your account was found, but we could not load: '+failed.join(', ')+'. Please try again shortly.');
       }
-    } catch { setNotFound(true); } finally { setLoading(false); }
+      const loadReqs=lrRes.status==='fulfilled' && Array.isArray(lrRes.value.data?.requests)
+        ? lrRes.value.data.requests : [];
+      const sameAccount=loadReqs.filter((request)=>String(request.account_number||request.accountNumber||'')===String(c.accountNumber));
+      setExtra({
+        loadRequests:sameAccount,
+        techRequests:techRes.status==='fulfilled' && Array.isArray(techRes.value.data?.requests)?techRes.value.data.requests:[],
+        tickets:ticketRes.status==='fulfilled' && Array.isArray(ticketRes.value.data?.tickets)?ticketRes.value.data.tickets:[],
+        loadHistory:loadRes.status==='fulfilled' && Array.isArray(loadRes.value.data?.history)?loadRes.value.data.history:[],
+      });
+    } catch (error) {
+      const response=error?.response;
+      if (response?.status===404) setNotFound(true);
+      else if (response?.status===403) setSearchError('For privacy, you can only view your own registered subscriber account.');
+      else if (response?.status===401) setSearchError('Your session has expired. Please log in again.');
+      else if (response?.status===429) setSearchError('Too many inquiries. Please wait a few minutes and try again.');
+      else setSearchError('Unable to retrieve your account right now. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const actStatus = result ? getActivityStatus(result.lastLoadDate) : null;
@@ -65,8 +96,8 @@ export default function UserRetrieveInfo() {
 
   return (
     <UserPageShell
-      title="Account Inquiry"
-      description="Retrieve your subscriber details, load activity, service requests, and support history."
+      title="CCA Inquiry"
+      description="Securely view your own subscriber record, load activity, service requests, and support history."
       icon={FileSearch}
     >
       <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
@@ -75,7 +106,7 @@ export default function UserRetrieveInfo() {
             <h2 className="text-sm font-bold text-slate-900">Find subscriber record</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">Use the Account Number or CCA Number registered to your profile.</p>
             <form onSubmit={handleSearch} className="mt-4 space-y-3">
-              <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Account No. or CCA Number" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#cc0000] focus:ring-4 focus:ring-red-100" />
+              <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Account No. or CCA Number" inputMode="numeric" maxLength={11} autoComplete="off" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#cc0000] focus:ring-4 focus:ring-red-100" />
               <button type="submit" disabled={loading || !query.trim()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#cc0000] px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
                 <Search size={15} /> {loading ? 'Searching...' : 'Search Account'}
               </button>
@@ -102,7 +133,9 @@ export default function UserRetrieveInfo() {
         </aside>
 
         <div className="min-w-0">
-          {notFound && <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">No subscriber record was found for “{query}”. Check the number and try again.</div>}
+          {searchError && <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{searchError}</div>}
+          {historyWarning && result && <div role="status" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">{historyWarning}</div>}
+          {notFound && <div role="alert" className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">No subscriber record was found for “{query}”. Check the number and try again.</div>}
 
           {!result && !notFound && !loading && (
             <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center">
